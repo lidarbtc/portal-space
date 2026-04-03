@@ -171,6 +171,11 @@ body {
     color: #ccccdd;
 }
 
+.chat-system {
+    color: #888899;
+    font-style: italic;
+}
+
 /* Chat input */
 #chat-container {
     position: absolute;

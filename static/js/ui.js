@@ -113,6 +113,26 @@ const UI = {
         }
     },
 
+    addSystemMessage(text) {
+        const log = document.getElementById('chat-log');
+        if (!log) return;
+
+        this.chatMessages.push({ text });
+        if (this.chatMessages.length > this.maxChatMessages) {
+            this.chatMessages.shift();
+            if (log.firstChild) log.removeChild(log.firstChild);
+        }
+
+        const entry = document.createElement('div');
+        entry.className = 'chat-entry chat-system';
+        entry.textContent = text;
+        log.appendChild(entry);
+
+        if (!this.userScrolled) {
+            log.scrollTop = log.scrollHeight;
+        }
+    },
+
     createChatUI() {
         // Chat input
         const container = document.createElement('div');

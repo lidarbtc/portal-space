@@ -177,6 +177,9 @@ class WorldScene extends Phaser.Scene {
         // Initialize UI
         UI.init();
         UI.updatePlayerCount(Object.keys(this.players).length);
+        if (this.selfInfo) {
+            UI.addSystemMessage(this.selfInfo.nickname + '님이 입장했습니다.');
+        }
 
         UI.onStatusChange = (status) => {
             Network.sendStatus(status);
@@ -249,12 +252,15 @@ class WorldScene extends Phaser.Scene {
                     this.localPlayerId = msg.player.id;
                 }
                 UI.updatePlayerCount(Object.keys(this.players).length);
+                UI.addSystemMessage(msg.player.nickname + '님이 입장했습니다.');
             }
         });
 
         Network.on('leave', (msg) => {
+            const nickname = this.players[msg.id]?.nickname || '알 수 없는 유저';
             this.removePlayer(msg.id);
             UI.updatePlayerCount(Object.keys(this.players).length);
+            UI.addSystemMessage(nickname + '님이 퇴장했습니다.');
         });
 
         Network.on('move', (msg) => {
@@ -335,6 +341,7 @@ class WorldScene extends Phaser.Scene {
 
         this.players[info.id] = {
             sprite, nameText, statusText,
+            nickname: info.nickname,
             gridX: info.x, gridY: info.y,
             dir: info.dir || 'down',
             avatar: avatarIndex,
