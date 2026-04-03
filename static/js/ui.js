@@ -10,12 +10,15 @@ const UI = {
     maxChatMessages: 50,
     userScrolled: false,
 
+    settingsPanelVisible: false,
+
     init() {
         this.createStatusBar();
         this.createEmoteBar();
         this.createChatLog();
         this.createChatUI();
         this.createPlayerCount();
+        this.createSettingsUI();
         this.setupKeyboardShortcut();
     },
 
@@ -191,5 +194,103 @@ const UI = {
 
     isChatActive() {
         return this.chatInputActive;
+    },
+
+    createSettingsUI() {
+        // Settings button
+        const btn = document.createElement('button');
+        btn.id = 'settings-btn';
+        btn.textContent = '\u2699';
+        btn.title = '\uc124\uc815';
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            NotifyAudio._ensureContext();
+            this.toggleSettingsPanel();
+        });
+        document.body.appendChild(btn);
+
+        // Settings panel
+        const panel = document.createElement('div');
+        panel.id = 'settings-panel';
+
+        const title = document.createElement('div');
+        title.className = 'settings-title';
+        title.textContent = '\uc624\ub514\uc624 \uc124\uc815';
+        panel.appendChild(title);
+
+        // Volume row
+        const volRow = document.createElement('div');
+        volRow.className = 'settings-row';
+
+        const volLabel = document.createElement('label');
+        volLabel.textContent = '\uc54c\ub9bc\uc74c \ubcfc\ub968';
+        volLabel.htmlFor = 'volume-slider';
+        volRow.appendChild(volLabel);
+
+        const volSlider = document.createElement('input');
+        volSlider.type = 'range';
+        volSlider.id = 'volume-slider';
+        volSlider.min = '0';
+        volSlider.max = '100';
+        volSlider.value = String(Math.round(NotifyAudio.getVolume() * 100));
+        volSlider.addEventListener('input', () => {
+            NotifyAudio.setVolume(Number(volSlider.value) / 100);
+        });
+        volRow.appendChild(volSlider);
+        panel.appendChild(volRow);
+
+        // Mute row
+        const muteRow = document.createElement('div');
+        muteRow.className = 'settings-row';
+
+        const muteLabel = document.createElement('label');
+        muteLabel.textContent = '\uc74c\uc18c\uac70';
+        muteLabel.htmlFor = 'mute-toggle';
+        muteRow.appendChild(muteLabel);
+
+        const muteToggle = document.createElement('input');
+        muteToggle.type = 'checkbox';
+        muteToggle.id = 'mute-toggle';
+        muteToggle.checked = NotifyAudio.isMuted();
+        muteToggle.addEventListener('change', () => {
+            NotifyAudio.setMuted(muteToggle.checked);
+        });
+        muteRow.appendChild(muteToggle);
+        panel.appendChild(muteRow);
+
+        document.body.appendChild(panel);
+
+        // Close on outside click
+        document.addEventListener('click', (e) => {
+            if (this.settingsPanelVisible &&
+                !panel.contains(e.target) &&
+                e.target !== btn) {
+                this.hideSettingsPanel();
+            }
+        });
+    },
+
+    toggleSettingsPanel() {
+        if (this.settingsPanelVisible) {
+            this.hideSettingsPanel();
+        } else {
+            this.showSettingsPanel();
+        }
+    },
+
+    showSettingsPanel() {
+        const panel = document.getElementById('settings-panel');
+        if (panel) {
+            panel.style.display = 'block';
+            this.settingsPanelVisible = true;
+        }
+    },
+
+    hideSettingsPanel() {
+        const panel = document.getElementById('settings-panel');
+        if (panel) {
+            panel.style.display = 'none';
+            this.settingsPanelVisible = false;
+        }
     }
 };

@@ -272,6 +272,9 @@ class WorldScene extends Phaser.Scene {
         });
 
         Network.on('chat', (msg) => {
+            if (msg.id !== this.localPlayerId) {
+                NotifyAudio.playIfHidden();
+            }
             this.showChatBubble(msg.id, msg.text, msg.nickname);
             UI.addChatMessage(msg.nickname, msg.text);
         });

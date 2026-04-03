@@ -271,9 +271,89 @@ body {
 #player-count {
     position: absolute;
     top: 12px;
-    right: 16px;
+    right: 56px;
     color: #8888aa;
     font-size: 0.85rem;
     font-family: 'MulmaruMono', monospace;
     z-index: 50;
+}
+
+/* Settings button */
+#settings-btn {
+    position: absolute;
+    top: 12px;
+    right: 16px;
+    width: 32px;
+    height: 32px;
+    font-size: 1.2rem;
+    background: rgba(22, 33, 62, 0.85);
+    color: #8888aa;
+    border: 2px solid #0f3460;
+    border-radius: 6px;
+    cursor: pointer;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s, color 0.2s;
+}
+
+#settings-btn:hover {
+    background: #1a2744;
+    color: #e0e0ff;
+}
+
+/* Settings panel */
+#settings-panel {
+    position: absolute;
+    top: 52px;
+    right: 16px;
+    width: 200px;
+    background: rgba(16, 24, 48, 0.95);
+    border: 2px solid #0f3460;
+    border-radius: 6px;
+    padding: 12px;
+    z-index: 51;
+    display: none;
+}
+
+.settings-title {
+    color: #e0e0ff;
+    font-size: 0.85rem;
+    font-family: 'MulmaruMono', monospace;
+    font-weight: bold;
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #0f3460;
+}
+
+.settings-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.settings-row:last-child {
+    margin-bottom: 0;
+}
+
+.settings-row label {
+    color: #aaaacc;
+    font-size: 0.75rem;
+    font-family: 'MulmaruMono', monospace;
+}
+
+#volume-slider {
+    width: 90px;
+    height: 4px;
+    accent-color: #533483;
+    cursor: pointer;
+}
+
+#mute-toggle {
+    accent-color: #533483;
+    cursor: pointer;
+    width: 16px;
+    height: 16px;
 }
