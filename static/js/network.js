@@ -4,7 +4,7 @@ const Network = {
     handlers: {},
     connected: false,
 
-    connect(nickname) {
+    connect(nickname, avatar = 0) {
         return new Promise((resolve, reject) => {
             // Determine WebSocket URL based on current path
             const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -22,7 +22,7 @@ const Network = {
             this.ws.onopen = () => {
                 this.connected = true;
                 // Send join message
-                this.send({ type: 'join', nickname: nickname });
+                this.send({ type: 'join', nickname: nickname, avatar: avatar });
             };
 
             this.ws.onmessage = (event) => {
@@ -81,5 +81,9 @@ const Network = {
 
     sendChat(text, x, y) {
         this.send({ type: 'chat', text, x, y });
+    },
+
+    sendEmote(emoji) {
+        this.send({ type: 'emote', emoji });
     }
 };

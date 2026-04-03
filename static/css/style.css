@@ -202,6 +202,71 @@ body {
     z-index: 49;
 }
 
+/* Avatar selection grid */
+.avatar-grid {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 1.5rem;
+}
+
+.avatar-option {
+    width: 64px;
+    height: 64px;
+    border: 3px solid #0f3460;
+    border-radius: 8px;
+    cursor: pointer;
+    background: #16213e;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: border-color 0.2s, transform 0.2s;
+}
+
+.avatar-option:hover {
+    border-color: #6a42a0;
+    transform: scale(1.05);
+}
+
+.avatar-option.selected {
+    border-color: #533483;
+    background: #1a2744;
+    box-shadow: 0 0 12px rgba(83, 52, 131, 0.5);
+}
+
+/* Emote bar */
+#emote-bar {
+    position: absolute;
+    bottom: 64px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 6px;
+    z-index: 50;
+}
+
+.emote-btn {
+    width: 36px;
+    height: 36px;
+    font-size: 1.2rem;
+    background: #16213e;
+    border: 2px solid #0f3460;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s, transform 0.15s;
+}
+
+.emote-btn:hover {
+    background: #1a2744;
+    transform: scale(1.15);
+}
+
+.emote-btn:active {
+    transform: scale(0.95);
+}
+
 /* Player count */
 #player-count {
     position: absolute;

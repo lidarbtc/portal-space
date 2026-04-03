@@ -12,6 +12,7 @@ const (
 	proximityRadius = 5.0
 	maxPlayers      = 20
 	moveRateLimit   = 10 // max moves per second per client
+	emoteRateLimit  = 2  // max emotes per second per client
 )
 
 // collisionMap stores which tiles block movement (true = blocked).
@@ -134,6 +135,7 @@ func (h *Hub) run() {
 					Y:        client.y,
 					Status:   client.status,
 					Dir:      client.dir,
+					Avatar:   client.avatar,
 				},
 			})
 
@@ -147,6 +149,7 @@ func (h *Hub) run() {
 					Y:        client.y,
 					Status:   client.status,
 					Dir:      client.dir,
+					Avatar:   client.avatar,
 				},
 			}
 			h.mu.RLock()
@@ -237,6 +240,23 @@ func (h *Hub) handleStatus(client *Client, status string) {
 	}
 }
 
+func (h *Hub) handleEmote(client *Client, emoji string) {
+	if !validateEmoji(emoji) {
+		return
+	}
+	now := time.Now()
+	if now.Sub(client.lastEmote) < time.Second/emoteRateLimit {
+		return
+	}
+	client.lastEmote = now
+
+	h.broadcast <- &OutgoingMessage{
+		Type:  MsgEmote,
+		ID:    client.id,
+		Emoji: emoji,
+	}
+}
+
 func (h *Hub) handleChat(client *Client, text string) {
 	text = sanitizeChat(text)
 	if text == "" {
@@ -261,6 +281,7 @@ func (h *Hub) snapshotLocked() []*PlayerInfo {
 			Y:        c.y,
 			Status:   c.status,
 			Dir:      c.dir,
+			Avatar:   c.avatar,
 		})
 	}
 	return players

@@ -13,6 +13,7 @@ const (
 	MsgMove     MsgType = "move"
 	MsgStatus   MsgType = "status"
 	MsgChat     MsgType = "chat"
+	MsgEmote    MsgType = "emote"
 	MsgSnapshot MsgType = "snapshot"
 	MsgError    MsgType = "error"
 )
@@ -27,6 +28,8 @@ type IncomingMessage struct {
 	Dir      string  `json:"dir,omitempty"`
 	Status   string  `json:"status,omitempty"`
 	Text     string  `json:"text,omitempty"`
+	Avatar   int     `json:"avatar,omitempty"`
+	Emoji    string  `json:"emoji,omitempty"`
 }
 
 // Server → Client messages
@@ -41,6 +44,7 @@ type OutgoingMessage struct {
 	Status   string        `json:"status,omitempty"`
 	Text     string        `json:"text,omitempty"`
 	Message  string        `json:"message,omitempty"`
+	Emoji    string        `json:"emoji,omitempty"`
 	Player   *PlayerInfo   `json:"player,omitempty"`
 	Players  []*PlayerInfo `json:"players,omitempty"`
 	Self     *PlayerInfo   `json:"self,omitempty"`
@@ -53,6 +57,7 @@ type PlayerInfo struct {
 	Y        int    `json:"y"`
 	Status   string `json:"status"`
 	Dir      string `json:"dir"`
+	Avatar   int    `json:"avatar"`
 }
 
 // Validation
@@ -110,4 +115,18 @@ func validateStatus(s string) bool {
 
 func validateDirection(d string) bool {
 	return validDirections[d]
+}
+
+const maxAvatars = 4
+
+func validateAvatar(a int) bool {
+	return a >= 0 && a < maxAvatars
+}
+
+var validEmojis = map[string]bool{
+	"👋": true, "☕": true, "🔥": true, "💻": true,
+}
+
+func validateEmoji(e string) bool {
+	return validEmojis[e]
 }

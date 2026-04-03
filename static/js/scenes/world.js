@@ -17,11 +17,8 @@ class WorldScene extends Phaser.Scene {
     preload() {
         // Generate placeholder tileset as a canvas texture
         this.createPlaceholderTileset();
-        // Load character spritesheet (128x32, 4 frames of 32x32: down, left, right, up)
-        this.load.spritesheet('characters', 'assets/characters.png', {
-            frameWidth: 32,
-            frameHeight: 32
-        });
+        // Load original gopher sprite for avatar 0
+        this.load.image('gopher-src', 'assets/gopher.png');
     }
 
     createPlaceholderTileset() {
@@ -81,7 +78,76 @@ class WorldScene extends Phaser.Scene {
         this.textures.addCanvas('tileset', canvas);
     }
 
+    createAvatarSpritesheet() {
+        const cols = 4; // directions: down, up, right, left
+        const rows = 4; // avatar count (0=gopher, 1-3=canvas)
+        const fw = 32, fh = 32;
+        const canvas = document.createElement('canvas');
+        canvas.width = cols * fw;
+        canvas.height = rows * fh;
+        const ctx = canvas.getContext('2d');
+
+        // Row 0: Original gopher from characters.png
+        const gopherSource = this.textures.get('gopher-src').getSourceImage();
+        ctx.drawImage(gopherSource, 0, 0);
+
+        // Rows 1-3: Canvas-generated colored avatars
+        const palettes = [
+            ['#4a90d9', '#2c5a8a', '#ffffff'], // blue
+            ['#5cb85c', '#3a7a3a', '#ffffff'], // green
+            ['#d94a4a', '#8a2c2c', '#ffffff'], // red
+        ];
+
+        for (let i = 0; i < palettes.length; i++) {
+            const [body, outline, eye] = palettes[i];
+            const avatarRow = i + 1; // offset by 1 (row 0 = gopher)
+            for (let dir = 0; dir < cols; dir++) {
+                const ox = dir * fw;
+                const oy = avatarRow * fh;
+
+                // Body
+                ctx.fillStyle = outline;
+                ctx.fillRect(ox + 8, oy + 6, 16, 20);
+                ctx.fillStyle = body;
+                ctx.fillRect(ox + 9, oy + 7, 14, 18);
+
+                // Head
+                ctx.fillStyle = outline;
+                ctx.beginPath();
+                ctx.arc(ox + 16, oy + 10, 8, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = body;
+                ctx.beginPath();
+                ctx.arc(ox + 16, oy + 10, 7, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Eyes based on direction
+                ctx.fillStyle = eye;
+                if (dir === 0) { // down
+                    ctx.fillRect(ox + 13, oy + 11, 2, 2);
+                    ctx.fillRect(ox + 17, oy + 11, 2, 2);
+                } else if (dir === 1) { // up - no eyes visible
+                    // back of head
+                } else if (dir === 2) { // right
+                    ctx.fillRect(ox + 18, oy + 10, 2, 2);
+                } else { // left
+                    ctx.fillRect(ox + 12, oy + 10, 2, 2);
+                }
+
+                // Feet
+                ctx.fillStyle = outline;
+                ctx.fillRect(ox + 10, oy + 26, 4, 4);
+                ctx.fillRect(ox + 18, oy + 26, 4, 4);
+            }
+        }
+
+        this.textures.addSpriteSheet('characters', canvas, { frameWidth: fw, frameHeight: fh });
+    }
+
     create() {
+        // Build combined spritesheet: gopher (row 0) + canvas avatars (rows 1-3)
+        this.createAvatarSpritesheet();
+
         // Create tilemap from data
         this.createMap();
 
@@ -117,6 +183,10 @@ class WorldScene extends Phaser.Scene {
             if (this.localPlayerId && this.players[this.localPlayerId]) {
                 this.updatePlayerStatus(this.localPlayerId, status);
             }
+        };
+
+        UI.onEmoteSend = (emoji) => {
+            Network.sendEmote(emoji);
         };
 
         UI.onChatSend = (text) => {
@@ -197,6 +267,10 @@ class WorldScene extends Phaser.Scene {
             this.updatePlayerStatus(msg.id, msg.status);
         });
 
+        Network.on('emote', (msg) => {
+            this.showEmote(msg.id, msg.emoji);
+        });
+
         Network.on('chat', (msg) => {
             this.showChatBubble(msg.id, msg.text, msg.nickname);
             UI.addChatMessage(msg.nickname, msg.text);
@@ -231,9 +305,10 @@ class WorldScene extends Phaser.Scene {
         const px = info.x * this.tileSize + this.tileSize / 2;
         const py = info.y * this.tileSize + this.tileSize / 2;
 
-        // Frame index: 4 cols x 1 row (down=0, up=1, right=2, left=3)
+        // Frame index: avatar * 4 + direction (down=0, up=1, right=2, left=3)
         const dirFrame = { down: 0, up: 1, right: 2, left: 3 };
-        const frameIndex = dirFrame[info.dir] || 0;
+        const avatarIndex = info.avatar || 0;
+        const frameIndex = avatarIndex * 4 + (dirFrame[info.dir] || 0);
 
         const sprite = this.add.sprite(px, py, 'characters', frameIndex);
         sprite.setDepth(10);
@@ -261,7 +336,9 @@ class WorldScene extends Phaser.Scene {
             sprite, nameText, statusText,
             gridX: info.x, gridY: info.y,
             dir: info.dir || 'down',
-            bubbleText: null, bubbleTimer: null
+            avatar: avatarIndex,
+            bubbleText: null, bubbleTimer: null,
+            emoteText: null, emoteTimer: null
         };
     }
 
@@ -273,6 +350,8 @@ class WorldScene extends Phaser.Scene {
         p.statusText.destroy();
         if (p.bubbleText) p.bubbleText.destroy();
         if (p.bubbleTimer) clearTimeout(p.bubbleTimer);
+        if (p.emoteText) p.emoteText.destroy();
+        if (p.emoteTimer) clearTimeout(p.emoteTimer);
         delete this.players[id];
     }
 
@@ -315,13 +394,21 @@ class WorldScene extends Phaser.Scene {
             });
         }
 
+        if (p.emoteText) {
+            this.tweens.add({
+                targets: [p.emoteText],
+                x: px, y: py - this.tileSize - 24,
+                duration: 150
+            });
+        }
+
         // Update character direction
         this.updateCharacterFrame(p, dir);
     }
 
     updateCharacterFrame(p, dir) {
         const dirFrame = { down: 0, up: 1, right: 2, left: 3 };
-        p.sprite.setFrame(dirFrame[dir] || 0);
+        p.sprite.setFrame((p.avatar || 0) * 4 + (dirFrame[dir] || 0));
     }
 
     updatePlayerStatus(id, status) {
@@ -373,6 +460,52 @@ class WorldScene extends Phaser.Scene {
                         if (p.bubbleText) {
                             p.bubbleText.destroy();
                             p.bubbleText = null;
+                        }
+                    }
+                });
+            }
+        }, 3000);
+    }
+
+    showEmote(id, emoji) {
+        const p = this.players[id];
+        if (!p) return;
+
+        // Remove existing emote
+        if (p.emoteText) {
+            p.emoteText.destroy();
+            clearTimeout(p.emoteTimer);
+        }
+
+        const px = p.sprite.x;
+        const py = p.sprite.y - this.tileSize - 24;
+
+        p.emoteText = this.add.text(px, py, emoji, {
+            fontSize: '20px',
+            fontFamily: 'MulmaruMono',
+            stroke: '#000',
+            strokeThickness: 2
+        }).setOrigin(0.5).setDepth(101).setResolution(2);
+
+        // Float up animation (relative delta so it works during movement)
+        this.tweens.add({
+            targets: p.emoteText,
+            y: '-=8',
+            duration: 600,
+            ease: 'Power1'
+        });
+
+        // Fade out after 3 seconds
+        p.emoteTimer = setTimeout(() => {
+            if (p.emoteText) {
+                this.tweens.add({
+                    targets: p.emoteText,
+                    alpha: 0,
+                    duration: 500,
+                    onComplete: () => {
+                        if (p.emoteText) {
+                            p.emoteText.destroy();
+                            p.emoteText = null;
                         }
                     }
                 });
@@ -440,6 +573,14 @@ class WorldScene extends Phaser.Scene {
                         this.tweens.add({
                             targets: [p.bubbleText],
                             x: px, y: py - this.tileSize - 10,
+                            duration: 150
+                        });
+                    }
+
+                    if (p.emoteText) {
+                        this.tweens.add({
+                            targets: [p.emoteText],
+                            x: px, y: py - this.tileSize - 24,
                             duration: 150
                         });
                     }

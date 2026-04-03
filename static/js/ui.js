@@ -4,6 +4,7 @@ const UI = {
     chatVisible: false,
     onStatusChange: null,
     onChatSend: null,
+    onEmoteSend: null,
     chatInputActive: false,
     chatMessages: [],
     maxChatMessages: 50,
@@ -11,6 +12,7 @@ const UI = {
 
     init() {
         this.createStatusBar();
+        this.createEmoteBar();
         this.createChatLog();
         this.createChatUI();
         this.createPlayerCount();
@@ -38,6 +40,24 @@ const UI = {
                 document.querySelectorAll('.status-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 if (this.onStatusChange) this.onStatusChange(s.key);
+            });
+            bar.appendChild(btn);
+        });
+
+        document.body.appendChild(bar);
+    },
+
+    createEmoteBar() {
+        const bar = document.createElement('div');
+        bar.id = 'emote-bar';
+
+        const emotes = ['👋', '☕', '🔥', '💻'];
+        emotes.forEach(emoji => {
+            const btn = document.createElement('button');
+            btn.className = 'emote-btn';
+            btn.textContent = emoji;
+            btn.addEventListener('click', () => {
+                if (this.onEmoteSend) this.onEmoteSend(emoji);
             });
             bar.appendChild(btn);
         });

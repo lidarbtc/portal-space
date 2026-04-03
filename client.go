@@ -32,8 +32,10 @@ type Client struct {
 	y        int
 	status   string
 	dir      string
+	avatar   int
 
-	lastMove time.Time
+	lastMove  time.Time
+	lastEmote time.Time
 
 	send chan []byte
 	once sync.Once
@@ -97,6 +99,9 @@ func (c *Client) readPump() {
 				nickname = "anonymous"
 			}
 			c.nickname = nickname
+			if validateAvatar(msg.Avatar) {
+				c.avatar = msg.Avatar
+			}
 			c.hub.register <- c
 
 		case MsgMove:
@@ -107,6 +112,9 @@ func (c *Client) readPump() {
 
 		case MsgChat:
 			c.hub.handleChat(c, msg.Text)
+
+		case MsgEmote:
+			c.hub.handleEmote(c, msg.Emoji)
 		}
 	}
 }
