@@ -327,13 +327,11 @@ class WorldScene extends Phaser.Scene {
 
         // Status text
         const statusLabel = this.getStatusLabel(info.status);
-        const statusText = this.add.text(px, py - this.tileSize / 2 - 2, statusLabel, {
-            fontSize: '12px',
-            color: '#aaddaa',
-            fontFamily: 'MulmaruMono',
-            stroke: '#000',
-            strokeThickness: 2
-        }).setOrigin(0.5).setDepth(11).setResolution(2);
+        const statusText = this.add.text(px, py - this.tileSize / 2 - 24, statusLabel, {
+            fontSize: '14px',
+            fontFamily: 'Arial',
+            padding: { x: 2, y: 2 }
+        }).setOrigin(0.5, 1).setDepth(11);
 
         this.players[info.id] = {
             sprite, nameText, statusText,
@@ -385,7 +383,7 @@ class WorldScene extends Phaser.Scene {
         });
         this.tweens.add({
             targets: [p.statusText],
-            x: px, y: py - this.tileSize / 2 - 2,
+            x: px, y: py - this.tileSize / 2 - 24,
             duration: 150
         });
 
@@ -400,7 +398,7 @@ class WorldScene extends Phaser.Scene {
         if (p.emoteText) {
             this.tweens.add({
                 targets: [p.emoteText],
-                x: px, y: py - this.tileSize - 24,
+                x: px, y: py - this.tileSize - 34,
                 duration: 150
             });
         }
@@ -481,7 +479,7 @@ class WorldScene extends Phaser.Scene {
         }
 
         const px = p.sprite.x;
-        const py = p.sprite.y - this.tileSize - 24;
+        const py = p.sprite.y - this.tileSize - 34;
 
         p.emoteText = this.add.text(px, py, emoji, {
             fontSize: '20px',
@@ -568,7 +566,7 @@ class WorldScene extends Phaser.Scene {
                     });
                     this.tweens.add({
                         targets: [p.statusText],
-                        x: px, y: py - this.tileSize / 2 - 2,
+                        x: px, y: py - this.tileSize / 2 - 24,
                         duration: 150
                     });
 
@@ -583,7 +581,7 @@ class WorldScene extends Phaser.Scene {
                     if (p.emoteText) {
                         this.tweens.add({
                             targets: [p.emoteText],
-                            x: px, y: py - this.tileSize - 24,
+                            x: px, y: py - this.tileSize - 34,
                             duration: 150
                         });
                     }

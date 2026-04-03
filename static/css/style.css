@@ -219,12 +219,11 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: border-color 0.2s, transform 0.2s;
+    transition: border-color 0.2s;
 }
 
 .avatar-option:hover {
     border-color: #6a42a0;
-    transform: scale(1.05);
 }
 
 .avatar-option.selected {
@@ -255,16 +254,11 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: background 0.2s, transform 0.15s;
+    transition: background 0.2s;
 }
 
 .emote-btn:hover {
     background: #1a2744;
-    transform: scale(1.15);
-}
-
-.emote-btn:active {
-    transform: scale(0.95);
 }
 
 /* Player count */
@@ -283,47 +277,45 @@ body {
     position: absolute;
     top: 12px;
     right: 16px;
-    width: 32px;
-    height: 32px;
-    font-size: 1.2rem;
-    background: rgba(22, 33, 62, 0.85);
-    color: #8888aa;
-    border: 2px solid #0f3460;
-    border-radius: 6px;
+    width: 64px;
+    height: 64px;
+    font-size: 4.4rem;
+    background: none;
+    color: #aaaacc;
+    border: none;
     cursor: pointer;
     z-index: 50;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: background 0.2s, color 0.2s;
+    transition: color 0.2s;
 }
 
 #settings-btn:hover {
-    background: #1a2744;
     color: #e0e0ff;
 }
 
 /* Settings panel */
 #settings-panel {
     position: absolute;
-    top: 52px;
+    top: 90px;
     right: 16px;
-    width: 200px;
+    width: 280px;
     background: rgba(16, 24, 48, 0.95);
     border: 2px solid #0f3460;
-    border-radius: 6px;
-    padding: 12px;
+    border-radius: 10px;
+    padding: 16px 20px;
     z-index: 51;
     display: none;
 }
 
 .settings-title {
     color: #e0e0ff;
-    font-size: 0.85rem;
+    font-size: 1.1rem;
     font-family: 'MulmaruMono', monospace;
     font-weight: bold;
-    margin-bottom: 10px;
-    padding-bottom: 6px;
+    margin-bottom: 14px;
+    padding-bottom: 8px;
     border-bottom: 1px solid #0f3460;
 }
 
@@ -331,7 +323,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 8px;
+    margin-bottom: 12px;
 }
 
 .settings-row:last-child {
@@ -340,13 +332,13 @@ body {
 
 .settings-row label {
     color: #aaaacc;
-    font-size: 0.75rem;
+    font-size: 1rem;
     font-family: 'MulmaruMono', monospace;
 }
 
 #volume-slider {
-    width: 90px;
-    height: 4px;
+    width: 130px;
+    height: 6px;
     accent-color: #533483;
     cursor: pointer;
 }
@@ -354,6 +346,6 @@ body {
 #mute-toggle {
     accent-color: #533483;
     cursor: pointer;
-    width: 16px;
-    height: 16px;
+    width: 22px;
+    height: 22px;
 }
