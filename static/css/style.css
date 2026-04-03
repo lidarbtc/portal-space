@@ -1,0 +1,163 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background: #1a1a2e;
+    overflow: hidden;
+    font-family: 'Courier New', monospace;
+}
+
+#game-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100vw;
+    height: 100vh;
+}
+
+/* Lobby overlay */
+#lobby-overlay {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background: rgba(26, 26, 46, 0.95);
+    z-index: 100;
+}
+
+#lobby-overlay h1 {
+    color: #e0e0ff;
+    font-size: 2.5rem;
+    margin-bottom: 0.5rem;
+}
+
+#lobby-overlay p {
+    color: #8888aa;
+    margin-bottom: 2rem;
+}
+
+#nickname-form {
+    display: flex;
+    gap: 0.5rem;
+}
+
+#nickname-input {
+    padding: 0.75rem 1rem;
+    font-size: 1.1rem;
+    font-family: 'Courier New', monospace;
+    background: #16213e;
+    border: 2px solid #0f3460;
+    color: #e0e0ff;
+    border-radius: 6px;
+    outline: none;
+    width: 250px;
+}
+
+#nickname-input:focus {
+    border-color: #533483;
+}
+
+#nickname-input::placeholder {
+    color: #555577;
+}
+
+#join-btn {
+    padding: 0.75rem 1.5rem;
+    font-size: 1.1rem;
+    font-family: 'Courier New', monospace;
+    background: #533483;
+    color: #e0e0ff;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+#join-btn:hover {
+    background: #6a42a0;
+}
+
+#error-msg {
+    color: #ff6b6b;
+    margin-top: 1rem;
+    min-height: 1.5rem;
+}
+
+/* Status bar */
+#status-bar {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 8px;
+    z-index: 50;
+}
+
+.status-btn {
+    padding: 8px 16px;
+    font-size: 0.9rem;
+    font-family: 'Courier New', monospace;
+    background: #16213e;
+    color: #aaaacc;
+    border: 2px solid #0f3460;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.status-btn:hover {
+    background: #1a2744;
+}
+
+.status-btn.active {
+    background: #533483;
+    border-color: #533483;
+    color: #e0e0ff;
+}
+
+/* Chat */
+#chat-container {
+    position: absolute;
+    bottom: 60px;
+    left: 16px;
+    z-index: 50;
+    display: none;
+}
+
+#chat-input {
+    padding: 8px 12px;
+    font-size: 0.9rem;
+    font-family: 'Courier New', monospace;
+    background: rgba(22, 33, 62, 0.9);
+    color: #e0e0ff;
+    border: 2px solid #0f3460;
+    border-radius: 6px;
+    outline: none;
+    width: 300px;
+}
+
+#chat-hint {
+    position: absolute;
+    bottom: 60px;
+    left: 16px;
+    color: #555577;
+    font-size: 0.8rem;
+    font-family: 'Courier New', monospace;
+    z-index: 49;
+}
+
+/* Player count */
+#player-count {
+    position: absolute;
+    top: 12px;
+    right: 16px;
+    color: #8888aa;
+    font-size: 0.85rem;
+    font-family: 'Courier New', monospace;
+    z-index: 50;
+}

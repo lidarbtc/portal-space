@@ -1,0 +1,17 @@
+# Binary
+mogakko
+
+# Portal identity
+identity.json
+
+# OS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OMC state
+.omc/
