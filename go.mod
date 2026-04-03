@@ -1,4 +1,4 @@
-module github.com/1ncursio/portal-mogakko
+module github.com/1ncursio/portal-space
 
 go 1.26.1
 

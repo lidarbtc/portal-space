@@ -294,7 +294,7 @@ func (h *Hub) closeAll() {
 		client.conn.Close()
 	}
 	h.mu.RUnlock()
-	log.Info().Msg("[mogakko] all connections closed")
+	log.Info().Msg("[portal-space] all connections closed")
 }
 
 func (h *Hub) wait() {

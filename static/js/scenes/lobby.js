@@ -10,8 +10,8 @@ class LobbyScene extends Phaser.Scene {
         const overlay = document.createElement('div');
         overlay.id = 'lobby-overlay';
         overlay.innerHTML = `
-            <h1>Mogakko</h1>
-            <p>모여서 각자 코딩 — 2D 가상 코워킹 스페이스</p>
+            <h1>Portal Space</h1>
+            <p>2D 가상 코워킹 스페이스</p>
             <div class="avatar-grid" id="avatar-grid"></div>
             <div id="nickname-form">
                 <input type="text" id="nickname-input" placeholder="닉네임 입력" maxlength="20" autocomplete="off">

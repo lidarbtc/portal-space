@@ -18,9 +18,9 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "mogakko",
-	Short: "Portal mogakko — 2D pixel co-coding space",
-	RunE:  runMogakko,
+	Use:   "portal-space",
+	Short: "Portal Space — 2D pixel co-coding space",
+	RunE:  runServer,
 }
 
 var (
@@ -42,21 +42,21 @@ func init() {
 	flags.BoolVar(&flagDiscovery, "discovery", utils.ResolveBoolEnv(false, "DISCOVERY", "DEFAULT_RELAYS"), "include registry relays and enable relay discovery [env: DISCOVERY, DEFAULT_RELAYS]")
 	flags.BoolVar(&flagBanMITM, "ban-mitm", utils.ResolveBoolEnv(false, "BAN_MITM"), "ban relay when MITM self-probe detects TLS termination [env: BAN_MITM]")
 	flags.IntVar(&flagPort, "port", 3000, "optional local HTTP port (negative to disable)")
-	flags.StringVar(&flagName, "name", "mogakko", "backend display name")
+	flags.StringVar(&flagName, "name", "portal-space", "backend display name")
 	flags.StringVar(&flagIdentityPath, "identity-path", "identity.json", "optional path to load/save the portal identity")
 	flags.BoolVar(&flagHide, "hide", false, "hide this lease from portal listings")
-	flags.StringVar(&flagDescription, "description", "Portal mogakko — 2D pixel co-coding space", "lease description")
-	flags.StringVar(&flagOwner, "owner", "Mogakko", "lease owner")
-	flags.StringVar(&flagTags, "tags", "collab,mogakko", "comma-separated lease tags")
+	flags.StringVar(&flagDescription, "description", "Portal Space — 2D pixel co-coding space", "lease description")
+	flags.StringVar(&flagOwner, "owner", "Portal Space", "lease owner")
+	flags.StringVar(&flagTags, "tags", "collab,portal-space", "comma-separated lease tags")
 }
 
 func main() {
 	if err := rootCmd.Execute(); err != nil {
-		log.Fatal().Err(err).Msg("execute mogakko command")
+		log.Fatal().Err(err).Msg("execute portal-space command")
 	}
 }
 
-func runMogakko(cmd *cobra.Command, args []string) error {
+func runServer(cmd *cobra.Command, args []string) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -154,7 +154,7 @@ func runMogakko(cmd *cobra.Command, args []string) error {
 		localAddr = fmt.Sprintf(":%d", flagPort)
 	}
 
-	log.Info().Str("name", flagName).Int("port", flagPort).Msg("[mogakko] starting")
+	log.Info().Str("name", flagName).Int("port", flagPort).Msg("[portal-space] starting")
 
 	err = exposure.RunHTTP(ctx, mux, localAddr)
 	hub.closeAll()
@@ -162,6 +162,6 @@ func runMogakko(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	log.Info().Msg("[mogakko] shutdown complete")
+	log.Info().Msg("[portal-space] shutdown complete")
 	return nil
 }
