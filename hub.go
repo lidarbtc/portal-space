@@ -237,20 +237,18 @@ func (h *Hub) handleStatus(client *Client, status string) {
 	}
 }
 
-func (h *Hub) handleChat(client *Client, text string, x, y int) {
+func (h *Hub) handleChat(client *Client, text string) {
 	text = sanitizeChat(text)
 	if text == "" {
 		return
 	}
 
-	msg := &OutgoingMessage{
+	h.broadcast <- &OutgoingMessage{
 		Type:     MsgChat,
 		ID:       client.id,
 		Nickname: client.nickname,
 		Text:     text,
 	}
-
-	h.broadcastProximity(msg, x, y, client.id)
 }
 
 func (h *Hub) snapshotLocked() []*PlayerInfo {

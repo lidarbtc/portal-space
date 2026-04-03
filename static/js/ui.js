@@ -5,9 +5,13 @@ const UI = {
     onStatusChange: null,
     onChatSend: null,
     chatInputActive: false,
+    chatMessages: [],
+    maxChatMessages: 50,
+    userScrolled: false,
 
     init() {
         this.createStatusBar();
+        this.createChatLog();
         this.createChatUI();
         this.createPlayerCount();
         this.setupKeyboardShortcut();
@@ -39,6 +43,51 @@ const UI = {
         });
 
         document.body.appendChild(bar);
+    },
+
+    createChatLog() {
+        const log = document.createElement('div');
+        log.id = 'chat-log';
+
+        // Pause auto-scroll when user scrolls up
+        log.addEventListener('scroll', () => {
+            const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 10;
+            this.userScrolled = !atBottom;
+        });
+
+        document.body.appendChild(log);
+    },
+
+    addChatMessage(nickname, text) {
+        const log = document.getElementById('chat-log');
+        if (!log) return;
+
+        // FIFO: remove oldest if over limit
+        this.chatMessages.push({ nickname, text });
+        if (this.chatMessages.length > this.maxChatMessages) {
+            this.chatMessages.shift();
+            if (log.firstChild) log.removeChild(log.firstChild);
+        }
+
+        const entry = document.createElement('div');
+        entry.className = 'chat-entry';
+
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'chat-name';
+        nameSpan.textContent = nickname;
+
+        const textSpan = document.createElement('span');
+        textSpan.className = 'chat-text';
+        textSpan.textContent = ' ' + text;
+
+        entry.appendChild(nameSpan);
+        entry.appendChild(textSpan);
+        log.appendChild(entry);
+
+        // Auto-scroll if user hasn't scrolled up
+        if (!this.userScrolled) {
+            log.scrollTop = log.scrollHeight;
+        }
     },
 
     createChatUI() {

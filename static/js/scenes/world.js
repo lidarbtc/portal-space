@@ -270,6 +270,7 @@ class WorldScene extends Phaser.Scene {
 
         Network.on('chat', (msg) => {
             this.showChatBubble(msg.id, msg.text, msg.nickname);
+            UI.addChatMessage(msg.nickname, msg.text);
         });
 
         Network.on('snapshot', (msg) => {
@@ -290,7 +291,7 @@ class WorldScene extends Phaser.Scene {
                 this.cameras.main.centerX,
                 this.cameras.main.centerY,
                 '연결이 끊어졌습니다',
-                { fontSize: '20px', color: '#ff6b6b', fontFamily: 'Courier New' }
+                { fontSize: '24px', color: '#ff6b6b', fontFamily: 'MulmaruMono' }
             ).setOrigin(0.5).setScrollFactor(0).setDepth(1000);
         });
     }
@@ -311,9 +312,9 @@ class WorldScene extends Phaser.Scene {
 
         // Name text
         const nameText = this.add.text(px, py - this.tileSize / 2 - 14, info.nickname, {
-            fontSize: '11px',
+            fontSize: '12px',
             color: '#e0e0ff',
-            fontFamily: 'Courier New',
+            fontFamily: 'MulmaruMono',
             stroke: '#000',
             strokeThickness: 2
         }).setOrigin(0.5).setDepth(11);
@@ -321,9 +322,9 @@ class WorldScene extends Phaser.Scene {
         // Status text
         const statusLabel = this.getStatusLabel(info.status);
         const statusText = this.add.text(px, py - this.tileSize / 2 - 2, statusLabel, {
-            fontSize: '10px',
+            fontSize: '12px',
             color: '#aaddaa',
-            fontFamily: 'Courier New',
+            fontFamily: 'MulmaruMono',
             stroke: '#000',
             strokeThickness: 2
         }).setOrigin(0.5).setDepth(11);
@@ -424,9 +425,9 @@ class WorldScene extends Phaser.Scene {
         const displayText = text.length > 40 ? text.substring(0, 40) + '...' : text;
 
         p.bubbleText = this.add.text(px, py, displayText, {
-            fontSize: '10px',
+            fontSize: '12px',
             color: '#ffffff',
-            fontFamily: 'Courier New',
+            fontFamily: 'MulmaruMono',
             backgroundColor: '#333355dd',
             padding: { x: 6, y: 4 },
             stroke: '#000',

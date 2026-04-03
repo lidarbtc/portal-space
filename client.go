@@ -106,7 +106,7 @@ func (c *Client) readPump() {
 			c.hub.handleStatus(c, msg.Status)
 
 		case MsgChat:
-			c.hub.handleChat(c, msg.Text, c.x, c.y)
+			c.hub.handleChat(c, msg.Text)
 		}
 	}
 }
