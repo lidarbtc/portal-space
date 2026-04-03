@@ -17,7 +17,11 @@ class WorldScene extends Phaser.Scene {
     preload() {
         // Generate placeholder tileset as a canvas texture
         this.createPlaceholderTileset();
-        this.createPlaceholderCharacters();
+        // Load character spritesheet (128x32, 4 frames of 32x32: down, left, right, up)
+        this.load.spritesheet('characters', 'assets/characters.png', {
+            frameWidth: 32,
+            frameHeight: 32
+        });
     }
 
     createPlaceholderTileset() {
@@ -75,74 +79,6 @@ class WorldScene extends Phaser.Scene {
         ctx.fill();
 
         this.textures.addCanvas('tileset', canvas);
-    }
-
-    createPlaceholderCharacters() {
-        const canvas = document.createElement('canvas');
-        // 4 directions × 2 frames = 8 frames, each 32x32
-        canvas.width = 64;  // 2 frames
-        canvas.height = 128; // 4 directions
-        const ctx = canvas.getContext('2d');
-
-        const colors = { body: '#5588cc', head: '#ffccaa', hair: '#553322' };
-        const directions = ['down', 'left', 'right', 'up'];
-
-        directions.forEach((dir, row) => {
-            for (let frame = 0; frame < 2; frame++) {
-                const x = frame * 32;
-                const y = row * 32;
-                const offsetX = frame === 1 ? 1 : -1;
-
-                // Body
-                ctx.fillStyle = colors.body;
-                ctx.fillRect(x + 10, y + 16, 12, 12);
-
-                // Head
-                ctx.fillStyle = colors.head;
-                ctx.fillRect(x + 11, y + 6, 10, 10);
-
-                // Hair
-                ctx.fillStyle = colors.hair;
-                ctx.fillRect(x + 11, y + 4, 10, 4);
-
-                // Eyes (direction-aware)
-                ctx.fillStyle = '#222';
-                if (dir === 'down') {
-                    ctx.fillRect(x + 13, y + 10, 2, 2);
-                    ctx.fillRect(x + 17, y + 10, 2, 2);
-                } else if (dir === 'up') {
-                    // No eyes visible from back
-                } else if (dir === 'left') {
-                    ctx.fillRect(x + 12, y + 10, 2, 2);
-                } else {
-                    ctx.fillRect(x + 18, y + 10, 2, 2);
-                }
-
-                // Legs with walk animation
-                ctx.fillStyle = '#334466';
-                if (frame === 0) {
-                    ctx.fillRect(x + 12, y + 28, 4, 4);
-                    ctx.fillRect(x + 16, y + 28, 4, 4);
-                } else {
-                    ctx.fillRect(x + 11 + offsetX, y + 28, 4, 4);
-                    ctx.fillRect(x + 17 - offsetX, y + 28, 4, 4);
-                }
-            }
-        });
-
-        // Add as spritesheet with proper frame data
-        const texture = this.textures.addCanvas('characters', canvas);
-        const frameWidth = 32;
-        const frameHeight = 32;
-        const cols = canvas.width / frameWidth;
-        const rows = canvas.height / frameHeight;
-        let frameIndex = 0;
-        for (let row = 0; row < rows; row++) {
-            for (let col = 0; col < cols; col++) {
-                texture.add(frameIndex, 0, col * frameWidth, row * frameHeight, frameWidth, frameHeight);
-                frameIndex++;
-            }
-        }
     }
 
     create() {
@@ -232,13 +168,6 @@ class WorldScene extends Phaser.Scene {
         ];
         tables.forEach(([x, y]) => { data[y][x] = 2; });
 
-        // Plants for decoration
-        const plants = [[2,2],[18,2],[2,12],[18,12],[9,1],[14,1]];
-        plants.forEach(([x, y]) => {
-            if (data[y][x] === 1) return; // don't overwrite walls
-            data[y][x] = 3;
-        });
-
         return data;
     }
 
@@ -292,7 +221,7 @@ class WorldScene extends Phaser.Scene {
                 this.cameras.main.centerY,
                 '연결이 끊어졌습니다',
                 { fontSize: '24px', color: '#ff6b6b', fontFamily: 'MulmaruMono' }
-            ).setOrigin(0.5).setScrollFactor(0).setDepth(1000);
+            ).setOrigin(0.5).setScrollFactor(0).setDepth(1000).setResolution(2);
         });
     }
 
@@ -302,10 +231,9 @@ class WorldScene extends Phaser.Scene {
         const px = info.x * this.tileSize + this.tileSize / 2;
         const py = info.y * this.tileSize + this.tileSize / 2;
 
-        // Frame index: row * 2 + col (2 cols per row, 4 rows for directions)
-        const dirRow = { down: 0, left: 1, right: 2, up: 3 };
-        const row = dirRow[info.dir] || 0;
-        const frameIndex = row * 2; // idle frame
+        // Frame index: 4 cols x 1 row (down=0, up=1, right=2, left=3)
+        const dirFrame = { down: 0, up: 1, right: 2, left: 3 };
+        const frameIndex = dirFrame[info.dir] || 0;
 
         const sprite = this.add.sprite(px, py, 'characters', frameIndex);
         sprite.setDepth(10);
@@ -317,7 +245,7 @@ class WorldScene extends Phaser.Scene {
             fontFamily: 'MulmaruMono',
             stroke: '#000',
             strokeThickness: 2
-        }).setOrigin(0.5).setDepth(11);
+        }).setOrigin(0.5).setDepth(11).setResolution(2);
 
         // Status text
         const statusLabel = this.getStatusLabel(info.status);
@@ -327,7 +255,7 @@ class WorldScene extends Phaser.Scene {
             fontFamily: 'MulmaruMono',
             stroke: '#000',
             strokeThickness: 2
-        }).setOrigin(0.5).setDepth(11);
+        }).setOrigin(0.5).setDepth(11).setResolution(2);
 
         this.players[info.id] = {
             sprite, nameText, statusText,
@@ -392,9 +320,8 @@ class WorldScene extends Phaser.Scene {
     }
 
     updateCharacterFrame(p, dir) {
-        const dirRow = { down: 0, left: 1, right: 2, up: 3 };
-        const row = dirRow[dir] || 0;
-        p.sprite.setFrame(row * 2); // idle frame for direction
+        const dirFrame = { down: 0, up: 1, right: 2, left: 3 };
+        p.sprite.setFrame(dirFrame[dir] || 0);
     }
 
     updatePlayerStatus(id, status) {
@@ -433,7 +360,7 @@ class WorldScene extends Phaser.Scene {
             stroke: '#000',
             strokeThickness: 1,
             wordWrap: { width: 200 }
-        }).setOrigin(0.5).setDepth(100);
+        }).setOrigin(0.5).setDepth(100).setResolution(2);
 
         // Fade out after 3 seconds
         p.bubbleTimer = setTimeout(() => {
