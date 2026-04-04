@@ -34,6 +34,8 @@ type Client struct {
 	dir      string
 	avatar   int
 
+	reconnect bool
+
 	lastMove  time.Time
 	lastEmote time.Time
 
@@ -101,6 +103,12 @@ func (c *Client) readPump() {
 			c.nickname = nickname
 			if validateAvatar(msg.Avatar) {
 				c.avatar = msg.Avatar
+			}
+			c.reconnect = msg.Reconnect
+			// Honor client-requested position (reconnect with position restore)
+			if msg.X != 0 && msg.Y != 0 && validateMove(msg.X, msg.Y) && isWalkable(msg.X, msg.Y) {
+				c.x = msg.X
+				c.y = msg.Y
 			}
 			c.hub.register <- c
 

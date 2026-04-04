@@ -175,7 +175,7 @@ export class WorldScene extends Phaser.Scene {
           m.set(msg.player!.id, msg.player!);
           return m;
         });
-        addSystemMessage(msg.player.nickname + '님이 입장했습니다.');
+        addSystemMessage(msg.player.nickname + (msg.reconnect ? '님이 재접속했습니다.' : '님이 입장했습니다.'));
       }
     });
 
@@ -234,31 +234,23 @@ export class WorldScene extends Phaser.Scene {
     });
 
     network.on('snapshot', (msg) => {
+      // Reset movement state and debug counter
+      this.isMoving = false;
+      this._debugLogCount = 0;
+
+      // Build fresh players map — msg.players can be undefined when alone in room
+      const newMap = new Map<string, PlayerInfo>();
       if (msg.players) {
         msg.players.forEach((p) => {
-          if (!this.playerObjects.has(p.id)) {
-            this.addPlayer(p);
-          }
-          players.update((m) => {
-            m.set(p.id, p);
-            return m;
-          });
+          newMap.set(p.id, p);
         });
       }
-    });
-
-    network.on('disconnect', () => {
-      this.add
-        .text(
-          this.cameras.main.centerX,
-          this.cameras.main.centerY,
-          '연결이 끊어졌습니다',
-          { fontSize: '24px', color: '#ff6b6b', fontFamily: 'MulmaruMono' }
-        )
-        .setOrigin(0.5)
-        .setScrollFactor(0)
-        .setDepth(1000)
-        .setResolution(2);
+      if (msg.self) {
+        newMap.set(msg.self.id, msg.self);
+        selfId.set(msg.self.id);
+        this.localPlayerId = msg.self.id;
+      }
+      players.set(newMap);
     });
   }
 
@@ -494,7 +486,14 @@ export class WorldScene extends Phaser.Scene {
     }, 3000);
   }
 
+  private _debugLogCount = 0;
+
   update(_time: number, _delta: number): void {
+    // Debug: log first 5 frames after each state change
+    if (this._debugLogCount < 5) {
+      console.log('[update]', { localPlayerId: this.localPlayerId, hasPlayer: this.playerObjects.has(this.localPlayerId ?? ''), isMoving: this.isMoving, chatActive: get(chatInputActive), playerObjectKeys: [...this.playerObjects.keys()] });
+      this._debugLogCount++;
+    }
     if (!this.localPlayerId || !this.playerObjects.has(this.localPlayerId)) return;
     if (get(chatInputActive)) return;
     if (this.isMoving) return;

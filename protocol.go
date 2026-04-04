@@ -21,15 +21,16 @@ const (
 // Client → Server messages
 
 type IncomingMessage struct {
-	Type     MsgType `json:"type"`
-	Nickname string  `json:"nickname,omitempty"`
-	X        int     `json:"x,omitempty"`
-	Y        int     `json:"y,omitempty"`
-	Dir      string  `json:"dir,omitempty"`
-	Status   string  `json:"status,omitempty"`
-	Text     string  `json:"text,omitempty"`
-	Avatar   int     `json:"avatar,omitempty"`
-	Emoji    string  `json:"emoji,omitempty"`
+	Type      MsgType `json:"type"`
+	Nickname  string  `json:"nickname,omitempty"`
+	X         int     `json:"x,omitempty"`
+	Y         int     `json:"y,omitempty"`
+	Dir       string  `json:"dir,omitempty"`
+	Status    string  `json:"status,omitempty"`
+	Text      string  `json:"text,omitempty"`
+	Avatar    int     `json:"avatar,omitempty"`
+	Emoji     string  `json:"emoji,omitempty"`
+	Reconnect bool    `json:"reconnect,omitempty"`
 }
 
 // Server → Client messages
@@ -45,9 +46,10 @@ type OutgoingMessage struct {
 	Text     string        `json:"text,omitempty"`
 	Message  string        `json:"message,omitempty"`
 	Emoji    string        `json:"emoji,omitempty"`
-	Player   *PlayerInfo   `json:"player,omitempty"`
-	Players  []*PlayerInfo `json:"players,omitempty"`
-	Self     *PlayerInfo   `json:"self,omitempty"`
+	Player    *PlayerInfo   `json:"player,omitempty"`
+	Players   []*PlayerInfo `json:"players,omitempty"`
+	Self      *PlayerInfo   `json:"self,omitempty"`
+	Reconnect bool          `json:"reconnect,omitempty"`
 }
 
 type PlayerInfo struct {

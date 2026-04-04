@@ -16,6 +16,7 @@ export interface IncomingMessage {
   text?: string;
   avatar?: number;
   emoji?: Emoji;
+  reconnect?: boolean;
 }
 
 // Matches protocol.go OutgoingMessage (Server -> Client)
@@ -35,6 +36,7 @@ export interface OutgoingMessage {
   player?: PlayerInfo;
   players?: PlayerInfo[];
   self?: PlayerInfo;
+  reconnect?: boolean;
 }
 
 // Matches protocol.go PlayerInfo (no omitempty — all fields required)

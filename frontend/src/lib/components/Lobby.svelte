@@ -6,7 +6,7 @@
   let { onJoin }: { onJoin: (data: { nickname: string; avatar: number; snapshot: OutgoingMessage }) => void } = $props();
 
   const persistedNickname = new PersistedState('portal-nickname', '');
-  let selectedAvatar = $state(0);
+  const persistedAvatar = new PersistedState('portal-avatar', 0);
   let error = $state('');
   let joining = $state(false);
 
@@ -115,8 +115,8 @@
     joining = true;
 
     try {
-      const snapshot = await network.connect(persistedNickname.current, selectedAvatar);
-      onJoin({ nickname: persistedNickname.current, avatar: selectedAvatar, snapshot });
+      const snapshot = await network.connect(persistedNickname.current, persistedAvatar.current);
+      onJoin({ nickname: persistedNickname.current, avatar: persistedAvatar.current, snapshot });
     } catch (err) {
       error = err instanceof Error ? err.message : '연결에 실패했습니다.';
       joining = false;
@@ -134,29 +134,29 @@
 
     <div class="avatar-grid">
       <button
-        class="avatar-option {selectedAvatar === 0 ? 'selected' : ''}"
-        onclick={() => (selectedAvatar = 0)}
+        class="avatar-option {persistedAvatar.current === 0 ? 'selected' : ''}"
+        onclick={() => (persistedAvatar.current = 0)}
         aria-label="Gopher avatar"
       >
         <div class="avatar-sprite" style="background-image: url('/assets/gopher.png'); background-position: 0 0; background-size: {4 * 48}px 48px;"></div>
       </button>
       <button
-        class="avatar-option {selectedAvatar === 1 ? 'selected' : ''}"
-        onclick={() => (selectedAvatar = 1)}
+        class="avatar-option {persistedAvatar.current === 1 ? 'selected' : ''}"
+        onclick={() => (persistedAvatar.current = 1)}
         aria-label="Blue avatar"
       >
         <canvas bind:this={canvas1} width="48" height="48"></canvas>
       </button>
       <button
-        class="avatar-option {selectedAvatar === 2 ? 'selected' : ''}"
-        onclick={() => (selectedAvatar = 2)}
+        class="avatar-option {persistedAvatar.current === 2 ? 'selected' : ''}"
+        onclick={() => (persistedAvatar.current = 2)}
         aria-label="Green avatar"
       >
         <canvas bind:this={canvas2} width="48" height="48"></canvas>
       </button>
       <button
-        class="avatar-option {selectedAvatar === 3 ? 'selected' : ''}"
-        onclick={() => (selectedAvatar = 3)}
+        class="avatar-option {persistedAvatar.current === 3 ? 'selected' : ''}"
+        onclick={() => (persistedAvatar.current = 3)}
         aria-label="Red avatar"
       >
         <canvas bind:this={canvas3} width="48" height="48"></canvas>

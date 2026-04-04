@@ -151,6 +151,7 @@ func (h *Hub) run() {
 					Dir:      client.dir,
 					Avatar:   client.avatar,
 				},
+				Reconnect: client.reconnect,
 			}
 			h.mu.RLock()
 			for _, c := range h.players {
