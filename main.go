@@ -56,6 +56,63 @@ func main() {
 	}
 }
 
+// mimeTypes maps file extensions to correct MIME types.
+// macOS may report "text/plain" for .js/.css via embed.FS, blocking ES module loads.
+var mimeTypes = map[string]string{
+	".js":    "application/javascript",
+	".mjs":   "application/javascript",
+	".css":   "text/css",
+	".json":  "application/json",
+	".html":  "text/html; charset=utf-8",
+	".woff2": "font/woff2",
+	".woff":  "font/woff",
+	".png":   "image/png",
+	".svg":   "image/svg+xml",
+	".ico":   "image/x-icon",
+}
+
+// mimeResponseWriter intercepts WriteHeader to force the correct Content-Type
+// before the response is flushed. http.FileServer calls ServeContent which
+// sniffs and sets Content-Type before Write, so we must override at WriteHeader time.
+type mimeResponseWriter struct {
+	http.ResponseWriter
+	contentType string
+	wroteHeader bool
+}
+
+func (w *mimeResponseWriter) WriteHeader(code int) {
+	if !w.wroteHeader && w.contentType != "" {
+		w.ResponseWriter.Header().Set("Content-Type", w.contentType)
+	}
+	w.wroteHeader = true
+	w.ResponseWriter.WriteHeader(code)
+}
+
+func (w *mimeResponseWriter) Write(b []byte) (int, error) {
+	if !w.wroteHeader {
+		w.WriteHeader(http.StatusOK)
+	}
+	return w.ResponseWriter.Write(b)
+}
+
+// withMIME wraps an http.Handler and overrides Content-Type based on file extension.
+func withMIME(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ct := ""
+		for ext, mime := range mimeTypes {
+			if strings.HasSuffix(r.URL.Path, ext) {
+				ct = mime
+				break
+			}
+		}
+		if ct != "" {
+			next.ServeHTTP(&mimeResponseWriter{ResponseWriter: w, contentType: ct}, r)
+		} else {
+			next.ServeHTTP(w, r)
+		}
+	})
+}
+
 func runServer(cmd *cobra.Command, args []string) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -68,7 +125,7 @@ func runServer(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("embed static: %w", err)
 	}
-	staticFS := http.FileServer(http.FS(sub))
+	staticFS := withMIME(http.FileServer(http.FS(sub)))
 
 	mux := http.NewServeMux()
 
