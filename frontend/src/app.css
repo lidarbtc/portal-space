@@ -1,6 +1,6 @@
 @font-face {
     font-family: 'MulmaruMono';
-    src: url('../fonts/MulmaruMono.woff2') format('woff2');
+    src: url('/fonts/MulmaruMono.woff2') format('woff2');
     font-weight: normal;
     font-style: normal;
     font-display: swap;
@@ -52,11 +52,24 @@ body {
 
 #nickname-form {
     display: flex;
+    flex-direction: column;
+    align-items: center;
     gap: 0.5rem;
 }
 
+#nickname-form .input-row {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.nickname-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
 #nickname-input {
-    padding: 0.75rem 1rem;
+    padding: 0.75rem 2.5rem 0.75rem 1rem;
     font-size: 1.1rem;
     font-family: 'MulmaruMono', monospace;
     background: #16213e;
@@ -65,6 +78,25 @@ body {
     border-radius: 6px;
     outline: none;
     width: 250px;
+}
+
+.nickname-dice-btn {
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 4px;
+    line-height: 1;
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+
+.nickname-dice-btn:hover {
+    background: rgba(83, 52, 131, 0.3);
 }
 
 #nickname-input:focus {
@@ -90,6 +122,11 @@ body {
     background: #6a42a0;
 }
 
+#join-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
 #error-msg {
     color: #ff6b6b;
     margin-top: 1rem;
@@ -107,7 +144,7 @@ body {
     z-index: 50;
 }
 
-.status-btn {
+#status-bar button {
     padding: 8px 16px;
     font-size: 0.9rem;
     font-family: 'MulmaruMono', monospace;
@@ -118,11 +155,11 @@ body {
     cursor: pointer;
 }
 
-.status-btn:hover {
+#status-bar button:hover {
     background: #1a2744;
 }
 
-.status-btn.active {
+#status-bar button[data-state="on"] {
     background: #533483;
     border-color: #533483;
     color: #e0e0ff;
@@ -182,7 +219,6 @@ body {
     bottom: 60px;
     left: 16px;
     z-index: 51;
-    display: none;
 }
 
 #chat-input {
@@ -198,13 +234,9 @@ body {
 }
 
 #chat-hint {
-    position: absolute;
-    bottom: 66px;
-    left: 16px;
     color: #555577;
     font-size: 0.8rem;
     font-family: 'MulmaruMono', monospace;
-    z-index: 49;
 }
 
 /* Avatar selection grid */
@@ -231,6 +263,13 @@ body {
     border-color: #6a42a0;
 }
 
+.avatar-sprite {
+    width: 48px;
+    height: 48px;
+    background-repeat: no-repeat;
+    image-rendering: pixelated;
+}
+
 .avatar-option.selected {
     border-color: #533483;
     background: #1a2744;
@@ -248,7 +287,7 @@ body {
     z-index: 50;
 }
 
-.emote-btn {
+#emote-bar button {
     width: 36px;
     height: 36px;
     font-size: 1.2rem;
@@ -262,8 +301,20 @@ body {
     transition: background 0.2s;
 }
 
-.emote-btn:hover {
+#emote-bar button:hover {
     background: #1a2744;
+}
+
+/* Emote tooltip */
+.emote-tooltip {
+    background: rgba(16, 24, 48, 0.95);
+    border: 1px solid #0f3460;
+    border-radius: 6px;
+    padding: 4px 8px;
+    color: #aaaacc;
+    font-size: 0.75rem;
+    font-family: 'MulmaruMono', monospace;
+    z-index: 100;
 }
 
 /* Player count */
@@ -300,10 +351,10 @@ body {
     color: #e0e0ff;
 }
 
-/* Settings panel */
+/* Settings panel (Bits UI Popover) */
 #settings-panel {
     position: absolute;
-    top: 90px;
+    top: 80px;
     right: 16px;
     width: 280px;
     background: rgba(16, 24, 48, 0.95);
@@ -311,10 +362,9 @@ body {
     border-radius: 10px;
     padding: 16px 20px;
     z-index: 51;
-    display: none;
 }
 
-.settings-title {
+#settings-panel h3 {
     color: #e0e0ff;
     font-size: 1.1rem;
     font-family: 'MulmaruMono', monospace;
@@ -324,33 +374,82 @@ body {
     border-bottom: 1px solid #0f3460;
 }
 
-.settings-row {
+.setting-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
     margin-bottom: 12px;
 }
 
-.settings-row:last-child {
+.setting-row:last-child {
     margin-bottom: 0;
 }
 
-.settings-row label {
+.setting-row span {
     color: #aaaacc;
     font-size: 1rem;
     font-family: 'MulmaruMono', monospace;
 }
 
-#volume-slider {
+/* Bits UI Slider */
+[data-slider-root] {
+    position: relative;
+    display: flex;
+    align-items: center;
     width: 130px;
-    height: 6px;
-    accent-color: #533483;
+    height: 20px;
     cursor: pointer;
 }
 
-#mute-toggle {
-    accent-color: #533483;
+[data-slider-range] {
+    position: absolute;
+    height: 6px;
+    background: #533483;
+    border-radius: 3px;
+}
+
+[data-slider-thumb] {
+    display: block;
+    width: 16px;
+    height: 16px;
+    background: #e0e0ff;
+    border: 2px solid #533483;
+    border-radius: 50%;
+    cursor: grab;
+}
+
+[data-slider-thumb]:active {
+    cursor: grabbing;
+}
+
+/* Bits UI Switch */
+[data-switch-root] {
+    display: inline-flex;
+    align-items: center;
+    width: 44px;
+    height: 24px;
+    background: #16213e;
+    border: 2px solid #0f3460;
+    border-radius: 12px;
+    padding: 2px;
     cursor: pointer;
-    width: 22px;
-    height: 22px;
+    transition: background 0.2s;
+}
+
+[data-switch-root][data-state="checked"] {
+    background: #533483;
+    border-color: #533483;
+}
+
+[data-switch-thumb] {
+    display: block;
+    width: 16px;
+    height: 16px;
+    background: #e0e0ff;
+    border-radius: 50%;
+    transition: transform 0.2s;
+}
+
+[data-switch-thumb][data-state="checked"] {
+    transform: translateX(20px);
 }
