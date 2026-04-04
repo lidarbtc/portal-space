@@ -15,3 +15,9 @@ identity.json
 
 # OMC state
 .omc/
+static.bak/
+
+# Frontend
+frontend/node_modules/
+frontend/.svelte-kit/
+frontend/bun.lock
