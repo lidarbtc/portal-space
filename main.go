@@ -42,7 +42,7 @@ func init() {
 	flags.BoolVar(&flagDiscovery, "discovery", utils.ResolveBoolEnv(false, "DISCOVERY", "DEFAULT_RELAYS"), "include registry relays and enable relay discovery [env: DISCOVERY, DEFAULT_RELAYS]")
 	flags.BoolVar(&flagBanMITM, "ban-mitm", utils.ResolveBoolEnv(false, "BAN_MITM"), "ban relay when MITM self-probe detects TLS termination [env: BAN_MITM]")
 	flags.IntVar(&flagPort, "port", 3000, "optional local HTTP port (negative to disable)")
-	flags.StringVar(&flagName, "name", "portal-space", "backend display name")
+	flags.StringVar(&flagName, "name", "space", "backend display name")
 	flags.StringVar(&flagIdentityPath, "identity-path", "identity.json", "optional path to load/save the portal identity")
 	flags.BoolVar(&flagHide, "hide", false, "hide this lease from portal listings")
 	flags.StringVar(&flagDescription, "description", "Portal Space — 2D pixel co-coding space", "lease description")
