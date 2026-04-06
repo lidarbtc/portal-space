@@ -27,3 +27,4 @@ frontend/bun.lock
 
 # SvelteKit build output
 static/_app/
+static/index.html
