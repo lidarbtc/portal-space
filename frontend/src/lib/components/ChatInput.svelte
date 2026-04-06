@@ -2,13 +2,13 @@
   import { onMount } from 'svelte';
   import { chatInputActive } from '$lib/stores/game';
 
-  let { onSend, mobile = false }: { onSend: (text: string) => void; mobile?: boolean } = $props();
+  let { onSend, mobile = false, alwaysActive = false }: { onSend: (text: string) => void; mobile?: boolean; alwaysActive?: boolean } = $props();
 
   let inputEl: HTMLInputElement | undefined = $state();
   let inputValue = $state('');
 
   onMount(() => {
-    if (mobile) {
+    if (mobile || alwaysActive) {
       chatInputActive.set(true);
     }
   });
@@ -22,7 +22,7 @@
 
   function hideInput() {
     inputValue = '';
-    if (!mobile) {
+    if (!mobile && !alwaysActive) {
       chatInputActive.set(false);
     }
   }
@@ -35,6 +35,8 @@
     inputValue = '';
     if (mobile) {
       inputEl?.blur();
+    } else if (alwaysActive) {
+      // Keep input active, just clear the value
     } else {
       hideInput();
     }
@@ -50,7 +52,7 @@
   }
 
   function handleGlobalKeydown(e: KeyboardEvent) {
-    if (mobile) return;
+    if (mobile || alwaysActive) return;
     if (e.key === 'Enter' && !$chatInputActive) {
       e.preventDefault();
       if (document.activeElement instanceof HTMLElement) {
@@ -64,7 +66,7 @@
 <svelte:window onkeydown={handleGlobalKeydown} />
 
 <div id="chat-container" class:mobile>
-  {#if mobile || $chatInputActive}
+  {#if mobile || alwaysActive || $chatInputActive}
     <div class="chat-input-row">
       <input
         id="chat-input"

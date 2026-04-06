@@ -51,7 +51,7 @@ func newClient(hub *Hub, conn *websocket.Conn) *Client {
 		id:     uuid.NewString()[:8],
 		x:      spawnX,
 		y:      spawnY,
-		status: "coding",
+		status: "online",
 		dir:    "down",
 		send:   make(chan []byte, 64),
 	}

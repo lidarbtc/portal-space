@@ -12,8 +12,7 @@
   let volumePercent = $derived(Math.round($volume * 100));
 
   const statuses: { key: PlayerStatus; label: string }[] = [
-    { key: 'coding', label: '💻 코딩중' },
-    { key: 'resting', label: '☕ 휴식' },
+    { key: 'online', label: '🟢 온라인' },
     { key: 'away', label: '🚶 자리비움' },
     { key: 'dnd', label: '🚫 방해금지' },
   ];

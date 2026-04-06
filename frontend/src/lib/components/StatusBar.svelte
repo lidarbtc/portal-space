@@ -5,9 +5,9 @@
   import type { PlayerStatus } from '$lib/types';
 
   const statuses: { key: PlayerStatus; label: string }[] = [
-    { key: 'coding', label: '💻 코딩중' },
-    { key: 'resting', label: '☕ 휴식' },
-    { key: 'away', label: '🚶 자리비움' }
+    { key: 'online', label: '🟢 온라인' },
+    { key: 'away', label: '🚶 자리비움' },
+    { key: 'dnd', label: '🚫 방해금지' },
   ];
 </script>
 

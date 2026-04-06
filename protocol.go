@@ -72,10 +72,9 @@ const (
 )
 
 var validStatuses = map[string]bool{
-	"coding":  true,
-	"resting": true,
-	"away":    true,
-	"dnd":     true,
+	"online": true,
+	"away":   true,
+	"dnd":    true,
 }
 
 var validDirections = map[string]bool{

@@ -409,8 +409,8 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private getStatusLabel(status: string): string {
-    const labels: Record<string, string> = { coding: '💻', resting: '☕', away: '🚶', dnd: '🚫' };
-    return labels[status] ?? '💻';
+    const labels: Record<string, string> = { online: '🟢', away: '🚶', dnd: '🚫' };
+    return labels[status] ?? '🟢';
   }
 
   private showChatBubble(id: string, text: string, _nickname: string): void {

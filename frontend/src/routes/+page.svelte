@@ -5,6 +5,7 @@
   import ChatLog from '$lib/components/ChatLog.svelte';
   import ChatInput from '$lib/components/ChatInput.svelte';
   import PlayerCount from '$lib/components/PlayerCount.svelte';
+  import PlayerList from '$lib/components/PlayerList.svelte';
 
   import Joystick from '$lib/components/Joystick.svelte';
   import { network } from '$lib/network';
@@ -16,6 +17,19 @@
 
   let inGame = $state(false);
   let gameData: OutgoingMessage | null = $state(null);
+  let isWideDesktop = $state(false);
+
+  $effect(() => {
+    if ($isMobile) {
+      isWideDesktop = false;
+      return;
+    }
+    const mql = window.matchMedia('(min-width: 960px)');
+    isWideDesktop = mql.matches;
+    const handler = (e: MediaQueryListEvent) => { isWideDesktop = e.matches; };
+    mql.addEventListener('change', handler);
+    return () => mql.removeEventListener('change', handler);
+  });
 
   // Lobby fallback: when connectionState becomes 'disconnected' while in game, return to lobby
   $effect(() => {
@@ -58,6 +72,21 @@
     <div class="mobile-chat">
       <ChatLog />
       <ChatInput onSend={handleChatSend} mobile={true} />
+    </div>
+  </div>
+{:else if isWideDesktop}
+  <div class="desktop-layout">
+    <div class="game-area">
+      <div id="game-container">
+        <GameCanvas snapshot={gameData} />
+      </div>
+      <ActionBar />
+      <PlayerCount />
+    </div>
+    <div class="chat-panel">
+      <PlayerList />
+      <ChatLog />
+      <ChatInput onSend={handleChatSend} alwaysActive={true} />
     </div>
   </div>
 {:else}

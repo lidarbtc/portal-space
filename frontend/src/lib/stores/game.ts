@@ -16,7 +16,7 @@ export const chatMessages = writable<ChatMessage[]>([]);
 
 export function addChatMessage(nickname: string, text: string): void {
   chatMessages.update((msgs) => {
-    const updated = [...msgs, { nickname, text, isSystem: false }];
+    const updated = [...msgs, { nickname, text, isSystem: false, timestamp: Date.now() }];
     if (updated.length > MAX_CHAT_MESSAGES) {
       return updated.slice(updated.length - MAX_CHAT_MESSAGES);
     }
@@ -26,7 +26,7 @@ export function addChatMessage(nickname: string, text: string): void {
 
 export function addSystemMessage(text: string): void {
   chatMessages.update((msgs) => {
-    const updated = [...msgs, { text, isSystem: true }];
+    const updated = [...msgs, { text, isSystem: true, timestamp: Date.now() }];
     if (updated.length > MAX_CHAT_MESSAGES) {
       return updated.slice(updated.length - MAX_CHAT_MESSAGES);
     }
@@ -35,7 +35,7 @@ export function addSystemMessage(text: string): void {
 }
 
 // Current status
-export const currentStatus = writable<PlayerStatus>('coding');
+export const currentStatus = writable<PlayerStatus>('online');
 
 // Chat input active state
 export const chatInputActive = writable(false);
