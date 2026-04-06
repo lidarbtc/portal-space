@@ -189,6 +189,18 @@ body {
     font-style: italic;
 }
 
+.chat-entry a {
+    color: #66ccff;
+    text-decoration: underline;
+    text-decoration-color: rgba(102, 204, 255, 0.4);
+    text-underline-offset: 2px;
+}
+
+.chat-entry a:hover {
+    color: #99ddff;
+    text-decoration-color: rgba(153, 221, 255, 0.8);
+}
+
 /* Chat input */
 #chat-container {
     position: absolute;
