@@ -5,7 +5,7 @@
   import ChatLog from '$lib/components/ChatLog.svelte';
   import ChatInput from '$lib/components/ChatInput.svelte';
   import PlayerCount from '$lib/components/PlayerCount.svelte';
-  import SettingsPanel from '$lib/components/SettingsPanel.svelte';
+
   import Joystick from '$lib/components/Joystick.svelte';
   import { network } from '$lib/network';
   import { players, selfId } from '$lib/stores/game';
@@ -68,7 +68,6 @@
   <ChatLog />
   <ChatInput onSend={handleChatSend} />
   <PlayerCount />
-  <SettingsPanel />
 {/if}
 
 {#if inGame && $connectionState === 'reconnecting'}

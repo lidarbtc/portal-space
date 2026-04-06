@@ -276,69 +276,6 @@ body {
     z-index: 50;
 }
 
-/* Settings button */
-#settings-btn {
-    position: absolute;
-    top: 12px;
-    right: 16px;
-    width: 64px;
-    height: 64px;
-    font-size: 4.4rem;
-    background: none;
-    color: #aaaacc;
-    border: none;
-    cursor: pointer;
-    z-index: 50;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: color 0.2s;
-}
-
-#settings-btn:hover {
-    color: #e0e0ff;
-}
-
-/* Settings panel (Bits UI Popover) */
-#settings-panel {
-    position: absolute;
-    top: 80px;
-    right: 16px;
-    width: 280px;
-    background: rgba(16, 24, 48, 0.95);
-    border: 2px solid #0f3460;
-    border-radius: 10px;
-    padding: 16px 20px;
-    z-index: 51;
-}
-
-#settings-panel h3 {
-    color: #e0e0ff;
-    font-size: 1.1rem;
-    font-family: 'MulmaruMono', monospace;
-    font-weight: bold;
-    margin-bottom: 14px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid #0f3460;
-}
-
-.setting-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 12px;
-}
-
-.setting-row:last-child {
-    margin-bottom: 0;
-}
-
-.setting-row span {
-    color: #aaaacc;
-    font-size: 1rem;
-    font-family: 'MulmaruMono', monospace;
-}
-
 /* Bits UI Slider */
 [data-slider-root] {
     position: relative;
@@ -442,9 +379,7 @@ body {
     }
 
     /* Hide V2 features on mobile */
-    .action-bar,
-    #settings-btn,
-    #settings-panel {
+    .action-bar {
         display: none !important;
     }
 

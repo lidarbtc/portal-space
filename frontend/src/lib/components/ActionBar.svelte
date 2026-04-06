@@ -1,13 +1,15 @@
 <script lang="ts">
-  import { ToggleGroup } from 'bits-ui';
+  import { ToggleGroup, Slider, Switch } from 'bits-ui';
   import { currentStatus } from '$lib/stores/game';
   import { network } from '$lib/network';
   import type { PlayerStatus, Emoji } from '$lib/types';
-  import { CircleUserRound, SmilePlus } from '@lucide/svelte';
+  import { CircleUserRound, SmilePlus, Settings } from '@lucide/svelte';
+  import { volume, muted } from '$lib/stores/settings';
 
-  type PanelType = 'status' | 'emote' | null;
+  type PanelType = 'status' | 'emote' | 'settings' | null;
 
   let openPanel: PanelType = $state(null);
+  let volumePercent = $derived(Math.round($volume * 100));
 
   const statuses: { key: PlayerStatus; label: string }[] = [
     { key: 'coding', label: '💻 코딩중' },
@@ -43,6 +45,7 @@
   $effect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (containerEl && !containerEl.contains(e.target as Node)) {
+        if ((e.target as HTMLElement).closest('[data-slider-root]')) return;
         openPanel = null;
       }
     }
@@ -80,6 +83,34 @@
     </div>
   {/if}
 
+  {#if openPanel === 'settings'}
+    <div class="dropdown settings-dropdown">
+      <div class="setting-row">
+        <span>볼륨</span>
+        <Slider.Root
+          type="single"
+          min={0}
+          max={100}
+          step={1}
+          value={volumePercent}
+          onValueChange={(v) => volume.set(v / 100)}
+        >
+          <Slider.Range />
+          <Slider.Thumb index={0} />
+        </Slider.Root>
+      </div>
+      <div class="setting-row">
+        <span>음소거</span>
+        <Switch.Root
+          checked={$muted}
+          onCheckedChange={(checked) => muted.set(checked)}
+        >
+          <Switch.Thumb />
+        </Switch.Root>
+      </div>
+    </div>
+  {/if}
+
   <div class="pill-bar">
     <button
       class="tab-button"
@@ -94,6 +125,13 @@
       onclick={() => togglePanel('emote')}
     >
       <SmilePlus size={24} />
+    </button>
+    <button
+      class="tab-button"
+      class:active={openPanel === 'settings'}
+      onclick={() => togglePanel('settings')}
+    >
+      <Settings size={24} />
     </button>
   </div>
 </div>
@@ -194,5 +232,18 @@
 
   .action-bar-wrapper :global(.emote-label) {
     font-size: 13px;
+  }
+
+  .settings-dropdown .setting-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px;
+  }
+
+  .settings-dropdown .setting-row span {
+    color: #aaaacc;
+    font-size: 14px;
+    font-family: 'MulmaruMono', monospace;
   }
 </style>
