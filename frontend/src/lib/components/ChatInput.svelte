@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { useEventListener } from 'runed';
   import { chatInputActive } from '$lib/stores/game';
 
   let { onSend, mobile = false, alwaysActive = false }: { onSend: (text: string) => void; mobile?: boolean; alwaysActive?: boolean } = $props();
@@ -8,9 +9,29 @@
   let inputValue = $state('');
 
   onMount(() => {
-    if (mobile || alwaysActive) {
+    if (mobile) {
       chatInputActive.set(true);
     }
+  });
+
+  function handleFocus() {
+    chatInputActive.set(true);
+  }
+
+  function handleBlur() {
+    if (!mobile) {
+      chatInputActive.set(false);
+    }
+  }
+
+  useEventListener(() => document, 'keydown', (e: KeyboardEvent) => {
+    if (!alwaysActive) return;
+    if (e.key !== 'j' && e.key !== 'J') return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const el = document.activeElement;
+    if (el?.tagName === 'INPUT' || el?.tagName === 'TEXTAREA' || (el as HTMLElement)?.isContentEditable) return;
+    e.preventDefault();
+    inputEl?.focus();
   });
 
   function showInput() {
@@ -22,7 +43,9 @@
 
   function hideInput() {
     inputValue = '';
-    if (!mobile && !alwaysActive) {
+    if (alwaysActive) {
+      inputEl?.blur();
+    } else if (!mobile) {
       chatInputActive.set(false);
     }
   }
@@ -71,11 +94,13 @@
       <input
         id="chat-input"
         type="text"
-        placeholder="메시지 입력..."
+        placeholder={alwaysActive ? '메시지를 입력해주세요 (J)' : '메시지 입력...'}
         maxlength={500}
         bind:this={inputEl}
         bind:value={inputValue}
         onkeydown={handleKeydown}
+        onfocus={handleFocus}
+        onblur={handleBlur}
       />
       {#if mobile}
         <button class="chat-send-btn" onclick={sendMessage} aria-label="전송">↑</button>
