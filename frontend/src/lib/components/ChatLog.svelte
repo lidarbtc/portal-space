@@ -86,7 +86,7 @@
     z-index: 201;
     transform: translate(-50%, -50%);
     background: rgba(16, 24, 48, 0.95);
-    border: 1px solid rgba(6, 182, 212, 0.3);
+    border: none;
     border-radius: 8px;
     padding: 20px;
     width: 360px;

@@ -4,7 +4,7 @@
   import ActionBar from '$lib/components/ActionBar.svelte';
   import ChatLog from '$lib/components/ChatLog.svelte';
   import ChatInput from '$lib/components/ChatInput.svelte';
-  import PlayerCount from '$lib/components/PlayerCount.svelte';
+
   import PlayerList from '$lib/components/PlayerList.svelte';
 
   import Joystick from '$lib/components/Joystick.svelte';
@@ -61,7 +61,6 @@
 {:else if $isMobile}
   <div class="mobile-layout">
     <div class="mobile-header">
-      <PlayerCount />
     </div>
     <div id="game-container" class="mobile-game">
       <GameCanvas snapshot={gameData} />
@@ -81,7 +80,6 @@
         <GameCanvas snapshot={gameData} />
       </div>
       <ActionBar />
-      <PlayerCount />
     </div>
     <div class="chat-panel">
       <PlayerList />
@@ -96,7 +94,6 @@
   <ActionBar />
   <ChatLog />
   <ChatInput onSend={handleChatSend} />
-  <PlayerCount />
 {/if}
 
 {#if inGame && $connectionState === 'reconnecting'}
