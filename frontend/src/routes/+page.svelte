@@ -7,9 +7,11 @@
   import ChatInput from '$lib/components/ChatInput.svelte';
   import PlayerCount from '$lib/components/PlayerCount.svelte';
   import SettingsPanel from '$lib/components/SettingsPanel.svelte';
+  import DPad from '$lib/components/DPad.svelte';
   import { network } from '$lib/network';
   import { players, selfId } from '$lib/stores/game';
   import { connectionState } from '$lib/stores/connection';
+  import { isMobile } from '$lib/stores/mobile';
   import { get } from 'svelte/store';
   import type { OutgoingMessage } from '$lib/types';
 
@@ -43,6 +45,22 @@
 
 {#if !inGame}
   <Lobby onJoin={handleJoin} />
+{:else if $isMobile}
+  <div class="mobile-layout">
+    <div class="mobile-header">
+      <PlayerCount />
+    </div>
+    <div id="game-container">
+      <GameCanvas snapshot={gameData} />
+    </div>
+    <div class="mobile-chat">
+      <ChatLog />
+      <ChatInput onSend={handleChatSend} mobile={true} />
+    </div>
+    <div class="mobile-dpad">
+      <DPad />
+    </div>
+  </div>
 {:else}
   <div id="game-container">
     <GameCanvas snapshot={gameData} />
@@ -53,15 +71,15 @@
   <ChatInput onSend={handleChatSend} />
   <PlayerCount />
   <SettingsPanel />
+{/if}
 
-  {#if $connectionState === 'reconnecting'}
-    <div class="reconnect-overlay">
-      <div class="reconnect-message">
-        <span class="reconnect-spinner"></span>
-        <span>재접속 중...</span>
-      </div>
+{#if inGame && $connectionState === 'reconnecting'}
+  <div class="reconnect-overlay">
+    <div class="reconnect-message">
+      <span class="reconnect-spinner"></span>
+      <span>재접속 중...</span>
     </div>
-  {/if}
+  </div>
 {/if}
 
 <style>
@@ -102,5 +120,47 @@
     to {
       transform: rotate(360deg);
     }
+  }
+
+  /* Mobile layout */
+  .mobile-layout {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    width: 100vw;
+    overflow: hidden;
+  }
+
+  .mobile-header {
+    flex: 0 0 auto;
+    display: flex;
+    justify-content: flex-end;
+    padding: 8px 12px;
+  }
+
+  .mobile-layout :global(#game-container) {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: auto;
+  }
+
+  .mobile-chat {
+    flex: 0 0 auto;
+    max-height: 150px;
+    overflow-y: auto;
+    border-top: 1px solid #0f3460;
+  }
+
+  .mobile-dpad {
+    flex: 0 0 auto;
+    display: flex;
+    justify-content: center;
+    padding: 8px 0;
+    background: #1a1a2e;
+    border-top: 1px solid #0f3460;
+  }
+
+  .mobile-header :global(#player-count) {
+    position: static;
   }
 </style>

@@ -9,6 +9,7 @@ import {
   currentStatus,
   chatInputActive
 } from '$lib/stores/game';
+import { dpadDirection } from '$lib/stores/dpad';
 import { notifyAudio } from '$lib/audio';
 import { createPlaceholderTileset } from '../tileset';
 import { createAvatarSpritesheet } from '../spritesheet';
@@ -495,8 +496,10 @@ export class WorldScene extends Phaser.Scene {
       this._debugLogCount++;
     }
     if (!this.localPlayerId || !this.playerObjects.has(this.localPlayerId)) return;
-    if (get(chatInputActive)) return;
     if (this.isMoving) return;
+
+    const dpad = get(dpadDirection);
+    if (get(chatInputActive) && !dpad) return;
 
     let dx = 0, dy = 0;
     let dir: Direction | null = null;
@@ -509,6 +512,13 @@ export class WorldScene extends Phaser.Scene {
       dy = -1; dir = 'up';
     } else if (this.cursors.down.isDown || this.wasd.down.isDown) {
       dy = 1; dir = 'down';
+    }
+
+    // D-pad fallback (mobile touch input)
+    if (!dir && dpad) {
+      dir = dpad;
+      dx = dpad === 'left' ? -1 : dpad === 'right' ? 1 : 0;
+      dy = dpad === 'up' ? -1 : dpad === 'down' ? 1 : 0;
     }
 
     if (dir) {
