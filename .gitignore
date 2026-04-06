@@ -13,6 +13,9 @@ identity.json
 *.swp
 *.swo
 
+# Claude
+.claude/
+
 # OMC state
 .omc/
 static.bak/
