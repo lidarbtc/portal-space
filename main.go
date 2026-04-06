@@ -197,6 +197,7 @@ func runServer(cmd *cobra.Command, args []string) error {
 			Tags:        utils.SplitCSV(flagTags),
 			Owner:       flagOwner,
 			Hide:        flagHide,
+			Thumbnail:   "https://space.portal.1ncursio.dev/assets/og-image.jpg",
 		},
 	})
 	if err != nil {
