@@ -60,13 +60,7 @@ class NetworkClient {
 
       this.ws.onmessage = (event: MessageEvent) => {
         try {
-          const raw = JSON.parse(event.data);
-          // Default missing x/y to 0 (Go omitempty on int omits zero values)
-          const msg: OutgoingMessage = {
-            ...raw,
-            x: raw.x ?? 0,
-            y: raw.y ?? 0
-          };
+          const msg: OutgoingMessage = JSON.parse(event.data);
 
           if (msg.type === 'snapshot') {
             if (!settled) {

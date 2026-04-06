@@ -20,14 +20,12 @@ export interface IncomingMessage {
 }
 
 // Matches protocol.go OutgoingMessage (Server -> Client)
-// NOTE: Go's `json:"x,omitempty"` on int fields means x/y are OMITTED when 0.
-// The TypeScript client must default missing x/y to 0, not treat as undefined.
 export interface OutgoingMessage {
   type: MsgType;
   id?: string;
   nickname?: string;
-  x?: number;
-  y?: number;
+  x: number;
+  y: number;
   dir?: Direction;
   status?: PlayerStatus;
   text?: string;

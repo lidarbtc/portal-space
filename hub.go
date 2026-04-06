@@ -63,8 +63,8 @@ func isWalkable(x, y int) bool {
 	return !collisionMap[y][x]
 }
 
-// findSpawnPoint finds a random walkable tile for a new player.
-func findSpawnPoint() (int, int) {
+// findSpawnPoint finds a random walkable tile and returns pixel coordinates (center of tile).
+func findSpawnPoint() (float64, float64) {
 	cx, cy := mapWidth/2, mapHeight/2
 	// Try center area first, then quadrant centers
 	candidates := [][2]int{
@@ -75,18 +75,18 @@ func findSpawnPoint() (int, int) {
 	}
 	for _, c := range candidates {
 		if isWalkable(c[0], c[1]) {
-			return c[0], c[1]
+			return float64(c[0]*32 + 16), float64(c[1]*32 + 16)
 		}
 	}
 	// Fallback: scan for any walkable tile
 	for y := 1; y < mapHeight-1; y++ {
 		for x := 1; x < mapWidth-1; x++ {
 			if isWalkable(x, y) {
-				return x, y
+				return float64(x*32 + 16), float64(y*32 + 16)
 			}
 		}
 	}
-	return 1, 1
+	return float64(1*32 + 16), float64(1*32 + 16)
 }
 
 type Hub struct {
@@ -194,33 +194,46 @@ func (h *Hub) run() {
 	}
 }
 
-func (h *Hub) broadcastProximity(msg *OutgoingMessage, senderX, senderY int, senderID string) {
+// broadcastProximity sends a message to players within proximity radius.
+// NOTE: Currently unused (dead code). Coordinates are now pixel-based.
+func (h *Hub) broadcastProximity(msg *OutgoingMessage, senderX, senderY float64, senderID string) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
+	pixelRadius := proximityRadius * 32 // convert tile radius to pixel radius
 	for _, client := range h.players {
-		dx := float64(client.x - senderX)
-		dy := float64(client.y - senderY)
+		dx := client.x - senderX
+		dy := client.y - senderY
 		dist := math.Sqrt(dx*dx + dy*dy)
-		if dist <= proximityRadius {
+		if dist <= pixelRadius {
 			client.sendMsg(msg)
 		}
 	}
 }
 
-func (h *Hub) handleMove(client *Client, x, y int, dir string) {
+func (h *Hub) handleMove(client *Client, x, y float64, dir string) {
 	if !validateMove(x, y) {
 		return
 	}
 	if !validateDirection(dir) {
 		return
 	}
-	if !isWalkable(x, y) {
-		return
+
+	now := time.Now()
+
+	// Speed validation: reject >400px/sec (skip on first move or after 2s idle)
+	elapsed := now.Sub(client.lastMove)
+	if !client.lastMove.IsZero() && elapsed < 2*time.Second && elapsed > 0 {
+		dx := x - client.x
+		dy := y - client.y
+		dist := math.Sqrt(dx*dx + dy*dy)
+		speed := dist / elapsed.Seconds()
+		if speed > 400 {
+			return
+		}
 	}
 
 	// Rate limit
-	now := time.Now()
-	if now.Sub(client.lastMove) < time.Second/moveRateLimit {
+	if elapsed < time.Second/moveRateLimit {
 		return
 	}
 	client.lastMove = now

@@ -28,8 +28,8 @@ type Client struct {
 
 	id       string
 	nickname string
-	x        int
-	y        int
+	x        float64
+	y        float64
 	status   string
 	dir      string
 	avatar   int
@@ -106,14 +106,19 @@ func (c *Client) readPump() {
 			}
 			c.reconnect = msg.Reconnect
 			// Honor client-requested position (reconnect with position restore)
-			if msg.X != 0 && msg.Y != 0 && validateMove(msg.X, msg.Y) && isWalkable(msg.X, msg.Y) {
-				c.x = msg.X
-				c.y = msg.Y
+			if (msg.X != 0 || msg.Y != 0) && validateMove(msg.X, msg.Y) {
+				tileX := int(msg.X) / 32
+				tileY := int(msg.Y) / 32
+				if isWalkable(tileX, tileY) {
+					c.x = msg.X
+					c.y = msg.Y
+				}
 			}
 			c.hub.register <- c
 
 		case MsgMove:
 			c.hub.handleMove(c, msg.X, msg.Y, msg.Dir)
+
 
 		case MsgStatus:
 			c.hub.handleStatus(c, msg.Status)

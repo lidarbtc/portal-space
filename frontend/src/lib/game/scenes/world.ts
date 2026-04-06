@@ -16,13 +16,19 @@ import { createAvatarSpritesheet } from '../spritesheet';
 import type { PlayerInfo, Direction } from '$lib/types';
 import { MAP_WIDTH, MAP_HEIGHT } from '$lib/types';
 
+const MOVE_SPEED = 200; // px/sec
+const NETWORK_SEND_INTERVAL = 100; // ms (10Hz)
+const REMOTE_LERP_FACTOR = 0.15;
+
 interface PlayerObject {
   sprite: Phaser.GameObjects.Sprite;
   nameText: Phaser.GameObjects.Text;
   statusText: Phaser.GameObjects.Text;
   nickname: string;
-  gridX: number;
-  gridY: number;
+  x: number;       // pixel coordinate
+  y: number;       // pixel coordinate
+  targetX: number;  // remote player interpolation target
+  targetY: number;  // remote player interpolation target
   dir: Direction;
   avatar: number;
   bubbleText: Phaser.GameObjects.Text | null;
@@ -35,7 +41,6 @@ export class WorldScene extends Phaser.Scene {
   private playerObjects: Map<string, PlayerObject> = new Map();
   private localPlayerId: string | null = null;
   private tileSize = 32;
-  private isMoving = false;
   private unsubscribers: Array<() => void> = [];
 
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
@@ -48,6 +53,10 @@ export class WorldScene extends Phaser.Scene {
   private mapLayer!: Phaser.Tilemaps.TilemapLayer;
   private mapData!: number[][];
 
+  // Network send throttle
+  private lastNetworkSendTime = 0;
+  private wasMoving = false;
+
   constructor() {
     super({ key: 'WorldScene' });
   }
@@ -55,7 +64,6 @@ export class WorldScene extends Phaser.Scene {
   preload(): void {
     createPlaceholderTileset(this);
 
-    // Load original gopher sprite for avatar 0, relay-aware base URL
     const match = location.pathname.match(/^(\/peer\/[^/]+\/)/);
     if (match) {
       this.load.setBaseURL(match[1]);
@@ -64,16 +72,11 @@ export class WorldScene extends Phaser.Scene {
   }
 
   create(): void {
-    // Build combined spritesheet: gopher (row 0) + canvas avatars (rows 1-3)
     createAvatarSpritesheet(this);
-
-    // Create tilemap from data
     this.createMap();
 
-    // Setup camera bounds for the full map
     this.cameras.main.setBounds(0, 0, MAP_WIDTH * this.tileSize, MAP_HEIGHT * this.tileSize);
 
-    // Setup players from store
     const currentPlayers = get(players);
     const currentSelfId = get(selfId);
     this.localPlayerId = currentSelfId;
@@ -82,7 +85,6 @@ export class WorldScene extends Phaser.Scene {
       this.addPlayer(info);
     });
 
-    // Setup keyboard
     this.cursors = this.input.keyboard!.createCursorKeys();
     this.wasd = this.input.keyboard!.addKeys({
       up: Phaser.Input.Keyboard.KeyCodes.W,
@@ -96,24 +98,19 @@ export class WorldScene extends Phaser.Scene {
       right: Phaser.Input.Keyboard.Key;
     };
 
-    // Setup network handlers
     this.setupNetwork();
 
-    // Subscribe to selfId store to track local player
     const unsubSelfId = selfId.subscribe((id) => {
       this.localPlayerId = id;
     });
     this.unsubscribers.push(unsubSelfId);
 
-    // Subscribe to players store to sync additions/removals
     const unsubPlayers = players.subscribe((currentMap) => {
-      // Add any players not yet in scene
       currentMap.forEach((info, id) => {
         if (!this.playerObjects.has(id)) {
           this.addPlayer(info);
         }
       });
-      // Remove any players no longer in store
       this.playerObjects.forEach((_, id) => {
         if (!currentMap.has(id)) {
           this.removePlayer(id);
@@ -122,7 +119,6 @@ export class WorldScene extends Phaser.Scene {
     });
     this.unsubscribers.push(unsubPlayers);
 
-    // Cleanup on scene shutdown
     this.events.on('shutdown', () => {
       this.unsubscribers.forEach((unsub) => unsub());
       this.unsubscribers = [];
@@ -140,7 +136,7 @@ export class WorldScene extends Phaser.Scene {
 
     const tileset = map.addTilesetImage('tileset', 'tileset', this.tileSize, this.tileSize)!;
     const layer = map.createLayer(0, tileset, 0, 0)!;
-    layer.setCollision([1, 2]); // walls and tables block movement
+    layer.setCollision([1, 2]);
 
     this.mapLayer = layer;
     this.mapData = mapData;
@@ -152,22 +148,19 @@ export class WorldScene extends Phaser.Scene {
       const row: number[] = [];
       for (let x = 0; x < MAP_WIDTH; x++) {
         if (y === 0 || y === MAP_HEIGHT - 1 || x === 0 || x === MAP_WIDTH - 1) {
-          row.push(1); // Wall
+          row.push(1);
         } else {
-          row.push(0); // Floor
+          row.push(0);
         }
       }
       data.push(row);
     }
 
-    // Tables (matching server collision map in hub.go)
-    // Base pattern from original 20x15 block, tiled across full map
     const baseTables: [number, number][] = [
       [4, 4], [5, 4], [4, 7], [5, 7], [4, 10], [5, 10],
       [10, 4], [11, 4], [10, 7], [11, 7], [10, 10], [11, 10],
       [16, 4], [17, 4], [16, 7], [17, 7], [16, 10], [17, 10]
     ];
-    // Tile the base pattern in 20x15 blocks across the full map
     for (let blockY = 0; blockY < Math.floor(MAP_HEIGHT / 15); blockY++) {
       for (let blockX = 0; blockX < Math.floor(MAP_WIDTH / 20); blockX++) {
         baseTables.forEach(([bx, by]) => {
@@ -209,11 +202,17 @@ export class WorldScene extends Phaser.Scene {
 
     network.on('move', (msg) => {
       if (msg.id && msg.id !== this.localPlayerId) {
-        this.movePlayerTo(msg.id, msg.x ?? 0, msg.y ?? 0, msg.dir ?? 'down');
+        const p = this.playerObjects.get(msg.id);
+        if (p) {
+          p.targetX = msg.x;
+          p.targetY = msg.y;
+          p.dir = msg.dir ?? 'down';
+          this.updateCharacterFrame(p, p.dir);
+        }
         players.update((m) => {
-          const p = m.get(msg.id!);
-          if (p) {
-            m.set(msg.id!, { ...p, x: msg.x ?? 0, y: msg.y ?? 0, dir: msg.dir ?? 'down' });
+          const info = m.get(msg.id!);
+          if (info) {
+            m.set(msg.id!, { ...info, x: msg.x, y: msg.y, dir: msg.dir ?? 'down' });
           }
           return m;
         });
@@ -250,11 +249,9 @@ export class WorldScene extends Phaser.Scene {
     });
 
     network.on('snapshot', (msg) => {
-      // Reset movement state and debug counter
-      this.isMoving = false;
-      this._debugLogCount = 0;
+      this.lastNetworkSendTime = 0;
+      this.wasMoving = false;
 
-      // Build fresh players map — msg.players can be undefined when alone in room
       const newMap = new Map<string, PlayerInfo>();
       if (msg.players) {
         msg.players.forEach((p) => {
@@ -266,7 +263,6 @@ export class WorldScene extends Phaser.Scene {
         selfId.set(msg.self.id);
         this.localPlayerId = msg.self.id;
 
-        // Re-attach camera follow on reconnect
         const localObj = this.playerObjects.get(msg.self.id);
         if (localObj) {
           this.cameras.main.startFollow(localObj.sprite, true, 0.1, 0.1);
@@ -279,10 +275,10 @@ export class WorldScene extends Phaser.Scene {
   private addPlayer(info: PlayerInfo): void {
     if (this.playerObjects.has(info.id)) return;
 
-    const px = info.x * this.tileSize + this.tileSize / 2;
-    const py = info.y * this.tileSize + this.tileSize / 2;
+    // Server now sends pixel coordinates directly
+    const px = info.x;
+    const py = info.y;
 
-    // Frame index: avatar * 4 + direction (down=0, up=1, right=2, left=3)
     const dirFrame: Record<Direction, number> = { down: 0, up: 1, right: 2, left: 3 };
     const avatarIndex = info.avatar ?? 0;
     const frameIndex = avatarIndex * 4 + (dirFrame[info.dir] ?? 0);
@@ -317,8 +313,10 @@ export class WorldScene extends Phaser.Scene {
       nameText,
       statusText,
       nickname: info.nickname,
-      gridX: info.x,
-      gridY: info.y,
+      x: px,
+      y: py,
+      targetX: px,
+      targetY: py,
       dir: info.dir ?? 'down',
       avatar: avatarIndex,
       bubbleText: null,
@@ -327,7 +325,6 @@ export class WorldScene extends Phaser.Scene {
       emoteTimer: null
     });
 
-    // Camera follows the local player smoothly
     if (info.id === this.localPlayerId) {
       this.cameras.main.startFollow(sprite, true, 0.1, 0.1);
     }
@@ -346,58 +343,58 @@ export class WorldScene extends Phaser.Scene {
     this.playerObjects.delete(id);
   }
 
-  private movePlayerTo(id: string, x: number, y: number, dir: Direction): void {
-    const p = this.playerObjects.get(id);
-    if (!p) return;
+  private isTileBlocked(tileX: number, tileY: number): boolean {
+    if (tileX < 0 || tileX >= MAP_WIDTH || tileY < 0 || tileY >= MAP_HEIGHT) return true;
+    const tile = this.mapData[tileY][tileX];
+    return tile === 1 || tile === 2;
+  }
 
-    p.gridX = x;
-    p.gridY = y;
-    p.dir = dir;
+  private checkCollision(
+    p: PlayerObject, newPx: number, newPy: number, dir: Direction
+  ): { x: number; y: number } {
+    const ts = this.tileSize;
+    const curTileX = Math.floor(p.x / ts);
+    const curTileY = Math.floor(p.y / ts);
 
-    const px = x * this.tileSize + this.tileSize / 2;
-    const py = y * this.tileSize + this.tileSize / 2;
+    if (dir === 'right') {
+      const newTileX = Math.floor(newPx / ts);
+      const checkTileY = Math.round((p.y - ts / 2) / ts);
+      if (newTileX !== curTileX && this.isTileBlocked(newTileX, checkTileY)) {
+        newPx = newTileX * ts - 0.5;
+      }
+    } else if (dir === 'left') {
+      const newTileX = Math.floor(newPx / ts);
+      const checkTileY = Math.round((p.y - ts / 2) / ts);
+      if (newTileX !== curTileX && this.isTileBlocked(newTileX, checkTileY)) {
+        newPx = (newTileX + 1) * ts + 0.5;
+      }
+    } else if (dir === 'down') {
+      const newTileY = Math.floor(newPy / ts);
+      const checkTileX = Math.round((p.x - ts / 2) / ts);
+      if (newTileY !== curTileY && this.isTileBlocked(checkTileX, newTileY)) {
+        newPy = newTileY * ts - 0.5;
+      }
+    } else if (dir === 'up') {
+      const newTileY = Math.floor(newPy / ts);
+      const checkTileX = Math.round((p.x - ts / 2) / ts);
+      if (newTileY !== curTileY && this.isTileBlocked(checkTileX, newTileY)) {
+        newPy = (newTileY + 1) * ts + 0.5;
+      }
+    }
 
-    this.tweens.add({
-      targets: [p.sprite],
-      x: px,
-      y: py,
-      duration: 150,
-      ease: 'Linear'
-    });
+    return { x: newPx, y: newPy };
+  }
 
-    this.tweens.add({
-      targets: [p.nameText],
-      x: px,
-      y: py - this.tileSize / 2 - 14,
-      duration: 150
-    });
-
-    this.tweens.add({
-      targets: [p.statusText],
-      x: px,
-      y: py - this.tileSize / 2 - 24,
-      duration: 150
-    });
-
+  private updatePlayerVisuals(p: PlayerObject): void {
+    p.sprite.setPosition(p.x, p.y);
+    p.nameText.setPosition(p.x, p.y - this.tileSize / 2 - 14);
+    p.statusText.setPosition(p.x, p.y - this.tileSize / 2 - 24);
     if (p.bubbleText) {
-      this.tweens.add({
-        targets: [p.bubbleText],
-        x: px,
-        y: py - this.tileSize - 10,
-        duration: 150
-      });
+      p.bubbleText.setPosition(p.x, p.y - this.tileSize - 10);
     }
-
     if (p.emoteText) {
-      this.tweens.add({
-        targets: [p.emoteText],
-        x: px,
-        y: py - this.tileSize - 34,
-        duration: 150
-      });
+      p.emoteText.setPosition(p.x, p.y - this.tileSize - 34);
     }
-
-    this.updateCharacterFrame(p, dir);
   }
 
   private updateCharacterFrame(p: PlayerObject, dir: Direction): void {
@@ -425,10 +422,9 @@ export class WorldScene extends Phaser.Scene {
       if (p.bubbleTimer) clearTimeout(p.bubbleTimer);
     }
 
-    const px = p.sprite.x;
-    const py = p.sprite.y - this.tileSize - 10;
+    const px = p.x;
+    const py = p.y - this.tileSize - 10;
 
-    // Truncate long messages for display
     const displayText = text.length > 40 ? text.substring(0, 40) + '...' : text;
 
     p.bubbleText = this.add
@@ -446,7 +442,6 @@ export class WorldScene extends Phaser.Scene {
       .setDepth(100)
       .setResolution(2);
 
-    // Fade out after 3 seconds
     p.bubbleTimer = setTimeout(() => {
       if (p.bubbleText) {
         this.tweens.add({
@@ -473,8 +468,8 @@ export class WorldScene extends Phaser.Scene {
       if (p.emoteTimer) clearTimeout(p.emoteTimer);
     }
 
-    const px = p.sprite.x;
-    const py = p.sprite.y - this.tileSize - 34;
+    const px = p.x;
+    const py = p.y - this.tileSize - 34;
 
     p.emoteText = this.add
       .text(px, py, emoji, {
@@ -487,7 +482,6 @@ export class WorldScene extends Phaser.Scene {
       .setDepth(101)
       .setResolution(2);
 
-    // Float up animation (relative delta so it works during movement)
     this.tweens.add({
       targets: p.emoteText,
       y: '-=8',
@@ -495,7 +489,6 @@ export class WorldScene extends Phaser.Scene {
       ease: 'Power1'
     });
 
-    // Fade out after 3 seconds
     p.emoteTimer = setTimeout(() => {
       if (p.emoteText) {
         this.tweens.add({
@@ -513,16 +506,30 @@ export class WorldScene extends Phaser.Scene {
     }, 3000);
   }
 
-  private _debugLogCount = 0;
+  update(_time: number, delta: number): void {
+    if (!this.localPlayerId) return;
 
-  update(_time: number, _delta: number): void {
-    // Debug: log first 5 frames after each state change
-    if (this._debugLogCount < 5) {
-      console.log('[update]', { localPlayerId: this.localPlayerId, hasPlayer: this.playerObjects.has(this.localPlayerId ?? ''), isMoving: this.isMoving, chatActive: get(chatInputActive), playerObjectKeys: [...this.playerObjects.keys()] });
-      this._debugLogCount++;
-    }
-    if (!this.localPlayerId || !this.playerObjects.has(this.localPlayerId)) return;
-    if (this.isMoving) return;
+    // Interpolate remote players
+    this.playerObjects.forEach((p, id) => {
+      if (id === this.localPlayerId) return;
+      const dx = p.targetX - p.x;
+      const dy = p.targetY - p.y;
+      if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) {
+        const clampedDelta = Math.min(delta, 50);
+        const t = Math.min(1, 1 - Math.pow(1 - REMOTE_LERP_FACTOR, clampedDelta / 16.67));
+        p.x += dx * t;
+        p.y += dy * t;
+        this.updatePlayerVisuals(p);
+      } else if (dx !== 0 || dy !== 0) {
+        p.x = p.targetX;
+        p.y = p.targetY;
+        this.updatePlayerVisuals(p);
+      }
+    });
+
+    // Local player movement
+    const localPlayer = this.playerObjects.get(this.localPlayerId);
+    if (!localPlayer) return;
 
     const dpad = get(dpadDirection);
     if (get(chatInputActive) && !dpad) return;
@@ -540,87 +547,57 @@ export class WorldScene extends Phaser.Scene {
       dy = 1; dir = 'down';
     }
 
-    // D-pad fallback (mobile touch input)
     if (!dir && dpad) {
       dir = dpad;
       dx = dpad === 'left' ? -1 : dpad === 'right' ? 1 : 0;
       dy = dpad === 'up' ? -1 : dpad === 'down' ? 1 : 0;
     }
 
+    const isMovingNow = dir !== null;
+
     if (dir) {
-      const p = this.playerObjects.get(this.localPlayerId)!;
-      const newX = p.gridX + dx;
-      const newY = p.gridY + dy;
+      const moveAmount = MOVE_SPEED * (delta / 1000);
+      let newX = localPlayer.x + dx * moveAmount;
+      let newY = localPlayer.y + dy * moveAmount;
 
-      // Client-side collision check
-      if (newX >= 0 && newX < MAP_WIDTH && newY >= 0 && newY < MAP_HEIGHT) {
-        const tile = this.mapData[newY][newX];
-        if (tile !== 1 && tile !== 2) { // Not wall or table
-          this.isMoving = true;
-          p.gridX = newX;
-          p.gridY = newY;
-          p.dir = dir;
+      const result = this.checkCollision(localPlayer, newX, newY, dir);
+      newX = result.x;
+      newY = result.y;
 
-          const px = newX * this.tileSize + this.tileSize / 2;
-          const py = newY * this.tileSize + this.tileSize / 2;
+      localPlayer.x = newX;
+      localPlayer.y = newY;
+      localPlayer.dir = dir;
 
-          network.sendMove(newX, newY, dir);
-          this.updateCharacterFrame(p, dir);
+      this.updateCharacterFrame(localPlayer, dir);
+      this.updatePlayerVisuals(localPlayer);
 
-          this.tweens.add({
-            targets: [p.sprite],
-            x: px,
-            y: py,
-            duration: 150,
-            ease: 'Linear',
-            onComplete: () => { this.isMoving = false; }
-          });
+      // Throttled network send
+      const now = performance.now();
+      if (now - this.lastNetworkSendTime >= NETWORK_SEND_INTERVAL) {
+        this.lastNetworkSendTime = now;
+        network.sendMove(newX, newY, dir);
 
-          this.tweens.add({
-            targets: [p.nameText],
-            x: px,
-            y: py - this.tileSize / 2 - 14,
-            duration: 150
-          });
-
-          this.tweens.add({
-            targets: [p.statusText],
-            x: px,
-            y: py - this.tileSize / 2 - 24,
-            duration: 150
-          });
-
-          if (p.bubbleText) {
-            this.tweens.add({
-              targets: [p.bubbleText],
-              x: px,
-              y: py - this.tileSize - 10,
-              duration: 150
-            });
+        players.update((m) => {
+          const info = m.get(this.localPlayerId!);
+          if (info) {
+            m.set(this.localPlayerId!, { ...info, x: newX, y: newY, dir });
           }
-
-          if (p.emoteText) {
-            this.tweens.add({
-              targets: [p.emoteText],
-              x: px,
-              y: py - this.tileSize - 34,
-              duration: 150
-            });
-          }
-
-          // Sync position back to store
-          players.update((m) => {
-            const info = m.get(this.localPlayerId!);
-            if (info) {
-              m.set(this.localPlayerId!, { ...info, x: newX, y: newY, dir });
-            }
-            return m;
-          });
-        } else {
-          // Blocked — just update facing direction
-          this.updateCharacterFrame(p, dir);
-        }
+          return m;
+        });
       }
+    } else if (!isMovingNow && this.wasMoving) {
+      // Movement ended — send final position immediately
+      network.sendMove(localPlayer.x, localPlayer.y, localPlayer.dir);
+
+      players.update((m) => {
+        const info = m.get(this.localPlayerId!);
+        if (info) {
+          m.set(this.localPlayerId!, { ...info, x: localPlayer.x, y: localPlayer.y, dir: localPlayer.dir });
+        }
+        return m;
+      });
     }
+
+    this.wasMoving = isMovingNow;
   }
 }
