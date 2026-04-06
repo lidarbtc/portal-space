@@ -21,3 +21,6 @@ static.bak/
 frontend/node_modules/
 frontend/.svelte-kit/
 frontend/bun.lock
+
+# SvelteKit build output
+static/_app/
