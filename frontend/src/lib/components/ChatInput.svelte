@@ -105,7 +105,7 @@
     height: 36px;
     border: 2px solid #0f3460;
     border-radius: 6px;
-    background: #533483;
+    background: var(--color-primary);
     color: #e0e0ff;
     font-size: 1.1rem;
     font-family: 'MulmaruMono', monospace;
@@ -117,6 +117,6 @@
   }
 
   .chat-send-btn:active {
-    background: #6a42a0;
+    background: var(--color-primary-hover);
   }
 </style>

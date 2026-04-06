@@ -138,7 +138,7 @@
   }
 
   .tab-button.active {
-    background: #533483;
+    background: var(--color-primary);
     color: #e0e0ff;
   }
 
@@ -168,12 +168,12 @@
   }
 
   .action-bar-wrapper :global(.dropdown-item:hover) {
-    background: rgba(83, 52, 131, 0.5);
+    background: var(--color-primary-alpha-50);
     color: #e0e0ff;
   }
 
   .action-bar-wrapper :global([data-state='on']) {
-    background: #533483;
+    background: var(--color-primary);
     color: #e0e0ff;
   }
 

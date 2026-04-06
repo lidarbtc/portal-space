@@ -96,6 +96,6 @@
 	}
 
 	.dpad-btn:active {
-		background-color: #533483;
+		background-color: var(--color-primary);
 	}
 </style>

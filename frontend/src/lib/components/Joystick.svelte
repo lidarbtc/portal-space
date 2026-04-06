@@ -116,7 +116,7 @@
 		width: 44px;
 		height: 44px;
 		border-radius: 50%;
-		background: #533483;
+		background: var(--color-primary);
 		pointer-events: none;
 	}
 </style>
