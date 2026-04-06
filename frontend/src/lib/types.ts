@@ -51,8 +51,8 @@ export interface PlayerInfo {
 }
 
 // Matches protocol.go map constants
-export const MAP_WIDTH = 20;
-export const MAP_HEIGHT = 15;
+export const MAP_WIDTH = 60;
+export const MAP_HEIGHT = 45;
 export const MAX_AVATARS = 4;
 export const MAX_NICKNAME_LEN = 20;
 export const MAX_CHAT_LEN = 500;

@@ -70,6 +70,9 @@ export class WorldScene extends Phaser.Scene {
     // Create tilemap from data
     this.createMap();
 
+    // Setup camera bounds for the full map
+    this.cameras.main.setBounds(0, 0, MAP_WIDTH * this.tileSize, MAP_HEIGHT * this.tileSize);
+
     // Setup players from store
     const currentPlayers = get(players);
     const currentSelfId = get(selfId);
@@ -158,12 +161,24 @@ export class WorldScene extends Phaser.Scene {
     }
 
     // Tables (matching server collision map in hub.go)
-    const tables: [number, number][] = [
+    // Base pattern from original 20x15 block, tiled across full map
+    const baseTables: [number, number][] = [
       [4, 4], [5, 4], [4, 7], [5, 7], [4, 10], [5, 10],
       [10, 4], [11, 4], [10, 7], [11, 7], [10, 10], [11, 10],
       [16, 4], [17, 4], [16, 7], [17, 7], [16, 10], [17, 10]
     ];
-    tables.forEach(([x, y]) => { data[y][x] = 2; });
+    // Tile the base pattern in 20x15 blocks across the full map
+    for (let blockY = 0; blockY < Math.floor(MAP_HEIGHT / 15); blockY++) {
+      for (let blockX = 0; blockX < Math.floor(MAP_WIDTH / 20); blockX++) {
+        baseTables.forEach(([bx, by]) => {
+          const x = bx + blockX * 20;
+          const y = by + blockY * 15;
+          if (x >= 0 && x < MAP_WIDTH && y >= 0 && y < MAP_HEIGHT) {
+            data[y][x] = 2;
+          }
+        });
+      }
+    }
 
     return data;
   }
@@ -250,6 +265,12 @@ export class WorldScene extends Phaser.Scene {
         newMap.set(msg.self.id, msg.self);
         selfId.set(msg.self.id);
         this.localPlayerId = msg.self.id;
+
+        // Re-attach camera follow on reconnect
+        const localObj = this.playerObjects.get(msg.self.id);
+        if (localObj) {
+          this.cameras.main.startFollow(localObj.sprite, true, 0.1, 0.1);
+        }
       }
       players.set(newMap);
     });
@@ -305,6 +326,11 @@ export class WorldScene extends Phaser.Scene {
       emoteText: null,
       emoteTimer: null
     });
+
+    // Camera follows the local player smoothly
+    if (info.id === this.localPlayerId) {
+      this.cameras.main.startFollow(sprite, true, 0.1, 0.1);
+    }
   }
 
   private removePlayer(id: string): void {

@@ -30,8 +30,8 @@ func initCollisionMap() {
 	}
 
 	// Interior furniture (tables, chairs, shelves)
-	// Tables (2x1 blocks)
-	furniture := [][2]int{
+	// Base pattern from original 20x15 block, tiled across 60x45 map
+	baseTables := [][2]int{
 		{4, 4}, {5, 4},
 		{4, 7}, {5, 7},
 		{4, 10}, {5, 10},
@@ -42,9 +42,16 @@ func initCollisionMap() {
 		{16, 7}, {17, 7},
 		{16, 10}, {17, 10},
 	}
-	for _, f := range furniture {
-		if f[1] >= 0 && f[1] < mapHeight && f[0] >= 0 && f[0] < mapWidth {
-			collisionMap[f[1]][f[0]] = true
+	// Tile the base pattern in 20x15 blocks across the full map
+	for blockY := 0; blockY < mapHeight/15; blockY++ {
+		for blockX := 0; blockX < mapWidth/20; blockX++ {
+			for _, f := range baseTables {
+				x := f[0] + blockX*20
+				y := f[1] + blockY*15
+				if x >= 0 && x < mapWidth && y >= 0 && y < mapHeight {
+					collisionMap[y][x] = true
+				}
+			}
 		}
 	}
 }
@@ -58,11 +65,13 @@ func isWalkable(x, y int) bool {
 
 // findSpawnPoint finds a random walkable tile for a new player.
 func findSpawnPoint() (int, int) {
-	// Try center area first, then expand
+	cx, cy := mapWidth/2, mapHeight/2
+	// Try center area first, then quadrant centers
 	candidates := [][2]int{
-		{9, 6}, {10, 6}, {9, 8}, {10, 8},
-		{7, 5}, {12, 5}, {7, 9}, {12, 9},
-		{3, 3}, {15, 3}, {3, 12}, {15, 12},
+		{cx, cy}, {cx - 1, cy}, {cx, cy - 1}, {cx - 1, cy - 1},
+		{cx - 2, cy + 2}, {cx + 2, cy + 2}, {cx - 2, cy - 2}, {cx + 2, cy - 2},
+		{mapWidth / 4, mapHeight / 4}, {3 * mapWidth / 4, mapHeight / 4},
+		{mapWidth / 4, 3 * mapHeight / 4}, {3 * mapWidth / 4, 3 * mapHeight / 4},
 	}
 	for _, c := range candidates {
 		if isWalkable(c[0], c[1]) {

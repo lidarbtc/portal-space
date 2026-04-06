@@ -67,8 +67,8 @@ type PlayerInfo struct {
 const (
 	maxNicknameLen = 20
 	maxChatLen     = 500
-	mapWidth       = 20
-	mapHeight      = 15
+	mapWidth       = 60
+	mapHeight      = 45
 )
 
 var validStatuses = map[string]bool{
