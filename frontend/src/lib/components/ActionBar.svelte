@@ -15,6 +15,7 @@
     { key: 'coding', label: '💻 코딩중' },
     { key: 'resting', label: '☕ 휴식' },
     { key: 'away', label: '🚶 자리비움' },
+    { key: 'dnd', label: '🚫 방해금지' },
   ];
 
   const emotes: { emoji: Emoji; label: string }[] = [

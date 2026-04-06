@@ -240,7 +240,7 @@ export class WorldScene extends Phaser.Scene {
     });
 
     network.on('chat', (msg) => {
-      if (msg.id !== this.localPlayerId) {
+      if (msg.id !== this.localPlayerId && get(currentStatus) !== 'dnd') {
         notifyAudio.playIfHidden();
       }
       if (msg.id && msg.nickname && msg.text) {
@@ -412,7 +412,7 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private getStatusLabel(status: string): string {
-    const labels: Record<string, string> = { coding: '💻', resting: '☕', away: '🚶' };
+    const labels: Record<string, string> = { coding: '💻', resting: '☕', away: '🚶', dnd: '🚫' };
     return labels[status] ?? '💻';
   }
 
