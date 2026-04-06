@@ -1,8 +1,7 @@
 <script lang="ts">
   import Lobby from '$lib/components/Lobby.svelte';
   import GameCanvas from '$lib/components/GameCanvas.svelte';
-  import StatusBar from '$lib/components/StatusBar.svelte';
-  import EmoteBar from '$lib/components/EmoteBar.svelte';
+  import ActionBar from '$lib/components/ActionBar.svelte';
   import ChatLog from '$lib/components/ChatLog.svelte';
   import ChatInput from '$lib/components/ChatInput.svelte';
   import PlayerCount from '$lib/components/PlayerCount.svelte';
@@ -65,8 +64,7 @@
   <div id="game-container">
     <GameCanvas snapshot={gameData} />
   </div>
-  <StatusBar />
-  <EmoteBar />
+  <ActionBar />
   <ChatLog />
   <ChatInput onSend={handleChatSend} />
   <PlayerCount />
