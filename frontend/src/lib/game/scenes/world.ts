@@ -23,7 +23,7 @@ const REMOTE_LERP_FACTOR = 0.15;
 interface PlayerObject {
   sprite: Phaser.GameObjects.Sprite;
   nameText: Phaser.GameObjects.Text;
-  statusText: Phaser.GameObjects.Text;
+  statusDot: Phaser.GameObjects.Graphics;
   nickname: string;
   x: number;       // pixel coordinate
   y: number;       // pixel coordinate
@@ -292,26 +292,25 @@ export class WorldScene extends Phaser.Scene {
         color: '#e0e0ff',
         fontFamily: 'MulmaruMono',
         backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        padding: { x: 4, y: 2 }
+        padding: { left: 14, right: 4, top: 2, bottom: 2 }
       })
       .setOrigin(0.5)
       .setDepth(11)
-      .setResolution(2);
+      .setResolution(1);
 
-    const statusLabel = this.getStatusLabel(info.status);
-    const statusText = this.add
-      .text(px, py - this.tileSize / 2 - 24, statusLabel, {
-        fontSize: '14px',
-        fontFamily: 'Arial',
-        padding: { x: 2, y: 2 }
-      })
-      .setOrigin(0.5, 1)
-      .setDepth(11);
+    const statusDot = this.add.graphics().setDepth(12);
+    const dotColor = Phaser.Display.Color.HexStringToColor(this.getStatusColor(info.status)).color;
+    statusDot.fillStyle(dotColor, 1);
+    statusDot.fillCircle(0, 0, 3);
+    statusDot.setPosition(
+      nameText.x - nameText.width / 2 + 8,
+      nameText.y
+    );
 
     this.playerObjects.set(info.id, {
       sprite,
       nameText,
-      statusText,
+      statusDot,
       nickname: info.nickname,
       x: px,
       y: py,
@@ -335,7 +334,7 @@ export class WorldScene extends Phaser.Scene {
     if (!p) return;
     p.sprite.destroy();
     p.nameText.destroy();
-    p.statusText.destroy();
+    p.statusDot.destroy();
     if (p.bubbleText) p.bubbleText.destroy();
     if (p.bubbleTimer) clearTimeout(p.bubbleTimer);
     if (p.emoteText) p.emoteText.destroy();
@@ -388,7 +387,10 @@ export class WorldScene extends Phaser.Scene {
   private updatePlayerVisuals(p: PlayerObject): void {
     p.sprite.setPosition(p.x, p.y);
     p.nameText.setPosition(p.x, p.y - this.tileSize / 2 - 14);
-    p.statusText.setPosition(p.x, p.y - this.tileSize / 2 - 24);
+    p.statusDot.setPosition(
+      p.nameText.x - p.nameText.width / 2 + 8,
+      p.nameText.y
+    );
     if (p.bubbleText) {
       p.bubbleText.setPosition(p.x, p.y - this.tileSize - 10);
     }
@@ -405,12 +407,15 @@ export class WorldScene extends Phaser.Scene {
   private updatePlayerStatus(id: string, status: string): void {
     const p = this.playerObjects.get(id);
     if (!p) return;
-    p.statusText.setText(this.getStatusLabel(status));
+    const dotColor = Phaser.Display.Color.HexStringToColor(this.getStatusColor(status)).color;
+    p.statusDot.clear();
+    p.statusDot.fillStyle(dotColor, 1);
+    p.statusDot.fillCircle(0, 0, 3);
   }
 
-  private getStatusLabel(status: string): string {
-    const labels: Record<string, string> = { online: '🟢', away: '🚶', dnd: '🚫' };
-    return labels[status] ?? '🟢';
+  private getStatusColor(status: string): string {
+    const colors: Record<string, string> = { online: '#4ade80', away: '#eab308', dnd: '#ef4444' };
+    return colors[status] ?? '#4ade80';
   }
 
   private showChatBubble(id: string, text: string, _nickname: string): void {
@@ -537,14 +542,18 @@ export class WorldScene extends Phaser.Scene {
     let dx = 0, dy = 0;
     let dir: Direction | null = null;
 
-    if (this.cursors.left.isDown || this.wasd.left.isDown) {
-      dx = -1; dir = 'left';
-    } else if (this.cursors.right.isDown || this.wasd.right.isDown) {
-      dx = 1; dir = 'right';
-    } else if (this.cursors.up.isDown || this.wasd.up.isDown) {
-      dy = -1; dir = 'up';
-    } else if (this.cursors.down.isDown || this.wasd.down.isDown) {
-      dy = 1; dir = 'down';
+    // 축별 독립 합산 — 반대 방향 상쇄
+    if (this.cursors.left.isDown || this.wasd.left.isDown) dx -= 1;
+    if (this.cursors.right.isDown || this.wasd.right.isDown) dx += 1;
+    if (this.cursors.up.isDown || this.wasd.up.isDown) dy -= 1;
+    if (this.cursors.down.isDown || this.wasd.down.isDown) dy += 1;
+
+    // 방향 결정 (4방향만, X축 우선)
+    if (dx !== 0) {
+      dy = 0;
+      dir = dx > 0 ? 'right' : 'left';
+    } else if (dy !== 0) {
+      dir = dy > 0 ? 'down' : 'up';
     }
 
     if (!dir && dpad) {
