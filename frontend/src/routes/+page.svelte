@@ -7,7 +7,7 @@
   import ChatInput from '$lib/components/ChatInput.svelte';
   import PlayerCount from '$lib/components/PlayerCount.svelte';
   import SettingsPanel from '$lib/components/SettingsPanel.svelte';
-  import DPad from '$lib/components/DPad.svelte';
+  import Joystick from '$lib/components/Joystick.svelte';
   import { network } from '$lib/network';
   import { players, selfId } from '$lib/stores/game';
   import { connectionState } from '$lib/stores/connection';
@@ -50,15 +50,15 @@
     <div class="mobile-header">
       <PlayerCount />
     </div>
-    <div id="game-container">
+    <div id="game-container" class="mobile-game">
       <GameCanvas snapshot={gameData} />
+      <div class="mobile-joystick">
+        <Joystick />
+      </div>
     </div>
     <div class="mobile-chat">
       <ChatLog />
       <ChatInput onSend={handleChatSend} mobile={true} />
-    </div>
-    <div class="mobile-dpad">
-      <DPad />
     </div>
   </div>
 {:else}
@@ -144,19 +144,22 @@
     height: auto;
   }
 
+  .mobile-game {
+    position: relative;
+  }
+
+  .mobile-joystick {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 60;
+  }
+
   .mobile-chat {
     flex: 0 0 auto;
     max-height: 150px;
     overflow-y: auto;
-    border-top: 1px solid #0f3460;
-  }
-
-  .mobile-dpad {
-    flex: 0 0 auto;
-    display: flex;
-    justify-content: center;
-    padding: 8px 0;
-    background: #1a1a2e;
     border-top: 1px solid #0f3460;
   }
 
