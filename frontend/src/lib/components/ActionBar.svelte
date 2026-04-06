@@ -3,6 +3,7 @@
   import { currentStatus } from '$lib/stores/game';
   import { network } from '$lib/network';
   import type { PlayerStatus, Emoji } from '$lib/types';
+  import { CircleUserRound, SmilePlus } from '@lucide/svelte';
 
   type PanelType = 'status' | 'emote' | null;
 
@@ -85,14 +86,14 @@
       class:active={openPanel === 'status'}
       onclick={() => togglePanel('status')}
     >
-      상태
+      <CircleUserRound size={24} />
     </button>
     <button
       class="tab-button"
       class:active={openPanel === 'emote'}
       onclick={() => togglePanel('emote')}
     >
-      이모트
+      <SmilePlus size={24} />
     </button>
   </div>
 </div>
@@ -115,17 +116,20 @@
     display: flex;
     align-items: center;
     background: rgba(16, 24, 48, 0.9);
-    border: 2px solid #0f3460;
-    border-radius: 9999px;
-    padding: 4px;
+    border: none;
+    border-radius: 12px;
+    padding: 8px;
     gap: 4px;
   }
 
   .tab-button {
     all: unset;
     cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     padding: 8px 20px;
-    border-radius: 9999px;
+    border-radius: 8px;
     color: #aaaacc;
     font-size: 14px;
     font-family: 'MulmaruMono', monospace;
@@ -147,7 +151,7 @@
     flex-direction: column;
     gap: 4px;
     background: rgba(16, 24, 48, 0.95);
-    border: 2px solid #0f3460;
+    border: none;
     border-radius: 12px;
     padding: 8px;
     z-index: 51;
@@ -163,7 +167,7 @@
     font-size: 14px;
     font-family: 'MulmaruMono', monospace;
     transition: background 0.15s, color 0.15s;
-    text-align: center;
+    text-align: left;
     user-select: none;
   }
 

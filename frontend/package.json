@@ -17,6 +17,7 @@
     "vite": "^8.0.0"
   },
   "dependencies": {
+    "@lucide/svelte": "^1.7.0",
     "bits-ui": "^2.16.5",
     "phaser": "^3.80.0",
     "runed": "^0.37.1"
