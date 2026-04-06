@@ -3,7 +3,7 @@ export type MsgType = 'join' | 'leave' | 'move' | 'status' | 'chat' | 'emote' | 
 
 export type Direction = 'up' | 'down' | 'left' | 'right';
 export type PlayerStatus = 'coding' | 'resting' | 'away' | 'dnd';
-export type Emoji = '👋' | '☕' | '🔥' | '💻';
+export type Emoji = '👋' | '☕' | '🔥' | '💻' | '📢';
 
 // Matches protocol.go IncomingMessage (Client -> Server)
 export interface IncomingMessage {

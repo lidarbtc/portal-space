@@ -23,6 +23,7 @@
     { emoji: '☕', label: '커피' },
     { emoji: '🔥', label: '불꽃' },
     { emoji: '💻', label: '코딩' },
+    { emoji: '📢', label: '확성기' },
   ];
 
   function togglePanel(panel: PanelType) {

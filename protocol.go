@@ -132,7 +132,7 @@ func validateAvatar(a int) bool {
 }
 
 var validEmojis = map[string]bool{
-	"👋": true, "☕": true, "🔥": true, "💻": true,
+	"👋": true, "☕": true, "🔥": true, "💻": true, "📢": true,
 }
 
 func validateEmoji(e string) bool {
