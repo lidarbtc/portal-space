@@ -274,8 +274,8 @@ export class WorldScene extends Phaser.Scene {
         fontSize: '12px',
         color: '#e0e0ff',
         fontFamily: 'MulmaruMono',
-        stroke: '#000',
-        strokeThickness: 2
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        padding: { x: 4, y: 2 }
       })
       .setOrigin(0.5)
       .setDepth(11)
