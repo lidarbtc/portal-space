@@ -1,6 +1,7 @@
 <script lang="ts">
   import { Dialog, Slider, Switch } from 'bits-ui';
   import { Settings, User, Volume2 } from '@lucide/svelte';
+  import { toast } from 'svelte-sonner';
   import { network } from '$lib/network';
   import { DEFAULT_COLORS } from '$lib/game/palette-swap';
   import { volume, muted } from '$lib/stores/settings';
@@ -52,7 +53,12 @@
     nicknameError = '';
     persistedNickname.current = trimmed;
     const colors = getCurrentColors();
-    network.sendProfile(trimmed, colors);
+    const sent = network.sendProfile(trimmed, colors);
+    if (sent) {
+      toast.success('프로필이 적용되었습니다');
+    } else {
+      toast.error('연결이 끊겨 적용할 수 없습니다');
+    }
   }
 </script>
 

@@ -208,10 +208,12 @@ class NetworkClient {
     connectionState.set('disconnected');
   }
 
-  send(msg: IncomingMessage): void {
+  send(msg: IncomingMessage): boolean {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(msg));
+      return true;
     }
+    return false;
   }
 
   on(type: MsgType | 'disconnect', handler: MessageHandler | DisconnectHandler): void {
@@ -236,10 +238,10 @@ class NetworkClient {
     this.send({ type: 'emote', emoji });
   }
 
-  sendProfile(nickname: string, colors: ColorPalette): void {
+  sendProfile(nickname: string, colors: ColorPalette): boolean {
     this.lastNickname = nickname;
     this.lastColors = { ...colors };
-    this.send({ type: 'profile', nickname, colors });
+    return this.send({ type: 'profile', nickname, colors });
   }
 
   get isConnected(): boolean {
