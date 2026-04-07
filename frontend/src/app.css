@@ -594,3 +594,21 @@ body {
         z-index: 10000;
     }
 }
+
+/* svelte-sonner toast theme override (v1.1.0) */
+[data-sonner-toaster] {
+    font-family: 'MulmaruMono', monospace !important;
+    --border-radius: 8px;
+}
+
+[data-sonner-toaster][data-sonner-theme='dark'] {
+    --normal-bg: rgba(16, 24, 48, 0.97);
+    --normal-border: #0f3460;
+    --normal-text: #e0e0ff;
+    --success-bg: rgba(16, 24, 48, 0.97);
+    --success-border: #0f3460;
+    --success-text: #4ade80;
+    --error-bg: rgba(48, 16, 16, 0.97);
+    --error-border: #460f0f;
+    --error-text: #ffa0a0;
+}

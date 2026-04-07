@@ -7,7 +7,7 @@
 </script>
 
 <Metadata />
-<Toaster richColors position="bottom-center" />
+<Toaster richColors theme="dark" position="top-center" />
 <div class="app-shell">
   <GNB />
   <main class="app-main">
