@@ -5,6 +5,12 @@ export type Direction = 'up' | 'down' | 'left' | 'right';
 export type PlayerStatus = 'online' | 'away' | 'dnd';
 export type Emoji = '👋' | '☕' | '🔥' | '💻' | '📢';
 
+export interface ColorPalette {
+  body: string;
+  eye: string;
+  foot: string;
+}
+
 // Matches protocol.go IncomingMessage (Client -> Server)
 export interface IncomingMessage {
   type: MsgType;
@@ -15,6 +21,7 @@ export interface IncomingMessage {
   status?: PlayerStatus;
   text?: string;
   avatar?: number;
+  colors?: ColorPalette;
   emoji?: Emoji;
   reconnect?: boolean;
 }
@@ -46,12 +53,12 @@ export interface PlayerInfo {
   status: PlayerStatus;
   dir: Direction;
   avatar: number;
+  colors?: ColorPalette;
 }
 
 // Matches protocol.go map constants
 export const MAP_WIDTH = 60;
 export const MAP_HEIGHT = 45;
-export const MAX_AVATARS = 4;
 export const MAX_NICKNAME_LEN = 20;
 export const MAX_CHAT_LEN = 500;
 

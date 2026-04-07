@@ -1,6 +1,7 @@
 package main
 
 import (
+	"regexp"
 	"strings"
 	"unicode"
 )
@@ -21,16 +22,17 @@ const (
 // Client → Server messages
 
 type IncomingMessage struct {
-	Type      MsgType `json:"type"`
-	Nickname  string  `json:"nickname,omitempty"`
-	X         float64 `json:"x"`
-	Y         float64 `json:"y"`
-	Dir       string  `json:"dir,omitempty"`
-	Status    string  `json:"status,omitempty"`
-	Text      string  `json:"text,omitempty"`
-	Avatar    int     `json:"avatar"`
-	Emoji     string  `json:"emoji,omitempty"`
-	Reconnect bool    `json:"reconnect,omitempty"`
+	Type      MsgType       `json:"type"`
+	Nickname  string        `json:"nickname,omitempty"`
+	X         float64       `json:"x"`
+	Y         float64       `json:"y"`
+	Dir       string        `json:"dir,omitempty"`
+	Status    string        `json:"status,omitempty"`
+	Text      string        `json:"text,omitempty"`
+	Avatar    int           `json:"avatar"`
+	Colors    *ColorPalette `json:"colors,omitempty"`
+	Emoji     string        `json:"emoji,omitempty"`
+	Reconnect bool          `json:"reconnect,omitempty"`
 }
 
 // Server → Client messages
@@ -52,14 +54,21 @@ type OutgoingMessage struct {
 	Reconnect bool          `json:"reconnect,omitempty"`
 }
 
+type ColorPalette struct {
+	Body string `json:"body"`
+	Eye  string `json:"eye"`
+	Foot string `json:"foot"`
+}
+
 type PlayerInfo struct {
-	ID       string  `json:"id"`
-	Nickname string  `json:"nickname"`
-	X        float64 `json:"x"`
-	Y        float64 `json:"y"`
-	Status   string  `json:"status"`
-	Dir      string  `json:"dir"`
-	Avatar   int     `json:"avatar"`
+	ID       string        `json:"id"`
+	Nickname string        `json:"nickname"`
+	X        float64       `json:"x"`
+	Y        float64       `json:"y"`
+	Status   string        `json:"status"`
+	Dir      string        `json:"dir"`
+	Avatar   int           `json:"avatar"`
+	Colors   *ColorPalette `json:"colors,omitempty"`
 }
 
 // Validation
@@ -136,4 +145,17 @@ var validEmojis = map[string]bool{
 
 func validateEmoji(e string) bool {
 	return validEmojis[e]
+}
+
+var hexColorRe = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
+
+func validateHexColor(c string) bool {
+	return hexColorRe.MatchString(c)
+}
+
+func validateColors(cp *ColorPalette) bool {
+	if cp == nil {
+		return false
+	}
+	return validateHexColor(cp.Body) && validateHexColor(cp.Eye) && validateHexColor(cp.Foot)
 }

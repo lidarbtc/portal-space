@@ -231,41 +231,6 @@ body {
 }
 
 /* Avatar selection grid */
-.avatar-grid {
-    display: flex;
-    gap: 12px;
-    margin-bottom: 1.5rem;
-}
-
-.avatar-option {
-    width: 64px;
-    height: 64px;
-    border: 3px solid #0f3460;
-    border-radius: 8px;
-    cursor: pointer;
-    background: #16213e;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: border-color 0.2s;
-}
-
-.avatar-option:hover {
-    border-color: var(--color-primary-hover);
-}
-
-.avatar-sprite {
-    width: 48px;
-    height: 48px;
-    background-repeat: no-repeat;
-    image-rendering: pixelated;
-}
-
-.avatar-option.selected {
-    border-color: var(--color-primary);
-    background: #1a2744;
-    box-shadow: 0 0 12px var(--color-primary-alpha-50);
-}
 
 
 /* Emote tooltip */
@@ -548,11 +513,6 @@ body {
 
     #nickname-input {
         width: 100%;
-    }
-
-    .avatar-grid {
-        flex-wrap: wrap;
-        justify-content: center;
     }
 
     .input-row {

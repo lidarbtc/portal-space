@@ -1,9 +1,8 @@
 <script lang="ts">
   import { players, selfId } from '$lib/stores/game';
+  import { DEFAULT_COLORS } from '$lib/game/palette-swap';
 
   let openDropdown: 'online' | 'away' | 'dnd' | null = $state(null);
-
-  const avatarColors = ['#06b6d4', '#4ade80', '#f472b6', '#fbbf24'];
 
   let onlinePlayers = $derived(
     [...$players.values()].filter((p) => p.status === 'online')
@@ -39,7 +38,7 @@
       <div class="player-dropdown">
         {#each onlinePlayers as player (player.id)}
           <div class="player-item" class:is-self={player.id === $selfId}>
-            <span class="player-avatar-dot" style="background: {avatarColors[player.avatar ?? 0]}"></span>
+            <span class="player-avatar-dot" style="background: {player.colors?.body ?? DEFAULT_COLORS.body}"></span>
             <span class="player-nickname">{player.nickname}</span>
           </div>
         {/each}
@@ -59,7 +58,7 @@
       <div class="player-dropdown">
         {#each awayPlayers as player (player.id)}
           <div class="player-item" class:is-self={player.id === $selfId}>
-            <span class="player-avatar-dot" style="background: {avatarColors[player.avatar ?? 0]}"></span>
+            <span class="player-avatar-dot" style="background: {player.colors?.body ?? DEFAULT_COLORS.body}"></span>
             <span class="player-nickname">{player.nickname}</span>
           </div>
         {/each}
@@ -79,7 +78,7 @@
       <div class="player-dropdown">
         {#each dndPlayers as player (player.id)}
           <div class="player-item" class:is-self={player.id === $selfId}>
-            <span class="player-avatar-dot" style="background: {avatarColors[player.avatar ?? 0]}"></span>
+            <span class="player-avatar-dot" style="background: {player.colors?.body ?? DEFAULT_COLORS.body}"></span>
             <span class="player-nickname">{player.nickname}</span>
           </div>
         {/each}

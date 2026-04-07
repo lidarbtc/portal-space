@@ -1,7 +1,8 @@
 import { connectionState } from './stores/connection';
 import { players, selfId, addSystemMessage } from './stores/game';
 import { retryWithBackoff } from './utils/retry';
-import type { MsgType, IncomingMessage, OutgoingMessage, Direction, PlayerStatus, Emoji, PlayerInfo } from './types';
+import type { MsgType, IncomingMessage, OutgoingMessage, Direction, PlayerStatus, Emoji, PlayerInfo, ColorPalette } from './types';
+import { DEFAULT_COLORS } from './game/palette-swap';
 
 type MessageHandler = (msg: OutgoingMessage) => void;
 type DisconnectHandler = () => void;
@@ -13,7 +14,7 @@ class NetworkClient {
 
   // Reconnection state
   private lastNickname = '';
-  private lastAvatar = 0;
+  private lastColors: ColorPalette = { ...DEFAULT_COLORS };
   private lastX = 0;
   private lastY = 0;
   private shouldReconnect = false;
@@ -21,7 +22,7 @@ class NetworkClient {
   private cancelRetry: (() => void) | null = null;
   private connectTimeoutId: ReturnType<typeof setTimeout> | undefined;
 
-  connect(nickname: string, avatar: number = 0, onSnapshot?: (msg: OutgoingMessage) => void, position?: { x: number; y: number; reconnect?: boolean }): Promise<OutgoingMessage> {
+  connect(nickname: string, colors: ColorPalette = { ...DEFAULT_COLORS }, onSnapshot?: (msg: OutgoingMessage) => void, position?: { x: number; y: number; reconnect?: boolean }): Promise<OutgoingMessage> {
     return new Promise((resolve, reject) => {
       // Clean up old socket before creating new one
       if (this.ws) {
@@ -55,7 +56,7 @@ class NetworkClient {
       this.ws.onopen = () => {
         this._connected = true;
         connectionState.set('connected');
-        this.send({ type: 'join', nickname, avatar, ...position });
+        this.send({ type: 'join', nickname, colors, ...position });
       };
 
       this.ws.onmessage = (event: MessageEvent) => {
@@ -119,7 +120,7 @@ class NetworkClient {
 
       // Store for reconnection
       this.lastNickname = nickname;
-      this.lastAvatar = avatar;
+      this.lastColors = { ...colors };
 
       this.connectTimeoutId = setTimeout(() => {
         this.connectTimeoutId = undefined;
@@ -167,7 +168,7 @@ class NetworkClient {
     };
 
     const { promise, cancel } = retryWithBackoff(
-      () => this.connect(this.lastNickname, this.lastAvatar, onReconnectSnapshot, { x: this.lastX, y: this.lastY, reconnect: true }),
+      () => this.connect(this.lastNickname, this.lastColors, onReconnectSnapshot, { x: this.lastX, y: this.lastY, reconnect: true }),
       { baseDelay: 1000, maxDelay: 16000, maxElapsed: 60000 }
     );
 

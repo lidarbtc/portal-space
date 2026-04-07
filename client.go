@@ -33,6 +33,7 @@ type Client struct {
 	status   string
 	dir      string
 	avatar   int
+	colors   *ColorPalette
 
 	reconnect bool
 
@@ -103,6 +104,9 @@ func (c *Client) readPump() {
 			c.nickname = nickname
 			if validateAvatar(msg.Avatar) {
 				c.avatar = msg.Avatar
+			}
+			if msg.Colors != nil && validateColors(msg.Colors) {
+				c.colors = msg.Colors
 			}
 			c.reconnect = msg.Reconnect
 			// Honor client-requested position (reconnect with position restore)

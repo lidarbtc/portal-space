@@ -13,7 +13,7 @@
   import { connectionState } from '$lib/stores/connection';
   import { isMobile } from '$lib/stores/mobile';
   import { get } from 'svelte/store';
-  import type { OutgoingMessage } from '$lib/types';
+  import type { OutgoingMessage, ColorPalette } from '$lib/types';
 
   let inGame = $state(false);
   let gameData: OutgoingMessage | null = $state(null);
@@ -39,7 +39,7 @@
     }
   });
 
-  function handleJoin(data: { nickname: string; avatar: number; snapshot: OutgoingMessage }) {
+  function handleJoin(data: { nickname: string; colors: ColorPalette; snapshot: OutgoingMessage }) {
     gameData = data.snapshot;
     inGame = true;
     network.enableReconnect();

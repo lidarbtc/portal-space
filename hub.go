@@ -145,6 +145,7 @@ func (h *Hub) run() {
 					Status:   client.status,
 					Dir:      client.dir,
 					Avatar:   client.avatar,
+					Colors:   client.colors,
 				},
 			})
 
@@ -159,6 +160,7 @@ func (h *Hub) run() {
 					Status:   client.status,
 					Dir:      client.dir,
 					Avatar:   client.avatar,
+					Colors:   client.colors,
 				},
 				Reconnect: client.reconnect,
 			}
@@ -305,6 +307,7 @@ func (h *Hub) snapshotLocked() []*PlayerInfo {
 			Status:   c.status,
 			Dir:      c.dir,
 			Avatar:   c.avatar,
+			Colors:   c.colors,
 		})
 	}
 	return players

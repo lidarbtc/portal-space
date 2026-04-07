@@ -13,6 +13,7 @@ import { dpadDirection } from '$lib/stores/dpad';
 import { notifyAudio } from '$lib/audio';
 import { createPlaceholderTileset } from '../tileset';
 import { createAvatarSpritesheet } from '../spritesheet';
+import { createTintedSpritesheet } from '../palette-swap';
 import type { PlayerInfo, Direction } from '$lib/types';
 import { MAP_WIDTH, MAP_HEIGHT } from '$lib/types';
 
@@ -30,7 +31,7 @@ interface PlayerObject {
   targetX: number;  // remote player interpolation target
   targetY: number;  // remote player interpolation target
   dir: Direction;
-  avatar: number;
+  textureKey: string;
   bubbleText: Phaser.GameObjects.Text | null;
   bubbleTimer: ReturnType<typeof setTimeout> | null;
   emoteText: Phaser.GameObjects.Text | null;
@@ -279,11 +280,16 @@ export class WorldScene extends Phaser.Scene {
     const px = info.x;
     const py = info.y;
 
-    const dirFrame: Record<Direction, number> = { down: 0, up: 1, right: 2, left: 3 };
-    const avatarIndex = info.avatar ?? 0;
-    const frameIndex = avatarIndex * 4 + (dirFrame[info.dir] ?? 0);
+    // Create per-player tinted texture or use default
+    const textureKey = info.colors ? 'player_' + info.id : 'characters';
+    if (info.colors) {
+      createTintedSpritesheet(this, textureKey, info.colors);
+    }
 
-    const sprite = this.add.sprite(px, py, 'characters', frameIndex);
+    const dirFrame: Record<Direction, number> = { down: 0, up: 1, right: 2, left: 3 };
+    const frameIndex = dirFrame[info.dir] ?? 0;
+
+    const sprite = this.add.sprite(px, py, textureKey, frameIndex);
     sprite.setDepth(10);
 
     const nameText = this.add
@@ -317,7 +323,7 @@ export class WorldScene extends Phaser.Scene {
       targetX: px,
       targetY: py,
       dir: info.dir ?? 'down',
-      avatar: avatarIndex,
+      textureKey,
       bubbleText: null,
       bubbleTimer: null,
       emoteText: null,
@@ -339,6 +345,13 @@ export class WorldScene extends Phaser.Scene {
     if (p.bubbleTimer) clearTimeout(p.bubbleTimer);
     if (p.emoteText) p.emoteText.destroy();
     if (p.emoteTimer) clearTimeout(p.emoteTimer);
+
+    // Clean up per-player texture to prevent memory leak
+    const playerTexKey = 'player_' + id;
+    if (this.textures.exists(playerTexKey)) {
+      this.textures.remove(playerTexKey);
+    }
+
     this.playerObjects.delete(id);
   }
 
@@ -401,7 +414,7 @@ export class WorldScene extends Phaser.Scene {
 
   private updateCharacterFrame(p: PlayerObject, dir: Direction): void {
     const dirFrame: Record<Direction, number> = { down: 0, up: 1, right: 2, left: 3 };
-    p.sprite.setFrame((p.avatar ?? 0) * 4 + (dirFrame[dir] ?? 0));
+    p.sprite.setFrame(dirFrame[dir] ?? 0);
   }
 
   private updatePlayerStatus(id: string, status: string): void {
