@@ -186,6 +186,9 @@ body {
 
 .chat-system {
     color: #888899;
+}
+
+.chat-system-text {
     font-style: italic;
 }
 

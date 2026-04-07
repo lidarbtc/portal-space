@@ -44,7 +44,7 @@
 <div id="chat-log" bind:this={chatLogEl} onscroll={handleScroll}>
   {#each $chatMessages as message, i (i)}
     {#if message.isSystem}
-      <div class="chat-entry chat-system"><span class="chat-time">{formatTime(message.timestamp)}</span>{#each parseTextWithUrls(message.text) as segment}{#if segment.type === 'url'}<a href={segment.value} onclick={(e) => handleLinkClick(e, segment.value)}>{segment.value}</a>{:else}{segment.value}{/if}{/each}</div>
+      <div class="chat-entry chat-system"><span class="chat-time">{formatTime(message.timestamp)}</span><span class="chat-system-text">{#each parseTextWithUrls(message.text) as segment}{#if segment.type === 'url'}<a href={segment.value} onclick={(e) => handleLinkClick(e, segment.value)}>{segment.value}</a>{:else}{segment.value}{/if}{/each}</span></div>
     {:else}
       <div class="chat-entry">
         <span class="chat-time">{formatTime(message.timestamp)}</span><span class="chat-name">{message.nickname}</span>
