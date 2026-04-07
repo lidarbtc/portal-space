@@ -7,7 +7,7 @@ build:
 
 # Dev: run Go backend + Vite dev server (run in separate terminals)
 dev-go:
-	go run . --port 3000
+	go run . --port 3001
 
 dev-frontend:
 	cd frontend && bun run dev

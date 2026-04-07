@@ -2,17 +2,16 @@ module github.com/1ncursio/portal-space
 
 go 1.26.1
 
-replace github.com/gosuda/portal/v2 => github.com/gosuda/portal-tunnel/v2 v2.1.2-0.20260403064421-440cea4f22c6
-
 require (
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
-	github.com/gosuda/portal/v2 v2.1.1
+	github.com/gosuda/portal-tunnel/v2 v2.1.3
 	github.com/rs/zerolog v1.34.0
 	github.com/spf13/cobra v1.10.1
 )
 
 require (
+	github.com/andybalholm/brotli v1.2.1 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.1.0 // indirect
 	github.com/gosuda/keyless_tls v0.0.1-0.20260304212324-7733f8366abc // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
