@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/binary"
 	"net/http"
 	"strings"
 	"sync"
@@ -64,7 +65,7 @@ func (r *YjsRelay) loadFromStorage() {
 	if r.storage == nil {
 		return
 	}
-	rows, err := r.storage.db.Query("SELECT board_id, doc_state FROM yjs_documents")
+	rows, err := r.storage.db.Query("SELECT board_id, doc_state, updates_blob FROM yjs_documents")
 	if err != nil {
 		log.Warn().Err(err).Msg("failed to load yjs documents")
 		return
@@ -75,12 +76,14 @@ func (r *YjsRelay) loadFromStorage() {
 	for rows.Next() {
 		var boardID string
 		var state []byte
-		if err := rows.Scan(&boardID, &state); err != nil {
+		var updatesBlob []byte
+		if err := rows.Scan(&boardID, &state, &updatesBlob); err != nil {
 			continue
 		}
 		room := &yjsRoom{
 			clients:  make(map[*yjsClient]bool),
 			docState: state,
+			updates:  decodeUpdates(updatesBlob),
 		}
 		r.rooms[boardID] = room
 		count++
@@ -183,6 +186,16 @@ func (r *YjsRelay) sendFullState(room *yjsRoom, client *yjsClient) {
 		default:
 		}
 	}
+
+	// Send SyncStep1 with empty state vector to prompt client to respond
+	// with SyncStep2 (full merged state), keeping room.docState fresh.
+	// Wire format: [msgSync=0x00, syncStep1=0x00, varUintLen=0x00]
+	// The 0x00 third byte is lib0 writeVarUint8Array with length 0.
+	syncStep1Msg := []byte{yjsMsgSync, yjsSyncStep1, 0x00}
+	select {
+	case client.send <- syncStep1Msg:
+	default:
+	}
 }
 
 func (r *YjsRelay) readPump(boardID string, room *yjsRoom, client *yjsClient) {
@@ -284,18 +297,60 @@ func (r *YjsRelay) persistState(boardID string, room *yjsRoom) {
 	}
 	room.mu.RLock()
 	state := room.docState
+	updatesBlob := encodeUpdates(room.updates)
 	room.mu.RUnlock()
 
-	if len(state) > 0 {
+	if len(state) > 0 || len(updatesBlob) > 0 {
 		r.storage.WriteAsync(
-			`INSERT INTO yjs_documents (board_id, doc_state, updated_at)
-			 VALUES (?, ?, CURRENT_TIMESTAMP)
+			`INSERT INTO yjs_documents (board_id, doc_state, updates_blob, updated_at)
+			 VALUES (?, ?, ?, CURRENT_TIMESTAMP)
 			 ON CONFLICT(board_id) DO UPDATE SET
 			   doc_state = excluded.doc_state,
+			   updates_blob = excluded.updates_blob,
 			   updated_at = CURRENT_TIMESTAMP`,
-			boardID, state,
+			boardID, state, updatesBlob,
 		)
 	}
+}
+
+// encodeUpdates serialises the updates buffer into a single blob using
+// 4-byte big-endian length-prefix framing: [len1][data1][len2][data2]...
+func encodeUpdates(updates [][]byte) []byte {
+	if len(updates) == 0 {
+		return nil
+	}
+	size := 0
+	for _, u := range updates {
+		size += 4 + len(u)
+	}
+	buf := make([]byte, 0, size)
+	for _, u := range updates {
+		var lenBuf [4]byte
+		binary.BigEndian.PutUint32(lenBuf[:], uint32(len(u)))
+		buf = append(buf, lenBuf[:]...)
+		buf = append(buf, u...)
+	}
+	return buf
+}
+
+// decodeUpdates deserialises a blob produced by encodeUpdates.
+func decodeUpdates(data []byte) [][]byte {
+	if len(data) == 0 {
+		return nil
+	}
+	var updates [][]byte
+	for len(data) >= 4 {
+		length := binary.BigEndian.Uint32(data[:4])
+		data = data[4:]
+		if uint32(len(data)) < length {
+			break
+		}
+		update := make([]byte, length)
+		copy(update, data[:length])
+		updates = append(updates, update)
+		data = data[length:]
+	}
+	return updates
 }
 
 func (r *YjsRelay) writePump(client *yjsClient) {

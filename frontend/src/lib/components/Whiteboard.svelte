@@ -151,7 +151,8 @@
         doc.yShapes,
         drawLayer,
         (id) => { selectedShapeId = id; },
-        () => get(currentTool) === 'select'
+        () => get(currentTool) === 'select',
+        doc.provider
       );
     }
 

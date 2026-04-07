@@ -49,10 +49,16 @@ func (s *Storage) migrate() error {
 		CREATE TABLE IF NOT EXISTS yjs_documents (
 			board_id TEXT PRIMARY KEY,
 			doc_state BLOB NOT NULL,
+			updates_blob BLOB,
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		);
 	`)
-	return err
+	if err != nil {
+		return err
+	}
+	// Migration for existing databases: add updates_blob column if missing.
+	s.db.Exec(`ALTER TABLE yjs_documents ADD COLUMN updates_blob BLOB`)
+	return nil
 }
 
 func (s *Storage) writeLoop() {

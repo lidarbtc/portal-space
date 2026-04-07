@@ -110,20 +110,45 @@ export function bindYjsToKonva(
   yShapes: Y.Array<Y.Map<unknown>>,
   layer: Konva.Layer,
   onShapeSelect?: (id: string | null) => void,
-  getDraggable?: () => boolean
+  getDraggable?: () => boolean,
+  provider?: { synced: boolean; on(event: string, cb: (...args: unknown[]) => void): void; off(event: string, cb: (...args: unknown[]) => void): void }
 ): BindingHandle {
   const nodeMap = new Map<string, Konva.Shape | Konva.Group>();
 
-  // Initial render
-  yShapes.forEach((shapeMap) => {
-    const id = shapeMap.get('id') as string;
-    const node = createKonvaNode(shapeMap, layer, getDraggable);
-    if (node && id) {
-      nodeMap.set(id, node);
-      attachNodeEvents(node, shapeMap, onShapeSelect);
-    }
-  });
-  layer.batchDraw();
+  // Render all current shapes in yShapes to the Konva layer.
+  function renderInitial() {
+    yShapes.forEach((shapeMap) => {
+      const id = shapeMap.get('id') as string;
+      if (id && !nodeMap.has(id)) {
+        const node = createKonvaNode(shapeMap, layer, getDraggable);
+        if (node) {
+          nodeMap.set(id, node);
+          attachNodeEvents(node, shapeMap, onShapeSelect);
+          observeShapeMap(shapeMap);
+        }
+      }
+    });
+    layer.batchDraw();
+  }
+
+  // Defer initial render until provider is synced to avoid flash of stale/deleted shapes.
+  let syncTimeout: ReturnType<typeof setTimeout> | null = null;
+  if (provider && !provider.synced) {
+    const onSync = () => {
+      if (syncTimeout) clearTimeout(syncTimeout);
+      provider!.off('synced', onSync);
+      renderInitial();
+    };
+    provider.on('synced', onSync);
+    // Fallback: render after 3s even if synced never fires
+    syncTimeout = setTimeout(() => {
+      provider!.off('synced', onSync);
+      renderInitial();
+    }, 3000);
+  } else {
+    // Already synced or no provider — render immediately
+    renderInitial();
+  }
 
   // Observe Y.js changes
   const observer = (event: Y.YArrayEvent<Y.Map<unknown>>) => {
@@ -203,8 +228,6 @@ export function bindYjsToKonva(
     shapeObservers.set(shapeMap, () => shapeMap.unobserve(handler));
   }
 
-  yShapes.forEach(observeShapeMap);
-
   // Also observe new shapes added later
   const insertObserver = (event: Y.YArrayEvent<Y.Map<unknown>>) => {
     for (const delta of event.changes.delta) {
@@ -219,6 +242,7 @@ export function bindYjsToKonva(
 
   return {
     cleanup: () => {
+      if (syncTimeout) clearTimeout(syncTimeout);
       yShapes.unobserve(observer);
       yShapes.unobserve(insertObserver);
       for (const unsub of shapeObservers.values()) unsub();
