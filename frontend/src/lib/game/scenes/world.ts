@@ -14,6 +14,7 @@ import { notifyAudio } from '$lib/audio';
 import { createPlaceholderTileset } from '../tileset';
 import { createAvatarSpritesheet } from '../spritesheet';
 import { createTintedSpritesheet } from '../palette-swap';
+import { resolveNicknameColor } from '$lib/utils/nickname-colors';
 import type { PlayerInfo, Direction } from '$lib/types';
 import { MAP_WIDTH, MAP_HEIGHT } from '$lib/types';
 import { zoomLevel, zoomIn, zoomOut, computeMinZoom, clampZoom } from '$lib/stores/zoom';
@@ -302,8 +303,14 @@ export class WorldScene extends Phaser.Scene {
         notifyAudio.playIfHidden();
       }
       if (msg.id && msg.nickname && msg.text) {
+        const senderColors = get(players).get(msg.id)?.colors;
         this.showChatBubble(msg.id, msg.text, msg.nickname);
-        addChatMessage(msg.nickname, msg.text);
+        addChatMessage({
+          senderId: msg.id,
+          nickname: msg.nickname,
+          nicknameColor: resolveNicknameColor(msg.id, senderColors),
+          text: msg.text,
+        });
       }
     });
 

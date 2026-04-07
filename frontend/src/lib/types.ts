@@ -69,7 +69,9 @@ export const MAX_CUSTOM_STATUS_LEN = 20;
 
 // Chat message for UI
 export interface ChatMessage {
+  senderId?: string;
   nickname?: string;
+  nicknameColor?: string;
   text: string;
   isSystem: boolean;
   timestamp: number;
