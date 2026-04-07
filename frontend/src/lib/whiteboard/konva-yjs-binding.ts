@@ -29,7 +29,7 @@ export function generateShapeId(): string {
 /**
  * Create a Konva node from a Y.Map shape definition.
  */
-export function createKonvaNode(shapeMap: Y.Map<unknown>, layer: Konva.Layer): Konva.Shape | Konva.Group | null {
+export function createKonvaNode(shapeMap: Y.Map<unknown>, layer: Konva.Layer, getDraggable?: () => boolean): Konva.Shape | Konva.Group | null {
   const type = shapeMap.get('type') as ShapeType;
   const id = shapeMap.get('id') as string;
   const x = (shapeMap.get('x') as number) ?? 0;
@@ -90,7 +90,7 @@ export function createKonvaNode(shapeMap: Y.Map<unknown>, layer: Konva.Layer): K
   }
 
   if (node) {
-    node.draggable(true);
+    node.draggable(getDraggable?.() ?? false);
     layer.add(node);
   }
 
@@ -101,17 +101,23 @@ export function createKonvaNode(shapeMap: Y.Map<unknown>, layer: Konva.Layer): K
  * Bind Y.js shapes array to a Konva layer.
  * Returns a cleanup function.
  */
+export interface BindingHandle {
+  cleanup: () => void;
+  setAllDraggable: (draggable: boolean) => void;
+}
+
 export function bindYjsToKonva(
   yShapes: Y.Array<Y.Map<unknown>>,
   layer: Konva.Layer,
-  onShapeSelect?: (id: string | null) => void
-): () => void {
+  onShapeSelect?: (id: string | null) => void,
+  getDraggable?: () => boolean
+): BindingHandle {
   const nodeMap = new Map<string, Konva.Shape | Konva.Group>();
 
   // Initial render
   yShapes.forEach((shapeMap) => {
     const id = shapeMap.get('id') as string;
-    const node = createKonvaNode(shapeMap, layer);
+    const node = createKonvaNode(shapeMap, layer, getDraggable);
     if (node && id) {
       nodeMap.set(id, node);
       attachNodeEvents(node, shapeMap, onShapeSelect);
@@ -137,7 +143,7 @@ export function bindYjsToKonva(
         for (const item of delta.insert as Y.Map<unknown>[]) {
           const id = item.get('id') as string;
           if (id && !nodeMap.has(id)) {
-            const node = createKonvaNode(item, layer);
+            const node = createKonvaNode(item, layer, getDraggable);
             if (node) {
               nodeMap.set(id, node);
               attachNodeEvents(node, item, onShapeSelect);
@@ -211,12 +217,20 @@ export function bindYjsToKonva(
   };
   yShapes.observe(insertObserver);
 
-  return () => {
-    yShapes.unobserve(observer);
-    yShapes.unobserve(insertObserver);
-    for (const unsub of shapeObservers.values()) unsub();
-    for (const node of nodeMap.values()) node.destroy();
-    nodeMap.clear();
+  return {
+    cleanup: () => {
+      yShapes.unobserve(observer);
+      yShapes.unobserve(insertObserver);
+      for (const unsub of shapeObservers.values()) unsub();
+      for (const node of nodeMap.values()) node.destroy();
+      nodeMap.clear();
+    },
+    setAllDraggable: (draggable: boolean) => {
+      for (const node of nodeMap.values()) {
+        node.draggable(draggable);
+      }
+      layer.batchDraw();
+    },
   };
 }
 

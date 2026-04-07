@@ -19,7 +19,8 @@
     addShape,
     removeShape,
     generateShapeId,
-    type ShapeType
+    type ShapeType,
+    type BindingHandle
   } from '$lib/whiteboard/konva-yjs-binding';
   import {
     createAwarenessRenderer,
@@ -32,7 +33,7 @@
   let drawLayer: Konva.Layer | null = $state(null);
   let awarenessLayer: Konva.Layer | null = $state(null);
   let doc: WhiteboardDoc | null = $state(null);
-  let cleanupBinding: (() => void) | null = null;
+  let bindingHandle: BindingHandle | null = null;
   let cleanupAwareness: (() => void) | null = null;
 
   let isDrawing = $state(false);
@@ -146,9 +147,12 @@
     activeDoc.set(doc);
 
     if (drawLayer) {
-      cleanupBinding = bindYjsToKonva(doc.yShapes, drawLayer, (id) => {
-        selectedShapeId = id;
-      });
+      bindingHandle = bindYjsToKonva(
+        doc.yShapes,
+        drawLayer,
+        (id) => { selectedShapeId = id; },
+        () => get(currentTool) === 'select'
+      );
     }
 
     if (awarenessLayer) {
@@ -393,8 +397,8 @@
 
   function close() {
     // Cleanup
-    cleanupBinding?.();
-    cleanupBinding = null;
+    bindingHandle?.cleanup();
+    bindingHandle = null;
     cleanupAwareness?.();
     cleanupAwareness = null;
     doc?.destroy();
@@ -411,6 +415,11 @@
   }
 
   $effect(() => {
+    const tool = $currentTool;
+    bindingHandle?.setAllDraggable(tool === 'select');
+  });
+
+  $effect(() => {
     const boardId = $currentBoardId;
     if (boardId && $whiteboardOpen && konvaContainer) {
       setTimeout(() => {
@@ -421,7 +430,7 @@
   });
 
   onDestroy(() => {
-    cleanupBinding?.();
+    bindingHandle?.cleanup();
     cleanupAwareness?.();
     doc?.destroy();
     stage?.destroy();
