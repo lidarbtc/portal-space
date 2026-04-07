@@ -1,5 +1,5 @@
 // Message types — must match protocol.go MsgType constants
-export type MsgType = 'join' | 'leave' | 'move' | 'status' | 'chat' | 'emote' | 'profile' | 'customStatus' | 'snapshot' | 'error';
+export type MsgType = 'join' | 'leave' | 'move' | 'dash' | 'status' | 'chat' | 'emote' | 'profile' | 'customStatus' | 'snapshot' | 'error';
 
 export type Direction = 'up' | 'down' | 'left' | 'right';
 export type PlayerStatus = 'online' | 'away' | 'dnd';

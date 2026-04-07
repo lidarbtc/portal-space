@@ -234,6 +234,10 @@ class NetworkClient {
     this.send({ type: 'chat', text, x, y });
   }
 
+  sendDash(dir: Direction): void {
+    this.send({ type: 'dash', dir });
+  }
+
   sendEmote(emoji: Emoji): void {
     this.send({ type: 'emote', emoji });
   }

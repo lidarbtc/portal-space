@@ -17,6 +17,7 @@ const (
 	MsgEmote        MsgType = "emote"
 	MsgProfile      MsgType = "profile"
 	MsgCustomStatus MsgType = "customStatus"
+	MsgDash         MsgType = "dash"
 	MsgSnapshot     MsgType = "snapshot"
 	MsgError        MsgType = "error"
 )

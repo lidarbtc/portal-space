@@ -22,6 +22,9 @@ import { zoomLevel, zoomIn, zoomOut, computeMinZoom, clampZoom } from '$lib/stor
 const MOVE_SPEED = 200; // px/sec
 const NETWORK_SEND_INTERVAL = 100; // ms (10Hz)
 const REMOTE_LERP_FACTOR = 0.15;
+const DASH_SPEED = 800; // px/sec during dash
+const DASH_DURATION = 200; // ms
+const DASH_COOLDOWN = 1500; // ms
 
 interface PlayerObject {
   sprite: Phaser.GameObjects.Sprite;
@@ -60,6 +63,13 @@ export class WorldScene extends Phaser.Scene {
   // Network send throttle
   private lastNetworkSendTime = 0;
   private wasMoving = false;
+
+  // Dash state
+  private isDashing = false;
+  private dashDir: Direction | null = null;
+  private dashStartTime = 0;
+  private lastDashTime = 0;
+  private spaceKey!: Phaser.Input.Keyboard.Key;
 
   constructor() {
     super({ key: 'WorldScene' });
@@ -101,6 +111,8 @@ export class WorldScene extends Phaser.Scene {
       left: Phaser.Input.Keyboard.Key;
       right: Phaser.Input.Keyboard.Key;
     };
+
+    this.spaceKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE, false);
 
     this.setupNetwork();
     this.setupZoom();
@@ -351,6 +363,15 @@ export class WorldScene extends Phaser.Scene {
         }
         return m;
       });
+    });
+
+    network.on('dash', (msg) => {
+      if (!msg.id || msg.id === this.localPlayerId) return;
+      const p = this.playerObjects.get(msg.id);
+      if (!p) return;
+      const dir = (msg.dir as Direction) ?? 'down';
+      const dirFrame: Record<Direction, number> = { down: 0, up: 1, right: 2, left: 3 };
+      this.spawnDashAfterimages(msg.x, msg.y, dir, p.textureKey, dirFrame[dir]);
     });
 
     network.on('snapshot', (msg) => {
@@ -671,6 +692,36 @@ export class WorldScene extends Phaser.Scene {
     }, 3000);
   }
 
+  private spawnDashAfterimages(
+    x: number, y: number, dir: Direction, textureKey: string, frame: number
+  ): void {
+    const dirVec: Record<Direction, [number, number]> = {
+      up: [0, 1], down: [0, -1], left: [1, 0], right: [-1, 0]
+    };
+    const [ox, oy] = dirVec[dir];
+    const count = 6;
+    const spacing = 28;
+
+    for (let i = 0; i < count; i++) {
+      const ghost = this.add.sprite(
+        x + ox * spacing * (i + 1),
+        y + oy * spacing * (i + 1),
+        textureKey, frame
+      );
+      ghost.setDepth(9);
+      ghost.setTintFill(0xffffff);
+      ghost.setAlpha(0.8 - i * 0.12);
+
+      this.tweens.add({
+        targets: ghost,
+        alpha: 0,
+        duration: 300 + i * 100,
+        ease: 'Power2',
+        onComplete: () => ghost.destroy()
+      });
+    }
+  }
+
   update(_time: number, delta: number): void {
     if (!this.localPlayerId) return;
 
@@ -725,38 +776,72 @@ export class WorldScene extends Phaser.Scene {
     }
 
     const isMovingNow = dir !== null;
+    const now = performance.now();
 
-    if (dir) {
-      const moveAmount = MOVE_SPEED * (delta / 1000);
-      let newX = localPlayer.x + dx * moveAmount;
-      let newY = localPlayer.y + dy * moveAmount;
+    // Dash trigger: spacebar while moving, respecting cooldown
+    if (dir && !this.isDashing && Phaser.Input.Keyboard.JustDown(this.spaceKey) && now - this.lastDashTime >= DASH_COOLDOWN) {
+      this.isDashing = true;
+      this.dashDir = dir;
+      this.dashStartTime = now;
+      this.lastDashTime = now;
+      network.sendDash(dir);
 
-      const result = this.checkCollision(localPlayer, newX, newY, dir);
+      const dirFrame: Record<Direction, number> = { down: 0, up: 1, right: 2, left: 3 };
+      this.spawnDashAfterimages(localPlayer.x, localPlayer.y, dir, localPlayer.textureKey, dirFrame[dir]);
+    }
+
+    // End dash if duration expired
+    if (this.isDashing && now - this.dashStartTime >= DASH_DURATION) {
+      this.isDashing = false;
+      this.dashDir = null;
+    }
+
+    // Determine effective direction and speed
+    const effectiveDir = this.isDashing ? this.dashDir! : dir;
+    const effectiveSpeed = this.isDashing ? DASH_SPEED : MOVE_SPEED;
+
+    if (effectiveDir) {
+      const eDx = effectiveDir === 'right' ? 1 : effectiveDir === 'left' ? -1 : 0;
+      const eDy = effectiveDir === 'down' ? 1 : effectiveDir === 'up' ? -1 : 0;
+      const moveAmount = effectiveSpeed * (delta / 1000);
+      let newX = localPlayer.x + eDx * moveAmount;
+      let newY = localPlayer.y + eDy * moveAmount;
+
+      const result = this.checkCollision(localPlayer, newX, newY, effectiveDir);
       newX = result.x;
       newY = result.y;
 
+      // If collision stopped movement during dash, end dash early
+      if (this.isDashing) {
+        const movedX = Math.abs(newX - localPlayer.x);
+        const movedY = Math.abs(newY - localPlayer.y);
+        if (movedX < 0.1 && movedY < 0.1) {
+          this.isDashing = false;
+          this.dashDir = null;
+        }
+      }
+
       localPlayer.x = newX;
       localPlayer.y = newY;
-      localPlayer.dir = dir;
+      localPlayer.dir = effectiveDir;
 
-      this.updateCharacterFrame(localPlayer, dir);
+      this.updateCharacterFrame(localPlayer, effectiveDir);
       this.updatePlayerVisuals(localPlayer);
 
       // Throttled network send
-      const now = performance.now();
       if (now - this.lastNetworkSendTime >= NETWORK_SEND_INTERVAL) {
         this.lastNetworkSendTime = now;
-        network.sendMove(newX, newY, dir);
+        network.sendMove(newX, newY, effectiveDir);
 
         players.update((m) => {
           const info = m.get(this.localPlayerId!);
           if (info) {
-            m.set(this.localPlayerId!, { ...info, x: newX, y: newY, dir });
+            m.set(this.localPlayerId!, { ...info, x: newX, y: newY, dir: effectiveDir });
           }
           return m;
         });
       }
-    } else if (!isMovingNow && this.wasMoving) {
+    } else if (!isMovingNow && !this.isDashing && this.wasMoving) {
       // Movement ended — send final position immediately
       network.sendMove(localPlayer.x, localPlayer.y, localPlayer.dir);
 
@@ -769,6 +854,6 @@ export class WorldScene extends Phaser.Scene {
       });
     }
 
-    this.wasMoving = isMovingNow;
+    this.wasMoving = isMovingNow || this.isDashing;
   }
 }

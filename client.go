@@ -42,6 +42,8 @@ type Client struct {
 	lastEmote        time.Time
 	lastProfile      time.Time
 	lastCustomStatus time.Time
+	lastDash         time.Time
+	dashUntil        time.Time
 
 	send chan []byte
 	once sync.Once
@@ -137,6 +139,9 @@ func (c *Client) readPump() {
 
 		case MsgCustomStatus:
 			c.hub.handleCustomStatus(c, msg.CustomStatus)
+
+		case MsgDash:
+			c.hub.handleDash(c, msg.Dir)
 
 		case MsgProfile:
 			nickname := sanitizeNickname(msg.Nickname)

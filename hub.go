@@ -15,6 +15,9 @@ const (
 	emoteRateLimit       = 2  // max emotes per second per client
 	profileCooldown      = 2  // seconds between profile updates
 	customStatusCooldown = 2  // seconds between custom status updates
+	dashCooldown         = 1500 * time.Millisecond
+	dashDuration         = 150 * time.Millisecond
+	dashMaxSpeed         = 1000.0 // px/sec validation cap during dash
 )
 
 // collisionMap stores which tiles block movement (true = blocked).
@@ -229,14 +232,18 @@ func (h *Hub) handleMove(client *Client, x, y float64, dir string) {
 
 	now := time.Now()
 
-	// Speed validation: reject >400px/sec (skip on first move or after 2s idle)
+	// Speed validation: reject excessive speed (skip on first move or after 2s idle)
 	elapsed := now.Sub(client.lastMove)
 	if !client.lastMove.IsZero() && elapsed < 2*time.Second && elapsed > 0 {
 		dx := x - client.x
 		dy := y - client.y
 		dist := math.Sqrt(dx*dx + dy*dy)
 		speed := dist / elapsed.Seconds()
-		if speed > 400 {
+		maxSpeed := 400.0
+		if now.Before(client.dashUntil) {
+			maxSpeed = dashMaxSpeed
+		}
+		if speed > maxSpeed {
 			return
 		}
 	}
@@ -256,6 +263,26 @@ func (h *Hub) handleMove(client *Client, x, y float64, dir string) {
 		ID:   client.id,
 		X:    x,
 		Y:    y,
+		Dir:  dir,
+	}
+}
+
+func (h *Hub) handleDash(client *Client, dir string) {
+	if !validateDirection(dir) {
+		return
+	}
+	now := time.Now()
+	if now.Sub(client.lastDash) < dashCooldown {
+		return
+	}
+	client.lastDash = now
+	client.dashUntil = now.Add(dashDuration)
+
+	h.broadcast <- &OutgoingMessage{
+		Type: MsgDash,
+		ID:   client.id,
+		X:    client.x,
+		Y:    client.y,
 		Dir:  dir,
 	}
 }
