@@ -238,6 +238,10 @@ class NetworkClient {
     this.send({ type: 'emote', emoji });
   }
 
+  sendCustomStatus(text: string): void {
+    this.send({ type: 'customStatus', customStatus: text });
+  }
+
   sendProfile(nickname: string, colors: ColorPalette): boolean {
     this.lastNickname = nickname;
     this.lastColors = { ...colors };

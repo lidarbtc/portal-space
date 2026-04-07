@@ -9,50 +9,53 @@ import (
 type MsgType string
 
 const (
-	MsgJoin     MsgType = "join"
-	MsgLeave    MsgType = "leave"
-	MsgMove     MsgType = "move"
-	MsgStatus   MsgType = "status"
-	MsgChat     MsgType = "chat"
-	MsgEmote    MsgType = "emote"
-	MsgProfile  MsgType = "profile"
-	MsgSnapshot MsgType = "snapshot"
-	MsgError    MsgType = "error"
+	MsgJoin         MsgType = "join"
+	MsgLeave        MsgType = "leave"
+	MsgMove         MsgType = "move"
+	MsgStatus       MsgType = "status"
+	MsgChat         MsgType = "chat"
+	MsgEmote        MsgType = "emote"
+	MsgProfile      MsgType = "profile"
+	MsgCustomStatus MsgType = "customStatus"
+	MsgSnapshot     MsgType = "snapshot"
+	MsgError        MsgType = "error"
 )
 
 // Client → Server messages
 
 type IncomingMessage struct {
-	Type      MsgType       `json:"type"`
-	Nickname  string        `json:"nickname,omitempty"`
-	X         float64       `json:"x"`
-	Y         float64       `json:"y"`
-	Dir       string        `json:"dir,omitempty"`
-	Status    string        `json:"status,omitempty"`
-	Text      string        `json:"text,omitempty"`
-	Avatar    int           `json:"avatar"`
-	Colors    *ColorPalette `json:"colors,omitempty"`
-	Emoji     string        `json:"emoji,omitempty"`
-	Reconnect bool          `json:"reconnect,omitempty"`
+	Type         MsgType       `json:"type"`
+	Nickname     string        `json:"nickname,omitempty"`
+	X            float64       `json:"x"`
+	Y            float64       `json:"y"`
+	Dir          string        `json:"dir,omitempty"`
+	Status       string        `json:"status,omitempty"`
+	Text         string        `json:"text,omitempty"`
+	Avatar       int           `json:"avatar"`
+	Colors       *ColorPalette `json:"colors,omitempty"`
+	Emoji        string        `json:"emoji,omitempty"`
+	CustomStatus string        `json:"customStatus,omitempty"`
+	Reconnect    bool          `json:"reconnect,omitempty"`
 }
 
 // Server → Client messages
 
 type OutgoingMessage struct {
-	Type     MsgType       `json:"type"`
-	ID       string        `json:"id,omitempty"`
-	Nickname string        `json:"nickname,omitempty"`
-	X        float64       `json:"x"`
-	Y        float64       `json:"y"`
-	Dir      string        `json:"dir,omitempty"`
-	Status   string        `json:"status,omitempty"`
-	Text     string        `json:"text,omitempty"`
-	Message  string        `json:"message,omitempty"`
-	Emoji    string        `json:"emoji,omitempty"`
-	Player    *PlayerInfo   `json:"player,omitempty"`
-	Players   []*PlayerInfo `json:"players,omitempty"`
-	Self      *PlayerInfo   `json:"self,omitempty"`
-	Reconnect bool          `json:"reconnect,omitempty"`
+	Type         MsgType       `json:"type"`
+	ID           string        `json:"id,omitempty"`
+	Nickname     string        `json:"nickname,omitempty"`
+	X            float64       `json:"x"`
+	Y            float64       `json:"y"`
+	Dir          string        `json:"dir,omitempty"`
+	Status       string        `json:"status,omitempty"`
+	Text         string        `json:"text,omitempty"`
+	Message      string        `json:"message,omitempty"`
+	Emoji        string        `json:"emoji,omitempty"`
+	CustomStatus string        `json:"customStatus,omitempty"`
+	Player       *PlayerInfo   `json:"player,omitempty"`
+	Players      []*PlayerInfo `json:"players,omitempty"`
+	Self         *PlayerInfo   `json:"self,omitempty"`
+	Reconnect    bool          `json:"reconnect,omitempty"`
 }
 
 type ColorPalette struct {
@@ -62,23 +65,25 @@ type ColorPalette struct {
 }
 
 type PlayerInfo struct {
-	ID       string        `json:"id"`
-	Nickname string        `json:"nickname"`
-	X        float64       `json:"x"`
-	Y        float64       `json:"y"`
-	Status   string        `json:"status"`
-	Dir      string        `json:"dir"`
-	Avatar   int           `json:"avatar"`
-	Colors   *ColorPalette `json:"colors,omitempty"`
+	ID           string        `json:"id"`
+	Nickname     string        `json:"nickname"`
+	X            float64       `json:"x"`
+	Y            float64       `json:"y"`
+	Status       string        `json:"status"`
+	Dir          string        `json:"dir"`
+	Avatar       int           `json:"avatar"`
+	Colors       *ColorPalette `json:"colors,omitempty"`
+	CustomStatus string        `json:"customStatus,omitempty"`
 }
 
 // Validation
 
 const (
-	maxNicknameLen = 20
-	maxChatLen     = 500
-	mapWidth       = 60
-	mapHeight      = 45
+	maxNicknameLen     = 20
+	maxChatLen         = 500
+	maxCustomStatusLen = 20
+	mapWidth           = 60
+	mapHeight          = 45
 )
 
 var validStatuses = map[string]bool{

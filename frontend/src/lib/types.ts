@@ -1,5 +1,5 @@
 // Message types — must match protocol.go MsgType constants
-export type MsgType = 'join' | 'leave' | 'move' | 'status' | 'chat' | 'emote' | 'profile' | 'snapshot' | 'error';
+export type MsgType = 'join' | 'leave' | 'move' | 'status' | 'chat' | 'emote' | 'profile' | 'customStatus' | 'snapshot' | 'error';
 
 export type Direction = 'up' | 'down' | 'left' | 'right';
 export type PlayerStatus = 'online' | 'away' | 'dnd';
@@ -23,6 +23,7 @@ export interface IncomingMessage {
   avatar?: number;
   colors?: ColorPalette;
   emoji?: Emoji;
+  customStatus?: string;
   reconnect?: boolean;
 }
 
@@ -38,6 +39,7 @@ export interface OutgoingMessage {
   text?: string;
   message?: string;
   emoji?: Emoji;
+  customStatus?: string;
   colors?: ColorPalette;
   player?: PlayerInfo;
   players?: PlayerInfo[];
@@ -55,6 +57,7 @@ export interface PlayerInfo {
   dir: Direction;
   avatar: number;
   colors?: ColorPalette;
+  customStatus?: string;
 }
 
 // Matches protocol.go map constants
@@ -62,6 +65,7 @@ export const MAP_WIDTH = 60;
 export const MAP_HEIGHT = 45;
 export const MAX_NICKNAME_LEN = 20;
 export const MAX_CHAT_LEN = 500;
+export const MAX_CUSTOM_STATUS_LEN = 20;
 
 // Chat message for UI
 export interface ChatMessage {

@@ -37,6 +37,7 @@ interface PlayerObject {
   bubbleTimer: ReturnType<typeof setTimeout> | null;
   emoteText: Phaser.GameObjects.Text | null;
   emoteTimer: ReturnType<typeof setTimeout> | null;
+  customStatusBubble: Phaser.GameObjects.Text | null;
 }
 
 export class WorldScene extends Phaser.Scene {
@@ -284,6 +285,12 @@ export class WorldScene extends Phaser.Scene {
       }
     });
 
+    network.on('customStatus', (msg) => {
+      if (msg.id) {
+        this.updateCustomStatus(msg.id, msg.customStatus ?? '');
+      }
+    });
+
     network.on('emote', (msg) => {
       if (msg.id && msg.emoji) {
         this.showEmote(msg.id, msg.emoji);
@@ -417,8 +424,13 @@ export class WorldScene extends Phaser.Scene {
       bubbleText: null,
       bubbleTimer: null,
       emoteText: null,
-      emoteTimer: null
+      emoteTimer: null,
+      customStatusBubble: null
     });
+
+    if (info.customStatus) {
+      this.updateCustomStatus(info.id, info.customStatus);
+    }
 
     if (info.id === this.localPlayerId) {
       this.cameras.main.startFollow(sprite, true, 0.1, 0.1);
@@ -441,6 +453,7 @@ export class WorldScene extends Phaser.Scene {
       p.emoteText.destroy();
     }
     if (p.emoteTimer) clearTimeout(p.emoteTimer);
+    if (p.customStatusBubble) p.customStatusBubble.destroy();
 
     // Clean up per-player texture to prevent memory leak
     const playerTexKey = 'player_' + id;
@@ -500,6 +513,9 @@ export class WorldScene extends Phaser.Scene {
       p.nameText.x - p.nameText.width / 2 + 8,
       p.nameText.y
     );
+    if (p.customStatusBubble) {
+      p.customStatusBubble.setPosition(p.x, p.y - this.tileSize / 2 - 34);
+    }
     if (p.bubbleText) {
       p.bubbleText.setPosition(p.x, p.y - this.tileSize - 10);
     }
@@ -525,6 +541,32 @@ export class WorldScene extends Phaser.Scene {
   private getStatusColor(status: string): string {
     const colors: Record<string, string> = { online: '#4ade80', away: '#eab308', dnd: '#ef4444' };
     return colors[status] ?? '#4ade80';
+  }
+
+  private updateCustomStatus(id: string, text: string): void {
+    const p = this.playerObjects.get(id);
+    if (!p) return;
+
+    if (p.customStatusBubble) {
+      p.customStatusBubble.destroy();
+      p.customStatusBubble = null;
+    }
+
+    if (!text) return;
+
+    p.customStatusBubble = this.add
+      .text(p.x, p.y - this.tileSize / 2 - 34, text, {
+        fontSize: '11px',
+        color: '#ffffff',
+        fontFamily: 'MulmaruMono',
+        backgroundColor: '#445588cc',
+        padding: { x: 6, y: 3 },
+        stroke: '#000',
+        strokeThickness: 1,
+      })
+      .setOrigin(0.5)
+      .setDepth(15)
+      .setResolution(2);
   }
 
   private showChatBubble(id: string, text: string, _nickname: string): void {

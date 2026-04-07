@@ -26,20 +26,22 @@ type Client struct {
 	hub  *Hub
 	conn *websocket.Conn
 
-	id       string
-	nickname string
-	x        float64
-	y        float64
-	status   string
-	dir      string
-	avatar   int
-	colors   *ColorPalette
+	id           string
+	nickname     string
+	x            float64
+	y            float64
+	status       string
+	dir          string
+	avatar       int
+	colors       *ColorPalette
+	customStatus string
 
 	reconnect bool
 
-	lastMove    time.Time
-	lastEmote   time.Time
-	lastProfile time.Time
+	lastMove         time.Time
+	lastEmote        time.Time
+	lastProfile      time.Time
+	lastCustomStatus time.Time
 
 	send chan []byte
 	once sync.Once
@@ -124,7 +126,6 @@ func (c *Client) readPump() {
 		case MsgMove:
 			c.hub.handleMove(c, msg.X, msg.Y, msg.Dir)
 
-
 		case MsgStatus:
 			c.hub.handleStatus(c, msg.Status)
 
@@ -133,6 +134,9 @@ func (c *Client) readPump() {
 
 		case MsgEmote:
 			c.hub.handleEmote(c, msg.Emoji)
+
+		case MsgCustomStatus:
+			c.hub.handleCustomStatus(c, msg.CustomStatus)
 
 		case MsgProfile:
 			nickname := sanitizeNickname(msg.Nickname)

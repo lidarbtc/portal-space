@@ -4,6 +4,7 @@
   import { network } from '$lib/network';
   import type { PlayerStatus, Emoji } from '$lib/types';
   import { CircleUserRound, SmilePlus, Settings } from '@lucide/svelte';
+  import CustomStatusModal from './CustomStatusModal.svelte';
 
   let { onOpenSettings }: { onOpenSettings?: () => void } = $props();
 
@@ -41,6 +42,8 @@
     network.sendEmote(emoji);
   }
 
+  let customStatusModalOpen = $state(false);
+
   let containerEl: HTMLDivElement | undefined = $state(undefined);
 
   $effect(() => {
@@ -71,6 +74,12 @@
         </ToggleGroup.Item>
       {/each}
     </ToggleGroup.Root>
+    <button
+      class="dropdown-item custom-status-btn"
+      onclick={() => { openPanel = null; customStatusModalOpen = true; }}
+    >
+      ✏️ 상태 설정
+    </button>
   {/if}
 
   {#if openPanel === 'emote'}
@@ -107,6 +116,8 @@
     </button>
   </div>
 </div>
+
+<CustomStatusModal bind:open={customStatusModalOpen} />
 
 <style>
   .action-bar-wrapper {
@@ -204,6 +215,27 @@
 
   .action-bar-wrapper :global(.emote-label) {
     font-size: 13px;
+  }
+
+  .custom-status-btn {
+    all: unset;
+    cursor: pointer;
+    padding: 8px 16px;
+    border-radius: 8px;
+    color: #aaaacc;
+    font-size: 14px;
+    font-family: 'MulmaruMono', monospace;
+    transition: background 0.15s, color 0.15s;
+    text-align: left;
+    user-select: none;
+    border-top: 1px solid rgba(15, 52, 96, 0.5);
+    margin-top: 4px;
+    padding-top: 12px;
+  }
+
+  .custom-status-btn:hover {
+    background: var(--color-primary-alpha-50);
+    color: #e0e0ff;
   }
 
 </style>

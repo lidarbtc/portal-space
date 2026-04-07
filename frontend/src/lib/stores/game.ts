@@ -37,5 +37,8 @@ export function addSystemMessage(text: string): void {
 // Current status
 export const currentStatus = writable<PlayerStatus>('online');
 
+// Custom status text (session-only)
+export const currentCustomStatus = writable<string>('');
+
 // Chat input active state
 export const chatInputActive = writable(false);

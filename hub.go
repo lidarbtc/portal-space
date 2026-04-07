@@ -9,11 +9,12 @@ import (
 )
 
 const (
-	proximityRadius = 5.0
-	maxPlayers      = 20
-	moveRateLimit   = 10 // max moves per second per client
-	emoteRateLimit  = 2  // max emotes per second per client
-	profileCooldown = 2  // seconds between profile updates
+	proximityRadius      = 5.0
+	maxPlayers           = 20
+	moveRateLimit        = 10 // max moves per second per client
+	emoteRateLimit       = 2  // max emotes per second per client
+	profileCooldown      = 2  // seconds between profile updates
+	customStatusCooldown = 2  // seconds between custom status updates
 )
 
 // collisionMap stores which tiles block movement (true = blocked).
@@ -139,14 +140,15 @@ func (h *Hub) run() {
 				Type:    MsgSnapshot,
 				Players: snapshot,
 				Self: &PlayerInfo{
-					ID:       client.id,
-					Nickname: client.nickname,
-					X:        client.x,
-					Y:        client.y,
-					Status:   client.status,
-					Dir:      client.dir,
-					Avatar:   client.avatar,
-					Colors:   client.colors,
+					ID:           client.id,
+					Nickname:     client.nickname,
+					X:            client.x,
+					Y:            client.y,
+					Status:       client.status,
+					Dir:          client.dir,
+					Avatar:       client.avatar,
+					Colors:       client.colors,
+					CustomStatus: client.customStatus,
 				},
 			})
 
@@ -154,14 +156,15 @@ func (h *Hub) run() {
 			joinMsg := &OutgoingMessage{
 				Type: MsgJoin,
 				Player: &PlayerInfo{
-					ID:       client.id,
-					Nickname: client.nickname,
-					X:        client.x,
-					Y:        client.y,
-					Status:   client.status,
-					Dir:      client.dir,
-					Avatar:   client.avatar,
-					Colors:   client.colors,
+					ID:           client.id,
+					Nickname:     client.nickname,
+					X:            client.x,
+					Y:            client.y,
+					Status:       client.status,
+					Dir:          client.dir,
+					Avatar:       client.avatar,
+					Colors:       client.colors,
+					CustomStatus: client.customStatus,
 				},
 				Reconnect: client.reconnect,
 			}
@@ -313,6 +316,23 @@ func (h *Hub) handleProfile(client *Client, nickname string, colors *ColorPalett
 	}
 }
 
+func (h *Hub) handleCustomStatus(client *Client, text string) {
+	now := time.Now()
+	if now.Sub(client.lastCustomStatus) < time.Duration(customStatusCooldown)*time.Second {
+		return
+	}
+	client.lastCustomStatus = now
+
+	text = sanitizeString(text, maxCustomStatusLen)
+	client.customStatus = text
+
+	h.broadcast <- &OutgoingMessage{
+		Type:         MsgCustomStatus,
+		ID:           client.id,
+		CustomStatus: text,
+	}
+}
+
 func (h *Hub) handleChat(client *Client, text string) {
 	text = sanitizeChat(text)
 	if text == "" {
@@ -331,14 +351,15 @@ func (h *Hub) snapshotLocked() []*PlayerInfo {
 	players := make([]*PlayerInfo, 0, len(h.players))
 	for _, c := range h.players {
 		players = append(players, &PlayerInfo{
-			ID:       c.id,
-			Nickname: c.nickname,
-			X:        c.x,
-			Y:        c.y,
-			Status:   c.status,
-			Dir:      c.dir,
-			Avatar:   c.avatar,
-			Colors:   c.colors,
+			ID:           c.id,
+			Nickname:     c.nickname,
+			X:            c.x,
+			Y:            c.y,
+			Status:       c.status,
+			Dir:          c.dir,
+			Avatar:       c.avatar,
+			Colors:       c.colors,
+			CustomStatus: c.customStatus,
 		})
 	}
 	return players
