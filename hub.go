@@ -175,13 +175,16 @@ func (h *Hub) run() {
 
 		case client := <-h.unregister:
 			h.mu.Lock()
-			if _, ok := h.players[client.id]; ok {
+			_, ok := h.players[client.id]
+			if ok {
 				delete(h.players, client.id)
 			}
 			h.mu.Unlock()
-			h.broadcast <- &OutgoingMessage{
-				Type: MsgLeave,
-				ID:   client.id,
+			if ok {
+				h.broadcast <- &OutgoingMessage{
+					Type: MsgLeave,
+					ID:   client.id,
+				}
 			}
 
 		case msg := <-h.broadcast:
