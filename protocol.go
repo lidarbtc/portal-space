@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"regexp"
 	"strings"
 	"unicode"
@@ -20,43 +21,64 @@ const (
 	MsgDash         MsgType = "dash"
 	MsgSnapshot     MsgType = "snapshot"
 	MsgError        MsgType = "error"
+	MsgAction       MsgType = "action"
+)
+
+// ActionMessage is the envelope for feature-specific messages.
+type ActionMessage struct {
+	Domain   string          `json:"domain"`
+	Action   string          `json:"action"`
+	ObjectID string          `json:"objectId,omitempty"`
+	Payload  json.RawMessage `json:"payload,omitempty"`
+}
+
+const (
+	proximityRadius      = 5.0
+	maxPlayers           = 20
+	moveRateLimit        = 10
+	emoteRateLimit       = 2
+	profileCooldown      = 2
+	customStatusCooldown = 2
 )
 
 // Client → Server messages
 
 type IncomingMessage struct {
-	Type         MsgType       `json:"type"`
-	Nickname     string        `json:"nickname,omitempty"`
-	X            float64       `json:"x"`
-	Y            float64       `json:"y"`
-	Dir          string        `json:"dir,omitempty"`
-	Status       string        `json:"status,omitempty"`
-	Text         string        `json:"text,omitempty"`
-	Avatar       int           `json:"avatar"`
-	Colors       *ColorPalette `json:"colors,omitempty"`
-	Emoji        string        `json:"emoji,omitempty"`
-	CustomStatus string        `json:"customStatus,omitempty"`
-	Reconnect    bool          `json:"reconnect,omitempty"`
+	Type         MsgType         `json:"type"`
+	Nickname     string          `json:"nickname,omitempty"`
+	X            float64         `json:"x"`
+	Y            float64         `json:"y"`
+	Dir          string          `json:"dir,omitempty"`
+	Status       string          `json:"status,omitempty"`
+	Text         string          `json:"text,omitempty"`
+	Avatar       int             `json:"avatar"`
+	Colors       *ColorPalette   `json:"colors,omitempty"`
+	Emoji        string          `json:"emoji,omitempty"`
+	CustomStatus string          `json:"customStatus,omitempty"`
+	Reconnect    bool            `json:"reconnect,omitempty"`
+	Payload      json.RawMessage `json:"payload,omitempty"`
 }
 
 // Server → Client messages
 
 type OutgoingMessage struct {
-	Type         MsgType       `json:"type"`
-	ID           string        `json:"id,omitempty"`
-	Nickname     string        `json:"nickname,omitempty"`
-	X            float64       `json:"x"`
-	Y            float64       `json:"y"`
-	Dir          string        `json:"dir,omitempty"`
-	Status       string        `json:"status,omitempty"`
-	Text         string        `json:"text,omitempty"`
-	Message      string        `json:"message,omitempty"`
-	Emoji        string        `json:"emoji,omitempty"`
-	CustomStatus string        `json:"customStatus,omitempty"`
-	Player       *PlayerInfo   `json:"player,omitempty"`
-	Players      []*PlayerInfo `json:"players,omitempty"`
-	Self         *PlayerInfo   `json:"self,omitempty"`
-	Reconnect    bool          `json:"reconnect,omitempty"`
+	Type          MsgType              `json:"type"`
+	ID            string               `json:"id,omitempty"`
+	Nickname      string               `json:"nickname,omitempty"`
+	X             float64              `json:"x"`
+	Y             float64              `json:"y"`
+	Dir           string               `json:"dir,omitempty"`
+	Status        string               `json:"status,omitempty"`
+	Text          string               `json:"text,omitempty"`
+	Message       string               `json:"message,omitempty"`
+	Emoji         string               `json:"emoji,omitempty"`
+	CustomStatus  string               `json:"customStatus,omitempty"`
+	Player        *PlayerInfo          `json:"player,omitempty"`
+	Players       []*PlayerInfo        `json:"players,omitempty"`
+	Self          *PlayerInfo          `json:"self,omitempty"`
+	Reconnect     bool                 `json:"reconnect,omitempty"`
+	Objects       []*InteractiveObject `json:"objects,omitempty"`
+	ActionPayload json.RawMessage      `json:"actionPayload,omitempty"`
 }
 
 type ColorPalette struct {
@@ -101,19 +123,16 @@ var validDirections = map[string]bool{
 }
 
 func sanitizeString(s string, maxLen int) string {
-	// Remove control characters and invisible unicode characters
 	s = strings.Map(func(r rune) rune {
 		if unicode.IsControl(r) && r != '\n' {
 			return -1
 		}
-		// Remove zero-width and invisible characters
 		switch r {
 		case '\u200B', '\u200C', '\u200D', '\uFEFF', '\u00AD', '\u2060', '\u180E',
 			'\u200E', '\u200F', '\u202A', '\u202B', '\u202C', '\u202D', '\u202E',
 			'\u2066', '\u2067', '\u2068', '\u2069', '\u00A0':
 			return -1
 		}
-		// Remove other space-like characters (ideographic space, etc.)
 		if unicode.In(r, unicode.Zs) && r != ' ' {
 			return -1
 		}

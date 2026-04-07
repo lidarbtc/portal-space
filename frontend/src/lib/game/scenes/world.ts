@@ -15,9 +15,17 @@ import { createPlaceholderTileset } from '../tileset';
 import { createAvatarSpritesheet } from '../spritesheet';
 import { createTintedSpritesheet } from '../palette-swap';
 import { resolveNicknameColor } from '$lib/utils/nickname-colors';
-import type { PlayerInfo, Direction } from '$lib/types';
+import type { PlayerInfo, Direction, InteractiveObject } from '$lib/types';
 import { MAP_WIDTH, MAP_HEIGHT } from '$lib/types';
 import { zoomLevel, zoomIn, zoomOut, computeMinZoom, clampZoom } from '$lib/stores/zoom';
+import { interactiveObjects, nearbyObjectId, activeObjectId } from '$lib/stores/objects';
+import { whiteboardOpen, currentBoardId } from '$lib/stores/whiteboard';
+import {
+  createInteractiveObject,
+  updateNearbyState,
+  destroyInteractiveObject,
+  type GameInteractiveObject
+} from '../objects/interactive-object';
 
 const MOVE_SPEED = 200; // px/sec
 const NETWORK_SEND_INTERVAL = 100; // ms (10Hz)
@@ -46,6 +54,7 @@ interface PlayerObject {
 
 export class WorldScene extends Phaser.Scene {
   private playerObjects: Map<string, PlayerObject> = new Map();
+  private gameObjects: Map<string, GameInteractiveObject> = new Map();
   private localPlayerId: string | null = null;
   private tileSize = 32;
   private unsubscribers: Array<() => void> = [];
@@ -116,6 +125,19 @@ export class WorldScene extends Phaser.Scene {
 
     this.setupNetwork();
     this.setupZoom();
+    this.setupInteractiveObjects();
+
+    // Render objects already in store (from initial snapshot)
+    const currentObjects = get(interactiveObjects);
+    currentObjects.forEach((obj, id) => {
+      if (!this.gameObjects.has(id)) {
+        const gameObj = createInteractiveObject(this, obj);
+        this.gameObjects.set(id, gameObj);
+        gameObj.container.on('pointerdown', () => {
+          this.onObjectInteract(obj);
+        });
+      }
+    });
 
     const unsubSelfId = selfId.subscribe((id) => {
       this.localPlayerId = id;
@@ -395,6 +417,22 @@ export class WorldScene extends Phaser.Scene {
         }
       }
       players.set(newMap);
+
+      // Load interactive objects from snapshot
+      if (msg.objects) {
+        const objMap = new Map<string, InteractiveObject>();
+        msg.objects.forEach((obj) => {
+          objMap.set(obj.id, obj);
+          if (!this.gameObjects.has(obj.id)) {
+            const gameObj = createInteractiveObject(this, obj);
+            this.gameObjects.set(obj.id, gameObj);
+            gameObj.container.on('pointerdown', () => {
+              this.onObjectInteract(obj);
+            });
+          }
+        });
+        interactiveObjects.set(objMap);
+      }
     });
   }
 
@@ -855,5 +893,64 @@ export class WorldScene extends Phaser.Scene {
     }
 
     this.wasMoving = isMovingNow || this.isDashing;
+
+    // Update nearby interactive objects
+    this.updateNearbyObjects();
+  }
+
+  private setupInteractiveObjects(): void {
+    const eKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.E, false);
+    eKey.on('down', () => {
+      const activeEl = document.activeElement;
+      const isTyping = activeEl?.tagName === 'INPUT' || activeEl?.tagName === 'TEXTAREA' || (activeEl as HTMLElement)?.isContentEditable;
+      if (get(chatInputActive) || isTyping) return;
+
+      const nearId = get(nearbyObjectId);
+      if (nearId) {
+        const gObj = this.gameObjects.get(nearId);
+        if (gObj) this.onObjectInteract(gObj.data);
+      }
+    });
+
+    const unsubObjects = interactiveObjects.subscribe((objMap) => {
+      this.gameObjects.forEach((gObj, id) => {
+        if (!objMap.has(id)) {
+          destroyInteractiveObject(gObj);
+          this.gameObjects.delete(id);
+        }
+      });
+    });
+    this.unsubscribers.push(unsubObjects);
+  }
+
+  private onObjectInteract(obj: InteractiveObject): void {
+    if (obj.type === 'whiteboard') {
+      currentBoardId.set(obj.id);
+      whiteboardOpen.set(true);
+    }
+  }
+
+  private updateNearbyObjects(): void {
+    if (!this.localPlayerId) return;
+    const localPlayer = this.playerObjects.get(this.localPlayerId);
+    if (!localPlayer) return;
+
+    let closestId: string | null = null;
+    let closestDist = Infinity;
+
+    this.gameObjects.forEach((gObj, id) => {
+      const isNear = updateNearbyState(gObj, localPlayer.x, localPlayer.y);
+      if (isNear) {
+        const dx = gObj.data.x - localPlayer.x;
+        const dy = gObj.data.y - localPlayer.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < closestDist) {
+          closestDist = dist;
+          closestId = id;
+        }
+      }
+    });
+
+    nearbyObjectId.set(closestId);
   }
 }

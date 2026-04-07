@@ -1,7 +1,7 @@
 import { connectionState } from './stores/connection';
 import { players, selfId, addSystemMessage } from './stores/game';
 import { retryWithBackoff } from './utils/retry';
-import type { MsgType, IncomingMessage, OutgoingMessage, Direction, PlayerStatus, Emoji, PlayerInfo, ColorPalette } from './types';
+import type { MsgType, IncomingMessage, OutgoingMessage, Direction, PlayerStatus, Emoji, PlayerInfo, ColorPalette, ActionMessage } from './types';
 import { DEFAULT_COLORS } from './game/palette-swap';
 
 type MessageHandler = (msg: OutgoingMessage) => void;
@@ -250,6 +250,24 @@ class NetworkClient {
     this.lastNickname = nickname;
     this.lastColors = { ...colors };
     return this.send({ type: 'profile', nickname, colors });
+  }
+
+  sendAction(domain: string, action: string, objectId?: string, payload?: unknown): void {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      const envelope: Record<string, unknown> = { domain, action };
+      if (objectId) envelope.objectId = objectId;
+      if (payload !== undefined) envelope.payload = payload;
+      // Send as { type: "action", payload: {object} } — payload must be a JSON object, not a string
+      this.ws.send(JSON.stringify({ type: 'action', payload: envelope }));
+    }
+  }
+
+  onAction(handler: (msg: ActionMessage) => void): void {
+    this.on('action', ((msg: OutgoingMessage) => {
+      if (msg.actionPayload) {
+        handler(msg.actionPayload);
+      }
+    }) as MessageHandler);
   }
 
   get isConnected(): boolean {

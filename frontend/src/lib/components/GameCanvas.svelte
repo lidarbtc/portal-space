@@ -3,7 +3,8 @@
   import Phaser from 'phaser';
   import { createGameConfig } from '$lib/game/config';
   import { players, selfId, addSystemMessage } from '$lib/stores/game';
-  import type { OutgoingMessage } from '$lib/types';
+  import { interactiveObjects } from '$lib/stores/objects';
+  import type { OutgoingMessage, InteractiveObject } from '$lib/types';
 
   let { snapshot }: { snapshot: OutgoingMessage | null } = $props();
 
@@ -22,6 +23,13 @@
         }
         players.set(initial);
         addSystemMessage(snapshot.self.nickname + '님이 입장했습니다.');
+      }
+
+      // Initialize interactive objects from snapshot
+      if (snapshot.objects) {
+        const objMap = new Map<string, InteractiveObject>();
+        snapshot.objects.forEach((obj) => objMap.set(obj.id, obj));
+        interactiveObjects.set(objMap);
       }
     }
 

@@ -1,5 +1,5 @@
 // Message types — must match protocol.go MsgType constants
-export type MsgType = 'join' | 'leave' | 'move' | 'dash' | 'status' | 'chat' | 'emote' | 'profile' | 'customStatus' | 'snapshot' | 'error';
+export type MsgType = 'join' | 'leave' | 'move' | 'dash' | 'status' | 'chat' | 'emote' | 'profile' | 'customStatus' | 'snapshot' | 'error' | 'action';
 
 export type Direction = 'up' | 'down' | 'left' | 'right';
 export type PlayerStatus = 'online' | 'away' | 'dnd';
@@ -25,6 +25,28 @@ export interface IncomingMessage {
   emoji?: Emoji;
   customStatus?: string;
   reconnect?: boolean;
+  payload?: string; // Action envelope JSON (for type: 'action')
+}
+
+// Action envelope for feature-specific messages
+export interface ActionMessage {
+  domain: string;
+  action: string;
+  objectId?: string;
+  senderId?: string;
+  payload?: unknown;
+  // Whiteboard state response fields
+  snapshot?: unknown;
+  strokes?: unknown[];
+}
+
+// Interactive object in the game world
+export interface InteractiveObject {
+  id: string;
+  type: string;
+  x: number;
+  y: number;
+  state?: unknown;
 }
 
 // Matches protocol.go OutgoingMessage (Server -> Client)
@@ -45,6 +67,8 @@ export interface OutgoingMessage {
   players?: PlayerInfo[];
   self?: PlayerInfo;
   reconnect?: boolean;
+  objects?: InteractiveObject[];
+  actionPayload?: ActionMessage;
 }
 
 // Matches protocol.go PlayerInfo (no omitempty — all fields required)

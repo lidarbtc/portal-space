@@ -1,407 +1,73 @@
 package main
 
 import (
-	"math"
 	"sync"
-	"time"
 
 	"github.com/rs/zerolog/log"
 )
 
-const (
-	proximityRadius      = 5.0
-	maxPlayers           = 20
-	moveRateLimit        = 10 // max moves per second per client
-	emoteRateLimit       = 2  // max emotes per second per client
-	profileCooldown      = 2  // seconds between profile updates
-	customStatusCooldown = 2  // seconds between custom status updates
-	dashCooldown         = 1500 * time.Millisecond
-	dashDuration         = 150 * time.Millisecond
-	dashMaxSpeed         = 1000.0 // px/sec validation cap during dash
-)
-
-// collisionMap stores which tiles block movement (true = blocked).
-var collisionMap [mapHeight][mapWidth]bool
-
-func initCollisionMap() {
-	// Outer walls
-	for x := 0; x < mapWidth; x++ {
-		collisionMap[0][x] = true
-		collisionMap[mapHeight-1][x] = true
-	}
-	for y := 0; y < mapHeight; y++ {
-		collisionMap[y][0] = true
-		collisionMap[y][mapWidth-1] = true
-	}
-
-	// Interior furniture (tables, chairs, shelves)
-	// Base pattern from original 20x15 block, tiled across 60x45 map
-	baseTables := [][2]int{
-		{4, 4}, {5, 4},
-		{4, 7}, {5, 7},
-		{4, 10}, {5, 10},
-		{10, 4}, {11, 4},
-		{10, 7}, {11, 7},
-		{10, 10}, {11, 10},
-		{16, 4}, {17, 4},
-		{16, 7}, {17, 7},
-		{16, 10}, {17, 10},
-	}
-	// Tile the base pattern in 20x15 blocks across the full map
-	for blockY := 0; blockY < mapHeight/15; blockY++ {
-		for blockX := 0; blockX < mapWidth/20; blockX++ {
-			for _, f := range baseTables {
-				x := f[0] + blockX*20
-				y := f[1] + blockY*15
-				if x >= 0 && x < mapWidth && y >= 0 && y < mapHeight {
-					collisionMap[y][x] = true
-				}
-			}
-		}
-	}
-}
-
-func isWalkable(x, y int) bool {
-	if x < 0 || x >= mapWidth || y < 0 || y >= mapHeight {
-		return false
-	}
-	return !collisionMap[y][x]
-}
-
-// findSpawnPoint finds a random walkable tile and returns pixel coordinates (center of tile).
-func findSpawnPoint() (float64, float64) {
-	cx, cy := mapWidth/2, mapHeight/2
-	// Try center area first, then quadrant centers
-	candidates := [][2]int{
-		{cx, cy}, {cx - 1, cy}, {cx, cy - 1}, {cx - 1, cy - 1},
-		{cx - 2, cy + 2}, {cx + 2, cy + 2}, {cx - 2, cy - 2}, {cx + 2, cy - 2},
-		{mapWidth / 4, mapHeight / 4}, {3 * mapWidth / 4, mapHeight / 4},
-		{mapWidth / 4, 3 * mapHeight / 4}, {3 * mapWidth / 4, 3 * mapHeight / 4},
-	}
-	for _, c := range candidates {
-		if isWalkable(c[0], c[1]) {
-			return float64(c[0]*32 + 16), float64(c[1]*32 + 16)
-		}
-	}
-	// Fallback: scan for any walkable tile
-	for y := 1; y < mapHeight-1; y++ {
-		for x := 1; x < mapWidth-1; x++ {
-			if isWalkable(x, y) {
-				return float64(x*32 + 16), float64(y*32 + 16)
-			}
-		}
-	}
-	return float64(1*32 + 16), float64(1*32 + 16)
-}
-
+// Hub manages rooms and global state.
 type Hub struct {
-	mu      sync.RWMutex
-	players map[string]*Client
+	mu    sync.RWMutex
+	rooms map[string]*Room
 
-	register   chan *Client
-	unregister chan *Client
-	broadcast  chan *OutgoingMessage
-
-	done chan struct{}
-	wg   sync.WaitGroup
+	storage *Storage
 }
 
-func newHub() *Hub {
-	initCollisionMap()
-	return &Hub{
-		players:    make(map[string]*Client),
-		register:   make(chan *Client),
-		unregister: make(chan *Client),
-		broadcast:  make(chan *OutgoingMessage, 256),
-		done:       make(chan struct{}),
+func newHub(storage *Storage) *Hub {
+	h := &Hub{
+		rooms:   make(map[string]*Room),
+		storage: storage,
 	}
+
+	// Create default room
+	defaultRoom := newRoom("default", h, mapWidth, mapHeight)
+	h.rooms["default"] = defaultRoom
+
+	// Place whiteboards near map center for visibility
+	defaultRoom.addObject(&InteractiveObject{
+		ID:   "wb-1",
+		Type: "whiteboard",
+		X:    float64(27*32 + 16),
+		Y:    float64(22*32 + 16),
+	})
+	defaultRoom.addObject(&InteractiveObject{
+		ID:   "wb-2",
+		Type: "whiteboard",
+		X:    float64(33*32 + 16),
+		Y:    float64(22*32 + 16),
+	})
+
+	return h
+}
+
+func (h *Hub) defaultRoom() *Room {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.rooms["default"]
 }
 
 func (h *Hub) run() {
-	h.wg.Add(1)
-	defer h.wg.Done()
-
-	for {
-		select {
-		case client := <-h.register:
-			h.mu.Lock()
-			if len(h.players) >= maxPlayers {
-				h.mu.Unlock()
-				client.sendMsg(&OutgoingMessage{
-					Type:    MsgError,
-					Message: "room is full",
-				})
-				client.conn.Close()
-				continue
-			}
-			// Send snapshot of existing players BEFORE adding new client
-			snapshot := h.snapshotLocked()
-			h.players[client.id] = client
-			h.mu.Unlock()
-
-			client.sendMsg(&OutgoingMessage{
-				Type:    MsgSnapshot,
-				Players: snapshot,
-				Self: &PlayerInfo{
-					ID:           client.id,
-					Nickname:     client.nickname,
-					X:            client.x,
-					Y:            client.y,
-					Status:       client.status,
-					Dir:          client.dir,
-					Avatar:       client.avatar,
-					Colors:       client.colors,
-					CustomStatus: client.customStatus,
-				},
-			})
-
-			// Broadcast join to all others (not the joining client)
-			joinMsg := &OutgoingMessage{
-				Type: MsgJoin,
-				Player: &PlayerInfo{
-					ID:           client.id,
-					Nickname:     client.nickname,
-					X:            client.x,
-					Y:            client.y,
-					Status:       client.status,
-					Dir:          client.dir,
-					Avatar:       client.avatar,
-					Colors:       client.colors,
-					CustomStatus: client.customStatus,
-				},
-				Reconnect: client.reconnect,
-			}
-			h.mu.RLock()
-			for _, c := range h.players {
-				if c.id != client.id {
-					c.sendMsg(joinMsg)
-				}
-			}
-			h.mu.RUnlock()
-
-		case client := <-h.unregister:
-			h.mu.Lock()
-			_, ok := h.players[client.id]
-			if ok {
-				delete(h.players, client.id)
-			}
-			h.mu.Unlock()
-			if ok {
-				h.broadcast <- &OutgoingMessage{
-					Type: MsgLeave,
-					ID:   client.id,
-				}
-			}
-
-		case msg := <-h.broadcast:
-			h.mu.RLock()
-			for _, client := range h.players {
-				client.sendMsg(msg)
-			}
-			h.mu.RUnlock()
-
-		case <-h.done:
-			return
-		}
-	}
-}
-
-// broadcastProximity sends a message to players within proximity radius.
-// NOTE: Currently unused (dead code). Coordinates are now pixel-based.
-func (h *Hub) broadcastProximity(msg *OutgoingMessage, senderX, senderY float64, senderID string) {
 	h.mu.RLock()
-	defer h.mu.RUnlock()
-	pixelRadius := proximityRadius * 32 // convert tile radius to pixel radius
-	for _, client := range h.players {
-		dx := client.x - senderX
-		dy := client.y - senderY
-		dist := math.Sqrt(dx*dx + dy*dy)
-		if dist <= pixelRadius {
-			client.sendMsg(msg)
-		}
+	for _, room := range h.rooms {
+		go room.run()
 	}
-}
-
-func (h *Hub) handleMove(client *Client, x, y float64, dir string) {
-	if !validateMove(x, y) {
-		return
-	}
-	if !validateDirection(dir) {
-		return
-	}
-
-	now := time.Now()
-
-	// Speed validation: reject excessive speed (skip on first move or after 2s idle)
-	elapsed := now.Sub(client.lastMove)
-	if !client.lastMove.IsZero() && elapsed < 2*time.Second && elapsed > 0 {
-		dx := x - client.x
-		dy := y - client.y
-		dist := math.Sqrt(dx*dx + dy*dy)
-		speed := dist / elapsed.Seconds()
-		maxSpeed := 400.0
-		if now.Before(client.dashUntil) {
-			maxSpeed = dashMaxSpeed
-		}
-		if speed > maxSpeed {
-			return
-		}
-	}
-
-	// Rate limit
-	if elapsed < time.Second/moveRateLimit {
-		return
-	}
-	client.lastMove = now
-
-	client.x = x
-	client.y = y
-	client.dir = dir
-
-	h.broadcast <- &OutgoingMessage{
-		Type: MsgMove,
-		ID:   client.id,
-		X:    x,
-		Y:    y,
-		Dir:  dir,
-	}
-}
-
-func (h *Hub) handleDash(client *Client, dir string) {
-	if !validateDirection(dir) {
-		return
-	}
-	now := time.Now()
-	if now.Sub(client.lastDash) < dashCooldown {
-		return
-	}
-	client.lastDash = now
-	client.dashUntil = now.Add(dashDuration)
-
-	h.broadcast <- &OutgoingMessage{
-		Type: MsgDash,
-		ID:   client.id,
-		X:    client.x,
-		Y:    client.y,
-		Dir:  dir,
-	}
-}
-
-func (h *Hub) handleStatus(client *Client, status string) {
-	if !validateStatus(status) {
-		return
-	}
-	client.status = status
-	h.broadcast <- &OutgoingMessage{
-		Type:   MsgStatus,
-		ID:     client.id,
-		Status: status,
-	}
-}
-
-func (h *Hub) handleEmote(client *Client, emoji string) {
-	if !validateEmoji(emoji) {
-		return
-	}
-	now := time.Now()
-	if now.Sub(client.lastEmote) < time.Second/emoteRateLimit {
-		return
-	}
-	client.lastEmote = now
-
-	h.broadcast <- &OutgoingMessage{
-		Type:  MsgEmote,
-		ID:    client.id,
-		Emoji: emoji,
-	}
-}
-
-func (h *Hub) handleProfile(client *Client, nickname string, colors *ColorPalette) {
-	now := time.Now()
-	if now.Sub(client.lastProfile) < time.Duration(profileCooldown)*time.Second {
-		return
-	}
-	client.lastProfile = now
-
-	client.nickname = nickname
-	client.colors = colors
-
-	h.broadcast <- &OutgoingMessage{
-		Type:     MsgProfile,
-		ID:       client.id,
-		Nickname: nickname,
-		Player: &PlayerInfo{
-			ID:       client.id,
-			Nickname: nickname,
-			X:        client.x,
-			Y:        client.y,
-			Status:   client.status,
-			Dir:      client.dir,
-			Avatar:   client.avatar,
-			Colors:   colors,
-		},
-	}
-}
-
-func (h *Hub) handleCustomStatus(client *Client, text string) {
-	now := time.Now()
-	if now.Sub(client.lastCustomStatus) < time.Duration(customStatusCooldown)*time.Second {
-		return
-	}
-	client.lastCustomStatus = now
-
-	text = sanitizeString(text, maxCustomStatusLen)
-	client.customStatus = text
-
-	h.broadcast <- &OutgoingMessage{
-		Type:         MsgCustomStatus,
-		ID:           client.id,
-		CustomStatus: text,
-	}
-}
-
-func (h *Hub) handleChat(client *Client, text string) {
-	text = sanitizeChat(text)
-	if text == "" {
-		return
-	}
-
-	h.broadcast <- &OutgoingMessage{
-		Type:     MsgChat,
-		ID:       client.id,
-		Nickname: client.nickname,
-		Text:     text,
-	}
-}
-
-func (h *Hub) snapshotLocked() []*PlayerInfo {
-	players := make([]*PlayerInfo, 0, len(h.players))
-	for _, c := range h.players {
-		players = append(players, &PlayerInfo{
-			ID:           c.id,
-			Nickname:     c.nickname,
-			X:            c.x,
-			Y:            c.y,
-			Status:       c.status,
-			Dir:          c.dir,
-			Avatar:       c.avatar,
-			Colors:       c.colors,
-			CustomStatus: c.customStatus,
-		})
-	}
-	return players
+	h.mu.RUnlock()
 }
 
 func (h *Hub) closeAll() {
-	close(h.done)
 	h.mu.RLock()
-	for _, client := range h.players {
-		client.conn.Close()
+	for _, room := range h.rooms {
+		room.closeAll()
 	}
 	h.mu.RUnlock()
 	log.Info().Msg("[portal-space] all connections closed")
 }
 
 func (h *Hub) wait() {
-	h.wg.Wait()
+	h.mu.RLock()
+	for _, room := range h.rooms {
+		room.wait()
+	}
+	h.mu.RUnlock()
 }

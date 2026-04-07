@@ -27,3 +27,6 @@ frontend/.svelte-kit/
 # SvelteKit build output
 static/_app/
 static/index.html
+portal-space.db
+portal-space.db-shm
+portal-space.db-wal

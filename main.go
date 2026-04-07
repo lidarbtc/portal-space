@@ -126,8 +126,16 @@ func runServer(cmd *cobra.Command, args []string) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	hub := newHub()
+	storage, err := newStorage("portal-space.db")
+	if err != nil {
+		return fmt.Errorf("init storage: %w", err)
+	}
+	defer storage.Close()
+
+	hub := newHub(storage)
 	go hub.run()
+
+	yjsRelay := newYjsRelay(storage, []string{"wb-1", "wb-2"})
 
 	// Static FS
 	sub, err := fs.Sub(embeddedStatic, "static")
@@ -137,6 +145,9 @@ func runServer(cmd *cobra.Command, args []string) error {
 	staticFS := withMIME(http.FileServer(http.FS(sub)))
 
 	mux := http.NewServeMux()
+
+	// Y.js WebSocket relay
+	mux.HandleFunc("/ws/yjs/", yjsRelay.ServeHTTP)
 
 	// WebSocket endpoint
 	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
@@ -177,6 +188,11 @@ func runServer(cmd *cobra.Command, args []string) error {
 
 		if suffix == "/ws" {
 			serveWS(hub, w, r)
+			return
+		}
+
+		if strings.HasPrefix(suffix, "/ws/yjs/") {
+			yjsRelay.ServeHTTP(w, r)
 			return
 		}
 

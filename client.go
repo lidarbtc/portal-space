@@ -24,6 +24,7 @@ var upgrader = websocket.Upgrader{
 
 type Client struct {
 	hub  *Hub
+	room *Room
 	conn *websocket.Conn
 
 	id           string
@@ -49,10 +50,11 @@ type Client struct {
 	once sync.Once
 }
 
-func newClient(hub *Hub, conn *websocket.Conn) *Client {
-	spawnX, spawnY := findSpawnPoint()
+func newClient(hub *Hub, room *Room, conn *websocket.Conn) *Client {
+	spawnX, spawnY := room.findSpawnPoint()
 	return &Client{
 		hub:    hub,
+		room:   room,
 		conn:   conn,
 		id:     uuid.NewString()[:8],
 		x:      spawnX,
@@ -71,13 +73,12 @@ func (c *Client) sendMsg(msg *OutgoingMessage) {
 	select {
 	case c.send <- data:
 	default:
-		// Drop message if buffer full
 	}
 }
 
 func (c *Client) readPump() {
 	defer func() {
-		c.hub.unregister <- c
+		c.room.unregister <- c
 		c.conn.Close()
 	}()
 
@@ -114,34 +115,33 @@ func (c *Client) readPump() {
 				c.colors = msg.Colors
 			}
 			c.reconnect = msg.Reconnect
-			// Honor client-requested position (reconnect with position restore)
-			if (msg.X != 0 || msg.Y != 0) && validateMove(msg.X, msg.Y) {
+			if (msg.X != 0 || msg.Y != 0) && c.room.validateMove(msg.X, msg.Y) {
 				tileX := int(msg.X) / 32
 				tileY := int(msg.Y) / 32
-				if isWalkable(tileX, tileY) {
+				if c.room.isWalkable(tileX, tileY) {
 					c.x = msg.X
 					c.y = msg.Y
 				}
 			}
-			c.hub.register <- c
+			c.room.register <- c
 
 		case MsgMove:
-			c.hub.handleMove(c, msg.X, msg.Y, msg.Dir)
+			c.room.handleMove(c, msg.X, msg.Y, msg.Dir)
 
 		case MsgStatus:
-			c.hub.handleStatus(c, msg.Status)
+			c.room.handleStatus(c, msg.Status)
 
 		case MsgChat:
-			c.hub.handleChat(c, msg.Text)
+			c.room.handleChat(c, msg.Text)
 
 		case MsgEmote:
-			c.hub.handleEmote(c, msg.Emoji)
+			c.room.handleEmote(c, msg.Emoji)
 
 		case MsgCustomStatus:
-			c.hub.handleCustomStatus(c, msg.CustomStatus)
+			c.room.handleCustomStatus(c, msg.CustomStatus)
 
 		case MsgDash:
-			c.hub.handleDash(c, msg.Dir)
+			c.room.handleDash(c, msg.Dir)
 
 		case MsgProfile:
 			nickname := sanitizeNickname(msg.Nickname)
@@ -154,7 +154,12 @@ func (c *Client) readPump() {
 			} else {
 				colors = c.colors
 			}
-			c.hub.handleProfile(c, nickname, colors)
+			c.room.handleProfile(c, nickname, colors)
+
+		case MsgAction:
+			if msg.Payload != nil {
+				c.room.handleAction(c, msg.Payload)
+			}
 		}
 	}
 }
@@ -194,8 +199,8 @@ func serveWS(hub *Hub, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := newClient(hub, conn)
-	// Don't register yet — wait for join message with nickname
+	room := hub.defaultRoom()
+	client := newClient(hub, room, conn)
 	go client.writePump()
 	go client.readPump()
 }
