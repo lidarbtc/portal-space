@@ -100,9 +100,20 @@ var validDirections = map[string]bool{
 }
 
 func sanitizeString(s string, maxLen int) string {
-	// Remove control characters
+	// Remove control characters and invisible unicode characters
 	s = strings.Map(func(r rune) rune {
 		if unicode.IsControl(r) && r != '\n' {
+			return -1
+		}
+		// Remove zero-width and invisible characters
+		switch r {
+		case '\u200B', '\u200C', '\u200D', '\uFEFF', '\u00AD', '\u2060', '\u180E',
+			'\u200E', '\u200F', '\u202A', '\u202B', '\u202C', '\u202D', '\u202E',
+			'\u2066', '\u2067', '\u2068', '\u2069', '\u00A0':
+			return -1
+		}
+		// Remove other space-like characters (ideographic space, etc.)
+		if unicode.In(r, unicode.Zs) && r != ' ' {
 			return -1
 		}
 		return r
