@@ -16,6 +16,7 @@ import { createAvatarSpritesheet } from '../spritesheet';
 import { createTintedSpritesheet } from '../palette-swap';
 import type { PlayerInfo, Direction } from '$lib/types';
 import { MAP_WIDTH, MAP_HEIGHT } from '$lib/types';
+import { zoomLevel, zoomIn, zoomOut, computeMinZoom, clampZoom } from '$lib/stores/zoom';
 
 const MOVE_SPEED = 200; // px/sec
 const NETWORK_SEND_INTERVAL = 100; // ms (10Hz)
@@ -100,6 +101,7 @@ export class WorldScene extends Phaser.Scene {
     };
 
     this.setupNetwork();
+    this.setupZoom();
 
     const unsubSelfId = selfId.subscribe((id) => {
       this.localPlayerId = id;
@@ -175,6 +177,55 @@ export class WorldScene extends Phaser.Scene {
     }
 
     return data;
+  }
+
+  private setupZoom(): void {
+    const cam = this.cameras.main;
+    const mapPixelW = MAP_WIDTH * this.tileSize;
+    const mapPixelH = MAP_HEIGHT * this.tileSize;
+
+    let lastAppliedZoom = 1;
+
+    // Subscribe to zoom store — apply camera zoom on change
+    const unsubZoom = zoomLevel.subscribe((level) => {
+      const minZoom = computeMinZoom(cam.width, cam.height, mapPixelW, mapPixelH);
+      const clamped = clampZoom(level, minZoom);
+
+      if (clamped !== level) {
+        zoomLevel.set(clamped);
+        return;
+      }
+
+      if (clamped !== lastAppliedZoom) {
+        this.tweens.killTweensOf(cam);
+        cam.setZoom(clamped);
+        lastAppliedZoom = clamped;
+      }
+    });
+    this.unsubscribers.push(unsubZoom);
+
+    // Mouse wheel zoom
+    this.input.on('wheel', (
+      _pointer: Phaser.Input.Pointer,
+      _gameObjects: Phaser.GameObjects.GameObject[],
+      _deltaX: number,
+      deltaY: number
+    ) => {
+      if (deltaY < 0) zoomIn();
+      else if (deltaY > 0) zoomOut();
+    });
+
+    // Recalculate min-zoom on viewport resize
+    const onResize = (gameSize: Phaser.Structs.Size) => {
+      const minZoom = computeMinZoom(gameSize.width, gameSize.height, mapPixelW, mapPixelH);
+      const current = get(zoomLevel);
+      const clamped = clampZoom(current, minZoom);
+      if (clamped !== current) {
+        zoomLevel.set(clamped);
+      }
+    };
+    this.scale.on('resize', onResize);
+    this.unsubscribers.push(() => this.scale.off('resize', onResize));
   }
 
   private setupNetwork(): void {

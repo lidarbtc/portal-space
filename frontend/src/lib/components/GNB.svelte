@@ -1,9 +1,22 @@
+<script lang="ts">
+  import ZoomControls from './ZoomControls.svelte';
+  import { isMobile } from '$lib/stores/mobile';
+</script>
+
 <nav class="gnb">
   <img src="/favicon.svg" alt="Portal Space" width="24" height="24" />
   <span class="title">Portal Space</span>
+  <div class="spacer"></div>
+  {#if !$isMobile}
+    <ZoomControls />
+  {/if}
 </nav>
 
 <style>
+  .spacer {
+    flex: 1;
+  }
+
   .gnb {
     height: var(--gnb-height, 48px);
     background: #1a1a2e;
