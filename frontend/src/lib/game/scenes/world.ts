@@ -93,7 +93,7 @@ export class WorldScene extends Phaser.Scene {
       down: Phaser.Input.Keyboard.KeyCodes.S,
       left: Phaser.Input.Keyboard.KeyCodes.A,
       right: Phaser.Input.Keyboard.KeyCodes.D
-    }) as {
+    }, false) as {
       up: Phaser.Input.Keyboard.Key;
       down: Phaser.Input.Keyboard.Key;
       left: Phaser.Input.Keyboard.Key;
@@ -431,9 +431,15 @@ export class WorldScene extends Phaser.Scene {
     p.sprite.destroy();
     p.nameText.destroy();
     p.statusDot.destroy();
-    if (p.bubbleText) p.bubbleText.destroy();
+    if (p.bubbleText) {
+      this.tweens.killTweensOf(p.bubbleText);
+      p.bubbleText.destroy();
+    }
     if (p.bubbleTimer) clearTimeout(p.bubbleTimer);
-    if (p.emoteText) p.emoteText.destroy();
+    if (p.emoteText) {
+      this.tweens.killTweensOf(p.emoteText);
+      p.emoteText.destroy();
+    }
     if (p.emoteTimer) clearTimeout(p.emoteTimer);
 
     // Clean up per-player texture to prevent memory leak
@@ -526,6 +532,7 @@ export class WorldScene extends Phaser.Scene {
     if (!p) return;
 
     if (p.bubbleText) {
+      this.tweens.killTweensOf(p.bubbleText);
       p.bubbleText.destroy();
       if (p.bubbleTimer) clearTimeout(p.bubbleTimer);
     }
@@ -572,6 +579,7 @@ export class WorldScene extends Phaser.Scene {
     if (!p) return;
 
     if (p.emoteText) {
+      this.tweens.killTweensOf(p.emoteText);
       p.emoteText.destroy();
       if (p.emoteTimer) clearTimeout(p.emoteTimer);
     }
@@ -640,7 +648,9 @@ export class WorldScene extends Phaser.Scene {
     if (!localPlayer) return;
 
     const dpad = get(dpadDirection);
-    if (get(chatInputActive) && !dpad) return;
+    const activeEl = document.activeElement;
+    const isTyping = activeEl?.tagName === 'INPUT' || activeEl?.tagName === 'TEXTAREA' || (activeEl as HTMLElement)?.isContentEditable;
+    if ((get(chatInputActive) || isTyping) && !dpad) return;
 
     let dx = 0, dy = 0;
     let dir: Direction | null = null;
