@@ -64,9 +64,7 @@
     </div>
     <div id="game-container" class="mobile-game">
       <GameCanvas snapshot={gameData} />
-      <div class="mobile-joystick">
-        <Joystick />
-      </div>
+      <Joystick />
     </div>
     <div class="mobile-chat">
       <ChatLog />
@@ -169,14 +167,6 @@
 
   .mobile-game {
     position: relative;
-  }
-
-  .mobile-joystick {
-    position: absolute;
-    bottom: 16px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 60;
   }
 
   .mobile-chat {
