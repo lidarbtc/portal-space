@@ -182,8 +182,19 @@
   .mobile-chat {
     flex: 0 0 auto;
     max-height: 150px;
-    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
     border-top: 1px solid #0f3460;
+  }
+
+  .mobile-chat :global(#chat-log) {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .mobile-chat :global(#chat-container) {
+    flex-shrink: 0;
   }
 
   .mobile-header :global(#player-count) {
