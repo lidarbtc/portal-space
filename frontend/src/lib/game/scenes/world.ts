@@ -249,6 +249,45 @@ export class WorldScene extends Phaser.Scene {
       }
     });
 
+    network.on('profile', (msg) => {
+      if (!msg.id || !msg.player) return;
+      const p = this.playerObjects.get(msg.id);
+      if (!p) return;
+
+      // Update nickname
+      if (msg.nickname) {
+        p.nickname = msg.nickname;
+        p.nameText.setText(msg.nickname);
+        p.statusDot.setPosition(
+          p.nameText.x - p.nameText.width / 2 + 8,
+          p.nameText.y
+        );
+      }
+
+      // Update colors — handle 'characters' -> 'player_' + id texture key transition
+      if (msg.player.colors) {
+        const newTextureKey = 'player_' + msg.id;
+        createTintedSpritesheet(this, newTextureKey, msg.player.colors);
+        p.textureKey = newTextureKey;
+        p.sprite.setTexture(newTextureKey);
+        const dirFrame: Record<Direction, number> = { down: 0, up: 1, right: 2, left: 3 };
+        p.sprite.setFrame(dirFrame[p.dir] ?? 0);
+      }
+
+      // Update players store (for PlayerList)
+      players.update((m) => {
+        const info = m.get(msg.id!);
+        if (info) {
+          m.set(msg.id!, {
+            ...info,
+            nickname: msg.nickname ?? info.nickname,
+            colors: msg.player!.colors ?? info.colors,
+          });
+        }
+        return m;
+      });
+    });
+
     network.on('snapshot', (msg) => {
       this.lastNetworkSendTime = 0;
       this.wasMoving = false;

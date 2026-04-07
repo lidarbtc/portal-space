@@ -236,6 +236,12 @@ class NetworkClient {
     this.send({ type: 'emote', emoji });
   }
 
+  sendProfile(nickname: string, colors: ColorPalette): void {
+    this.lastNickname = nickname;
+    this.lastColors = { ...colors };
+    this.send({ type: 'profile', nickname, colors });
+  }
+
   get isConnected(): boolean {
     return this._connected;
   }

@@ -1,15 +1,15 @@
 <script lang="ts">
-  import { ToggleGroup, Slider, Switch } from 'bits-ui';
+  import { ToggleGroup } from 'bits-ui';
   import { currentStatus } from '$lib/stores/game';
   import { network } from '$lib/network';
   import type { PlayerStatus, Emoji } from '$lib/types';
   import { CircleUserRound, SmilePlus, Settings } from '@lucide/svelte';
-  import { volume, muted } from '$lib/stores/settings';
 
-  type PanelType = 'status' | 'emote' | 'settings' | null;
+  let { onOpenSettings }: { onOpenSettings?: () => void } = $props();
+
+  type PanelType = 'status' | 'emote' | null;
 
   let openPanel: PanelType = $state(null);
-  let volumePercent = $derived(Math.round($volume * 100));
 
   const statuses: { key: PlayerStatus; label: string; color: string }[] = [
     { key: 'online', label: '온라인', color: '#4ade80' },
@@ -84,34 +84,6 @@
     </div>
   {/if}
 
-  {#if openPanel === 'settings'}
-    <div class="dropdown settings-dropdown">
-      <div class="setting-row">
-        <span>볼륨</span>
-        <Slider.Root
-          type="single"
-          min={0}
-          max={100}
-          step={1}
-          value={volumePercent}
-          onValueChange={(v) => volume.set(v / 100)}
-        >
-          <Slider.Range />
-          <Slider.Thumb index={0} />
-        </Slider.Root>
-      </div>
-      <div class="setting-row">
-        <span>음소거</span>
-        <Switch.Root
-          checked={$muted}
-          onCheckedChange={(checked) => muted.set(checked)}
-        >
-          <Switch.Thumb />
-        </Switch.Root>
-      </div>
-    </div>
-  {/if}
-
   <div class="pill-bar">
     <button
       class="tab-button"
@@ -129,8 +101,7 @@
     </button>
     <button
       class="tab-button"
-      class:active={openPanel === 'settings'}
-      onclick={() => togglePanel('settings')}
+      onclick={() => { openPanel = null; onOpenSettings?.(); }}
     >
       <Settings size={24} />
     </button>
@@ -235,16 +206,4 @@
     font-size: 13px;
   }
 
-  .settings-dropdown .setting-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 8px 16px;
-  }
-
-  .settings-dropdown .setting-row span {
-    color: #aaaacc;
-    font-size: 14px;
-    font-family: 'MulmaruMono', monospace;
-  }
 </style>

@@ -2,6 +2,7 @@
   import Lobby from '$lib/components/Lobby.svelte';
   import GameCanvas from '$lib/components/GameCanvas.svelte';
   import ActionBar from '$lib/components/ActionBar.svelte';
+  import SettingsModal from '$lib/components/SettingsModal.svelte';
   import ChatLog from '$lib/components/ChatLog.svelte';
   import ChatInput from '$lib/components/ChatInput.svelte';
 
@@ -18,6 +19,7 @@
   let inGame = $state(false);
   let gameData: OutgoingMessage | null = $state(null);
   let isWideDesktop = $state(false);
+  let settingsOpen = $state(false);
 
   $effect(() => {
     if ($isMobile) {
@@ -61,6 +63,9 @@
 {:else if $isMobile}
   <div class="mobile-layout">
     <div class="mobile-header">
+      <button class="mobile-settings-btn" onclick={() => (settingsOpen = true)}>
+        ⚙
+      </button>
     </div>
     <div id="game-container" class="mobile-game">
       <GameCanvas snapshot={gameData} />
@@ -77,7 +82,7 @@
       <div id="game-container">
         <GameCanvas snapshot={gameData} />
       </div>
-      <ActionBar />
+      <ActionBar onOpenSettings={() => (settingsOpen = true)} />
     </div>
     <div class="chat-panel">
       <PlayerList />
@@ -89,9 +94,13 @@
   <div id="game-container">
     <GameCanvas snapshot={gameData} />
   </div>
-  <ActionBar />
+  <ActionBar onOpenSettings={() => (settingsOpen = true)} />
   <ChatLog />
   <ChatInput onSend={handleChatSend} />
+{/if}
+
+{#if inGame}
+  <SettingsModal bind:open={settingsOpen} />
 {/if}
 
 {#if inGame && $connectionState === 'reconnecting'}
@@ -189,5 +198,25 @@
 
   .mobile-header :global(#player-count) {
     position: static;
+  }
+
+  .mobile-settings-btn {
+    all: unset;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: rgba(16, 24, 48, 0.9);
+    color: #aaaacc;
+    font-size: 20px;
+    transition: color 0.2s, background 0.2s;
+  }
+
+  .mobile-settings-btn:hover {
+    color: #e0e0ff;
+    background: var(--color-primary-alpha-50);
   }
 </style>

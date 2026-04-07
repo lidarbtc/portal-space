@@ -13,6 +13,7 @@ const (
 	maxPlayers      = 20
 	moveRateLimit   = 10 // max moves per second per client
 	emoteRateLimit  = 2  // max emotes per second per client
+	profileCooldown = 2  // seconds between profile updates
 )
 
 // collisionMap stores which tiles block movement (true = blocked).
@@ -279,6 +280,33 @@ func (h *Hub) handleEmote(client *Client, emoji string) {
 		Type:  MsgEmote,
 		ID:    client.id,
 		Emoji: emoji,
+	}
+}
+
+func (h *Hub) handleProfile(client *Client, nickname string, colors *ColorPalette) {
+	now := time.Now()
+	if now.Sub(client.lastProfile) < time.Duration(profileCooldown)*time.Second {
+		return
+	}
+	client.lastProfile = now
+
+	client.nickname = nickname
+	client.colors = colors
+
+	h.broadcast <- &OutgoingMessage{
+		Type:     MsgProfile,
+		ID:       client.id,
+		Nickname: nickname,
+		Player: &PlayerInfo{
+			ID:       client.id,
+			Nickname: nickname,
+			X:        client.x,
+			Y:        client.y,
+			Status:   client.status,
+			Dir:      client.dir,
+			Avatar:   client.avatar,
+			Colors:   colors,
+		},
 	}
 }
 

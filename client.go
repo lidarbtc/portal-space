@@ -37,8 +37,9 @@ type Client struct {
 
 	reconnect bool
 
-	lastMove  time.Time
-	lastEmote time.Time
+	lastMove    time.Time
+	lastEmote   time.Time
+	lastProfile time.Time
 
 	send chan []byte
 	once sync.Once
@@ -132,6 +133,19 @@ func (c *Client) readPump() {
 
 		case MsgEmote:
 			c.hub.handleEmote(c, msg.Emoji)
+
+		case MsgProfile:
+			nickname := sanitizeNickname(msg.Nickname)
+			if nickname == "" {
+				nickname = c.nickname
+			}
+			var colors *ColorPalette
+			if msg.Colors != nil && validateColors(msg.Colors) {
+				colors = msg.Colors
+			} else {
+				colors = c.colors
+			}
+			c.hub.handleProfile(c, nickname, colors)
 		}
 	}
 }

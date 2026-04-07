@@ -15,6 +15,7 @@ const (
 	MsgStatus   MsgType = "status"
 	MsgChat     MsgType = "chat"
 	MsgEmote    MsgType = "emote"
+	MsgProfile  MsgType = "profile"
 	MsgSnapshot MsgType = "snapshot"
 	MsgError    MsgType = "error"
 )
