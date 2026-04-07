@@ -506,7 +506,7 @@
 
   :global(.wb-content) {
     position: fixed;
-    inset: 16px;
+    inset: 48px;
     z-index: 201;
     display: flex;
     flex-direction: column;
@@ -514,6 +514,12 @@
     border: 1px solid rgba(99, 102, 241, 0.3);
     background: #1a1a2e;
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  }
+
+  @media (min-width: 960px) {
+    :global(.wb-content) {
+      right: 352px; /* 320px chat-panel + 32px margin */
+    }
   }
 
   :global(.wb-header) {
