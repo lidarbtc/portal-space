@@ -110,7 +110,7 @@
               </div>
 
               <div class="field-group">
-                <label class="field-label">캐릭터 색상</label>
+                <div class="field-label">캐릭터 색상</div>
                 <ColorCustomizer
                   bind:bodyColor={persistedBodyColor.current}
                   bind:eyeColor={persistedEyeColor.current}
@@ -127,7 +127,7 @@
               <h3 class="section-heading">오디오</h3>
 
               <div class="field-group">
-                <label class="field-label">볼륨</label>
+                <div class="field-label">볼륨</div>
                 <div class="audio-row">
                   <Slider.Root
                     type="single"
@@ -147,7 +147,7 @@
 
               <div class="field-group">
                 <div class="audio-toggle-row">
-                  <label class="field-label">음소거</label>
+                  <div class="field-label">음소거</div>
                   <Switch.Root
                     checked={$muted}
                     onCheckedChange={(checked) => muted.set(checked)}

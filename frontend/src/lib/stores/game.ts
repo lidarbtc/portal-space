@@ -14,9 +14,22 @@ export const playerCount = derived(players, ($players) => $players.size);
 const MAX_CHAT_MESSAGES = 50;
 export const chatMessages = writable<ChatMessage[]>([]);
 
-export function addChatMessage(nickname: string, text: string): void {
+export function addChatMessage({
+  senderId,
+  nickname,
+  nicknameColor,
+  text,
+}: {
+  senderId?: string;
+  nickname: string;
+  nicknameColor?: string;
+  text: string;
+}): void {
   chatMessages.update((msgs) => {
-    const updated = [...msgs, { nickname, text, isSystem: false, timestamp: Date.now() }];
+    const updated = [
+      ...msgs,
+      { senderId, nickname, nicknameColor, text, isSystem: false, timestamp: Date.now() }
+    ];
     if (updated.length > MAX_CHAT_MESSAGES) {
       return updated.slice(updated.length - MAX_CHAT_MESSAGES);
     }
