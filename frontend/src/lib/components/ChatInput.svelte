@@ -67,7 +67,7 @@
 
   function handleKeydown(e: KeyboardEvent) {
     e.stopPropagation();
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' && !e.isComposing) {
       sendMessage();
     } else if (e.key === 'Escape') {
       hideInput();
