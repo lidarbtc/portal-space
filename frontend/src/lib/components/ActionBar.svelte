@@ -62,24 +62,25 @@
 
 <div class="action-bar-wrapper" bind:this={containerEl}>
   {#if openPanel === 'status'}
-    <ToggleGroup.Root
-      type="single"
-      class="dropdown"
-      value={$currentStatus}
-      onValueChange={handleStatusChange}
-    >
-      {#each statuses as { key, label, color } (key)}
-        <ToggleGroup.Item value={key} class="dropdown-item status-item">
-          <span style="color: {color}">●</span> {label}
-        </ToggleGroup.Item>
-      {/each}
-    </ToggleGroup.Root>
-    <button
-      class="dropdown-item custom-status-btn"
-      onclick={() => { openPanel = null; customStatusModalOpen = true; }}
-    >
-      ✏️ 상태 설정
-    </button>
+    <div class="dropdown">
+      <ToggleGroup.Root
+        type="single"
+        value={$currentStatus}
+        onValueChange={handleStatusChange}
+      >
+        {#each statuses as { key, label, color } (key)}
+          <ToggleGroup.Item value={key} class="dropdown-item status-item">
+            <span style="color: {color}">●</span> {label}
+          </ToggleGroup.Item>
+        {/each}
+      </ToggleGroup.Root>
+      <button
+        class="dropdown-item custom-status-btn"
+        onclick={() => { openPanel = null; customStatusModalOpen = true; }}
+      >
+        ✏️ 상태 설정
+      </button>
+    </div>
   {/if}
 
   {#if openPanel === 'emote'}
@@ -177,6 +178,12 @@
     padding: 8px;
     z-index: 51;
     min-width: 160px;
+  }
+
+  .action-bar-wrapper :global(.dropdown [data-toggle-group-root]) {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
   }
 
   .action-bar-wrapper :global(.dropdown-item) {

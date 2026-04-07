@@ -556,7 +556,7 @@ export class WorldScene extends Phaser.Scene {
 
     p.customStatusBubble = this.add
       .text(p.x, p.y - this.tileSize / 2 - 34, text, {
-        fontSize: '11px',
+        fontSize: '12px',
         color: '#ffffff',
         fontFamily: 'MulmaruMono',
         backgroundColor: '#445588cc',
