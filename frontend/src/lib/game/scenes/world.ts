@@ -15,11 +15,19 @@ import { createPlaceholderTileset } from '../tileset';
 import { createAvatarSpritesheet } from '../spritesheet';
 import { createTintedSpritesheet } from '../palette-swap';
 import { resolveNicknameColor } from '$lib/utils/nickname-colors';
-import type { PlayerInfo, Direction, InteractiveObject } from '$lib/types';
+import type { PlayerInfo, Direction, InteractiveObject, RegionalChatState } from '$lib/types';
 import { MAP_WIDTH, MAP_HEIGHT } from '$lib/types';
 import { zoomLevel, zoomIn, zoomOut, computeMinZoom, clampZoom } from '$lib/stores/zoom';
 import { interactiveObjects, nearbyObjectId, activeObjectId } from '$lib/stores/objects';
 import { whiteboardOpen, currentBoardId } from '$lib/stores/whiteboard';
+import {
+  enterZone,
+  exitZone,
+  addRegionalMessage,
+  currentZoneId,
+  regionalChatSettingsOpen,
+  currentRegionalChatId,
+} from '$lib/stores/regional-chat';
 import {
   createInteractiveObject,
   updateNearbyState,
@@ -92,6 +100,7 @@ export class WorldScene extends Phaser.Scene {
       this.load.setBaseURL(match[1]);
     }
     this.load.image('gopher-src', 'assets/gopher.png');
+    this.load.image('ward-stone', 'assets/ward-stone.png');
   }
 
   create(): void {
@@ -333,6 +342,38 @@ export class WorldScene extends Phaser.Scene {
     });
 
     network.on('chat', (msg) => {
+      // Zone enter/exit system messages
+      if (msg.isSystem && msg.zoneId) {
+        const text = msg.text || '';
+        if (msg.zoneEvent === 'enter') {
+          enterZone(msg.zoneId, msg.zoneName || '');
+        } else if (msg.zoneEvent === 'exit') {
+          exitZone();
+        }
+        // Add to regional messages
+        addRegionalMessage({ text, isSystem: true });
+        return;
+      }
+
+      // Regional chat message
+      if (msg.zoneId) {
+        if (msg.id !== this.localPlayerId && get(currentStatus) !== 'dnd') {
+          notifyAudio.playIfHidden();
+        }
+        if (msg.id && msg.nickname && msg.text) {
+          const senderColors = get(players).get(msg.id)?.colors;
+          this.showChatBubble(msg.id, msg.text, msg.nickname);
+          addRegionalMessage({
+            senderId: msg.id,
+            nickname: msg.nickname,
+            nicknameColor: resolveNicknameColor(msg.id, senderColors),
+            text: msg.text,
+          });
+        }
+        return;
+      }
+
+      // Global chat message (existing behavior)
       if (msg.id !== this.localPlayerId && get(currentStatus) !== 'dnd') {
         notifyAudio.playIfHidden();
       }
@@ -433,6 +474,48 @@ export class WorldScene extends Phaser.Scene {
         });
         interactiveObjects.set(objMap);
       }
+    });
+
+    network.on('action', (msg) => {
+      const ap = msg.actionPayload;
+      if (!ap || ap.domain !== 'regional_chat' || ap.action !== 'state_updated') return;
+      if (!ap.objectId) return;
+
+      const gObj = this.gameObjects.get(ap.objectId);
+      if (!gObj || gObj.data.type !== 'regional_chat') return;
+
+      const newState = ap.payload as RegionalChatState | undefined;
+      if (!newState) return;
+
+      // Update stored data
+      gObj.data = { ...gObj.data, state: newState };
+
+      // Redraw zone fill circle
+      if (gObj.zoneCircle) {
+        gObj.zoneCircle.clear();
+        gObj.zoneCircle.fillStyle(0x06b6d4, 0.08);
+        gObj.zoneCircle.fillCircle(0, 0, newState.radius);
+      }
+
+      // Redraw stroke circle (keep current alpha for tween)
+      if (gObj.zoneStroke) {
+        const currentAlpha = gObj.zoneStroke.alpha;
+        gObj.zoneStroke.clear();
+        gObj.zoneStroke.lineStyle(2, 0x06b6d4, 0.3);
+        gObj.zoneStroke.strokeCircle(0, 0, newState.radius);
+        gObj.zoneStroke.setAlpha(currentAlpha);
+      }
+
+      // Update label text
+      if (gObj.zoneLabel) {
+        gObj.zoneLabel.setText(newState.name);
+      }
+
+      // Update interactiveObjects store
+      interactiveObjects.update((m) => {
+        m.set(ap.objectId!, gObj.data);
+        return m;
+      });
     });
   }
 
@@ -927,6 +1010,9 @@ export class WorldScene extends Phaser.Scene {
     if (obj.type === 'whiteboard') {
       currentBoardId.set(obj.id);
       whiteboardOpen.set(true);
+    } else if (obj.type === 'regional_chat') {
+      currentRegionalChatId.set(obj.id);
+      regionalChatSettingsOpen.set(true);
     }
   }
 

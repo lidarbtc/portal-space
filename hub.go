@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"sync"
 
 	"github.com/rs/zerolog/log"
@@ -36,6 +37,15 @@ func newHub(storage *Storage) *Hub {
 		Type: "whiteboard",
 		X:    float64(33*32 + 16),
 		Y:    float64(22*32 + 16),
+	})
+
+	// Place a regional chat zone
+	defaultRoom.addObject(&InteractiveObject{
+		ID:    "rc-1",
+		Type:  "regional_chat",
+		X:     float64(20*32 + 16),
+		Y:     float64(15*32 + 16),
+		State: json.RawMessage(`{"name":"결계석","radius":160,"retainHistory":false}`),
 	})
 
 	return h

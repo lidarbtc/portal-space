@@ -1,5 +1,7 @@
 <script lang="ts">
   import { chatMessages } from '$lib/stores/game';
+  import { activeChatTab, currentZoneId, currentZoneName, regionalMessages } from '$lib/stores/regional-chat';
+  import type { ChatChannel } from '$lib/types';
   import { parseTextWithUrls } from '$lib/utils/linkify';
   import { AlertDialog } from 'bits-ui';
 
@@ -7,6 +9,12 @@
   let atBottom = $state(true);
   let openLinkDialog = $state(false);
   let pendingUrl = $state('');
+
+  let displayMessages = $derived($activeChatTab === 'regional' && $currentZoneId ? $regionalMessages : $chatMessages);
+
+  function switchTab(tab: ChatChannel) {
+    activeChatTab.set(tab);
+  }
 
   function formatTime(ts: number): string {
     const d = new Date(ts);
@@ -30,7 +38,7 @@
   }
 
   $effect(() => {
-    const msgs = $chatMessages;
+    const msgs = displayMessages;
     if (atBottom && chatLogEl) {
       requestAnimationFrame(() => {
         if (chatLogEl) {
@@ -41,8 +49,27 @@
   });
 </script>
 
+<div class="chat-tab-bar">
+  <button
+    class="chat-tab"
+    class:active={$activeChatTab === 'global'}
+    onclick={() => switchTab('global')}
+  >
+    Global
+  </button>
+  {#if $currentZoneId}
+    <button
+      class="chat-tab"
+      class:active={$activeChatTab === 'regional'}
+      onclick={() => switchTab('regional')}
+    >
+      {$currentZoneName ?? 'Regional'}
+    </button>
+  {/if}
+</div>
+
 <div id="chat-log" bind:this={chatLogEl} onscroll={handleScroll}>
-  {#each $chatMessages as message, i (i)}
+  {#each displayMessages as message, i (i)}
     {#if message.isSystem}
       <div class="chat-entry chat-system"><span class="chat-time">{formatTime(message.timestamp)}</span><span class="chat-system-text">{#each parseTextWithUrls(message.text) as segment}{#if segment.type === 'url'}<a href={segment.value} onclick={(e) => handleLinkClick(e, segment.value)}>{segment.value}</a>{:else}{segment.value}{/if}{/each}</span></div>
     {:else}
@@ -72,6 +99,40 @@
 </AlertDialog.Root>
 
 <style>
+  .chat-tab-bar {
+    display: flex;
+    gap: 0;
+    padding: 0 4px;
+    background: transparent;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    flex-shrink: 0;
+  }
+
+  .chat-tab {
+    font-family: 'MulmaruMono', monospace;
+    font-size: 0.75rem;
+    padding: 6px 12px;
+    border: none;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    background: transparent;
+    color: #888899;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+    margin-bottom: -1px;
+  }
+
+  .chat-tab:hover {
+    color: #ccccdd;
+    border-bottom-color: rgba(255, 255, 255, 0.2);
+  }
+
+  .chat-tab.active {
+    color: #e0e0ff;
+    border-bottom-color: var(--color-primary);
+    font-weight: bold;
+  }
+
   :global(.link-dialog-overlay) {
     position: fixed;
     inset: 0;
