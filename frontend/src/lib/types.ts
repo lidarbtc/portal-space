@@ -5,6 +5,13 @@ export type Direction = 'up' | 'down' | 'left' | 'right';
 export type PlayerStatus = 'online' | 'away' | 'dnd';
 export type Emoji = '👋' | '☕' | '🔥' | '💻' | '📢';
 
+export interface ChatImage {
+  mime: string;
+  data: string;
+  size: number;
+  name?: string;
+}
+
 export interface ColorPalette {
   body: string;
   eye: string;
@@ -20,6 +27,7 @@ export interface IncomingMessage {
   dir?: Direction;
   status?: PlayerStatus;
   text?: string;
+  image?: ChatImage;
   avatar?: number;
   colors?: ColorPalette;
   emoji?: Emoji;
@@ -59,6 +67,7 @@ export interface OutgoingMessage {
   dir?: Direction;
   status?: PlayerStatus;
   text?: string;
+  image?: ChatImage;
   message?: string;
   emoji?: Emoji;
   customStatus?: string;
@@ -90,13 +99,15 @@ export const MAP_HEIGHT = 45;
 export const MAX_NICKNAME_LEN = 20;
 export const MAX_CHAT_LEN = 500;
 export const MAX_CUSTOM_STATUS_LEN = 20;
+export const MAX_CHAT_IMAGE_BYTES = 10 * 1024 * 1024;
 
 // Chat message for UI
 export interface ChatMessage {
   senderId?: string;
   nickname?: string;
   nicknameColor?: string;
-  text: string;
+  text?: string;
+  image?: ChatImage;
   isSystem: boolean;
   timestamp: number;
 }

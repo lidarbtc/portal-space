@@ -1,7 +1,7 @@
 import { connectionState } from './stores/connection';
 import { players, selfId, addSystemMessage } from './stores/game';
 import { retryWithBackoff } from './utils/retry';
-import type { MsgType, IncomingMessage, OutgoingMessage, Direction, PlayerStatus, Emoji, PlayerInfo, ColorPalette, ActionMessage } from './types';
+import type { MsgType, IncomingMessage, OutgoingMessage, Direction, PlayerStatus, Emoji, PlayerInfo, ColorPalette, ActionMessage, ChatImage } from './types';
 import { DEFAULT_COLORS } from './game/palette-swap';
 
 type MessageHandler = (msg: OutgoingMessage) => void;
@@ -232,6 +232,10 @@ class NetworkClient {
 
   sendChat(text: string, x: number, y: number): void {
     this.send({ type: 'chat', text, x, y });
+  }
+
+  sendChatImage(image: ChatImage, x: number, y: number): void {
+    this.send({ type: 'chat', image, x, y });
   }
 
   sendDash(dir: Direction): void {
