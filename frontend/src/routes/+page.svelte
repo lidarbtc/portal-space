@@ -15,7 +15,7 @@
   import { connectionState } from '$lib/stores/connection';
   import { isMobile } from '$lib/stores/mobile';
   import { get } from 'svelte/store';
-  import type { OutgoingMessage, ColorPalette } from '$lib/types';
+  import { MAX_CHAT_IMAGE_BYTES, type OutgoingMessage, type ColorPalette } from '$lib/types';
 
   let inGame = $state(false);
   let gameData: OutgoingMessage | null = $state(null);
@@ -57,6 +57,58 @@
       network.sendChat(text, self.x, self.y);
     }
   }
+
+  function fileToBase64(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result;
+        if (typeof result !== 'string') {
+          reject(new Error('이미지를 읽지 못했습니다.'));
+          return;
+        }
+
+        const commaIndex = result.indexOf(',');
+        if (commaIndex === -1) {
+          reject(new Error('잘못된 이미지 데이터입니다.'));
+          return;
+        }
+
+        resolve(result.slice(commaIndex + 1));
+      };
+      reader.onerror = () => reject(new Error('이미지를 읽지 못했습니다.'));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function handleChatImageSend(file: File) {
+    const id = get(selfId);
+    if (!id) throw new Error('플레이어 정보를 찾을 수 없습니다.');
+
+    if (!file.type.startsWith('image/')) {
+      throw new Error('이미지 파일만 전송할 수 있습니다.');
+    }
+
+    if (file.size > MAX_CHAT_IMAGE_BYTES) {
+      throw new Error('이미지는 10MB 이하만 전송할 수 있습니다.');
+    }
+
+    const currentPlayers = get(players);
+    const self = currentPlayers.get(id);
+    if (!self) throw new Error('내 플레이어 정보를 찾을 수 없습니다.');
+
+    const data = await fileToBase64(file);
+    network.sendChatImage(
+      {
+        mime: file.type,
+        name: file.name,
+        size: file.size,
+        data,
+      },
+      self.x,
+      self.y
+    );
+  }
 </script>
 
 {#if !inGame}
@@ -74,7 +126,7 @@
     </div>
     <div class="mobile-chat">
       <ChatLog />
-      <ChatInput onSend={handleChatSend} mobile={true} />
+      <ChatInput onSend={handleChatSend} onSendImage={handleChatImageSend} mobile={true} />
     </div>
   </div>
 {:else if isWideDesktop}
@@ -88,7 +140,7 @@
     <div class="chat-panel">
       <PlayerList />
       <ChatLog />
-      <ChatInput onSend={handleChatSend} alwaysActive={true} />
+      <ChatInput onSend={handleChatSend} onSendImage={handleChatImageSend} alwaysActive={true} />
     </div>
   </div>
 {:else}
@@ -97,7 +149,7 @@
   </div>
   <ActionBar onOpenSettings={() => (settingsOpen = true)} />
   <ChatLog />
-  <ChatInput onSend={handleChatSend} />
+  <ChatInput onSend={handleChatSend} onSendImage={handleChatImageSend} />
 {/if}
 
 {#if inGame}

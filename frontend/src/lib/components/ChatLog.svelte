@@ -44,11 +44,25 @@
 <div id="chat-log" bind:this={chatLogEl} onscroll={handleScroll}>
   {#each $chatMessages as message, i (i)}
     {#if message.isSystem}
-      <div class="chat-entry chat-system"><span class="chat-time">{formatTime(message.timestamp)}</span><span class="chat-system-text">{#each parseTextWithUrls(message.text) as segment}{#if segment.type === 'url'}<a href={segment.value} onclick={(e) => handleLinkClick(e, segment.value)}>{segment.value}</a>{:else}{segment.value}{/if}{/each}</span></div>
+      <div class="chat-entry chat-system"><span class="chat-time">{formatTime(message.timestamp)}</span><span class="chat-system-text">{#each parseTextWithUrls(message.text ?? '') as segment}{#if segment.type === 'url'}<a href={segment.value} onclick={(e) => handleLinkClick(e, segment.value)}>{segment.value}</a>{:else}{segment.value}{/if}{/each}</span></div>
     {:else}
       <div class="chat-entry">
         <span class="chat-time">{formatTime(message.timestamp)}</span><span class="chat-name" style:color={message.nicknameColor ?? undefined}>{message.nickname}</span>
-        <span class="chat-text"> {#each parseTextWithUrls(message.text) as segment}{#if segment.type === 'url'}<a href={segment.value} onclick={(e) => handleLinkClick(e, segment.value)}>{segment.value}</a>{:else}{segment.value}{/if}{/each}</span>
+        {#if message.image}
+          <div class="chat-image-message">
+            <img
+              class="chat-image"
+              src={`data:${message.image.mime};base64,${message.image.data}`}
+              alt={message.image.name ?? 'shared image'}
+              loading="lazy"
+            />
+            {#if message.image.name}
+              <span class="chat-image-name">{message.image.name}</span>
+            {/if}
+          </div>
+        {:else if message.text}
+          <span class="chat-text"> {#each parseTextWithUrls(message.text) as segment}{#if segment.type === 'url'}<a href={segment.value} onclick={(e) => handleLinkClick(e, segment.value)}>{segment.value}</a>{:else}{segment.value}{/if}{/each}</span>
+        {/if}
       </div>
     {/if}
   {/each}
@@ -150,5 +164,41 @@
 
   :global(.link-dialog-confirm:hover) {
     background: var(--color-primary-hover);
+  }
+
+  #chat-log {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .chat-entry {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .chat-image-message {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-left: 4px;
+    max-width: min(240px, 100%);
+  }
+
+  .chat-image {
+    display: block;
+    max-width: 100%;
+    max-height: 200px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(0, 0, 0, 0.2);
+  }
+
+  .chat-image-name {
+    color: #888899;
+    font-size: 0.75rem;
+    word-break: break-all;
   }
 </style>

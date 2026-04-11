@@ -2,11 +2,25 @@
   import { onMount } from 'svelte';
   import { useEventListener } from 'runed';
   import { chatInputActive } from '$lib/stores/game';
+  import { MAX_CHAT_IMAGE_BYTES } from '$lib/types';
 
-  let { onSend, mobile = false, alwaysActive = false }: { onSend: (text: string) => void; mobile?: boolean; alwaysActive?: boolean } = $props();
+  let {
+    onSend,
+    onSendImage,
+    mobile = false,
+    alwaysActive = false
+  }: {
+    onSend: (text: string) => void;
+    onSendImage: (file: File) => void | Promise<void>;
+    mobile?: boolean;
+    alwaysActive?: boolean;
+  } = $props();
 
   let inputEl: HTMLInputElement | undefined = $state();
+  let fileInputEl: HTMLInputElement | undefined = $state();
   let inputValue = $state('');
+  let imageError = $state('');
+  let isSendingImage = $state(false);
 
   onMount(() => {
     if (mobile) {
@@ -43,6 +57,7 @@
 
   function hideInput() {
     inputValue = '';
+    imageError = '';
     if (alwaysActive) {
       inputEl?.blur();
     } else if (!mobile) {
@@ -51,6 +66,7 @@
   }
 
   function sendMessage() {
+    if (isSendingImage) return;
     const text = inputValue.trim();
     if (text) {
       onSend(text);
@@ -84,6 +100,47 @@
       showInput();
     }
   }
+
+  function openImagePicker() {
+    imageError = '';
+    if (fileInputEl) {
+      fileInputEl.value = '';
+      fileInputEl.click();
+    }
+  }
+
+  async function handleFileChange(e: Event) {
+    const target = e.currentTarget as HTMLInputElement | null;
+    const file = target?.files?.[0];
+    if (!file) return;
+
+    imageError = '';
+
+    if (!file.type.startsWith('image/')) {
+      imageError = '이미지 파일만 전송할 수 있습니다.';
+      target.value = '';
+      return;
+    }
+
+    if (file.size > MAX_CHAT_IMAGE_BYTES) {
+      imageError = '이미지는 10MB 이하만 전송할 수 있습니다.';
+      target.value = '';
+      return;
+    }
+
+    isSendingImage = true;
+    try {
+      await onSendImage(file);
+      if (mobile) {
+        inputEl?.blur();
+      }
+    } catch (error) {
+      imageError = error instanceof Error ? error.message : '이미지 전송에 실패했습니다.';
+    } finally {
+      isSendingImage = false;
+      target.value = '';
+    }
+  }
 </script>
 
 <svelte:window onkeydown={handleGlobalKeydown} />
@@ -91,6 +148,16 @@
 <div id="chat-container" class:mobile>
   {#if mobile || alwaysActive || $chatInputActive}
     <div class="chat-input-row">
+      <button class="chat-attach-btn" type="button" onclick={openImagePicker} aria-label="이미지 업로드" disabled={isSendingImage}>
+        🖼
+      </button>
+      <input
+        bind:this={fileInputEl}
+        class="sr-only-file-input"
+        type="file"
+        accept="image/png,image/jpeg,image/webp,image/gif"
+        onchange={handleFileChange}
+      />
       <input
         id="chat-input"
         type="text"
@@ -101,11 +168,17 @@
         onkeydown={handleKeydown}
         onfocus={handleFocus}
         onblur={handleBlur}
+        disabled={isSendingImage}
       />
       {#if mobile}
-        <button class="chat-send-btn" onclick={sendMessage} aria-label="전송">↑</button>
+        <button class="chat-send-btn" onclick={sendMessage} aria-label="전송" disabled={isSendingImage}>↑</button>
       {/if}
     </div>
+    {#if isSendingImage}
+      <div class="chat-upload-status">이미지 전송 중...</div>
+    {:else if imageError}
+      <div class="chat-upload-error">{imageError}</div>
+    {/if}
   {:else}
     <div id="chat-hint">Enter로 채팅</div>
   {/if}
@@ -126,7 +199,8 @@
     flex: 1;
   }
 
-  .chat-send-btn {
+  .chat-send-btn,
+  .chat-attach-btn {
     flex: 0 0 auto;
     width: 36px;
     height: 36px;
@@ -143,7 +217,33 @@
     -webkit-tap-highlight-color: transparent;
   }
 
-  .chat-send-btn:active {
+  .chat-send-btn:disabled,
+  .chat-attach-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .sr-only-file-input {
+    display: none;
+  }
+
+  .chat-upload-status,
+  .chat-upload-error {
+    margin-top: 6px;
+    font-size: 0.75rem;
+    font-family: 'MulmaruMono', monospace;
+  }
+
+  .chat-upload-status {
+    color: #ccccdd;
+  }
+
+  .chat-upload-error {
+    color: #ff9aa2;
+  }
+
+  .chat-send-btn:active,
+  .chat-attach-btn:active {
     background: var(--color-primary-hover);
   }
 </style>
