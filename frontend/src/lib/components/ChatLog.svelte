@@ -180,7 +180,8 @@
   }
 
   .chat-image-message {
-    display: inline-flex;
+    display: flex;
+    flex: 0 0 100%;
     flex-direction: column;
     align-items: flex-start;
     gap: 4px;
