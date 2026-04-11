@@ -336,6 +336,19 @@ export class WorldScene extends Phaser.Scene {
       if (msg.id !== this.localPlayerId && get(currentStatus) !== 'dnd') {
         notifyAudio.playIfHidden();
       }
+
+      if (msg.id && msg.nickname && msg.image) {
+        const senderColors = get(players).get(msg.id)?.colors;
+        this.showChatBubble(msg.id, '[사진]', msg.nickname);
+        addChatMessage({
+          senderId: msg.id,
+          nickname: msg.nickname,
+          nicknameColor: resolveNicknameColor(msg.id, senderColors),
+          image: msg.image,
+        });
+        return;
+      }
+
       if (msg.id && msg.nickname && msg.text) {
         const senderColors = get(players).get(msg.id)?.colors;
         this.showChatBubble(msg.id, msg.text, msg.nickname);
