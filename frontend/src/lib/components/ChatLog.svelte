@@ -182,6 +182,7 @@
   .chat-image-message {
     display: inline-flex;
     flex-direction: column;
+    align-items: flex-start;
     gap: 4px;
     margin-left: 4px;
     max-width: min(240px, 100%);
@@ -189,8 +190,12 @@
 
   .chat-image {
     display: block;
+    width: auto;
+    height: auto;
+    align-self: flex-start;
     max-width: 100%;
     max-height: 200px;
+    object-fit: contain;
     border-radius: 8px;
     border: 1px solid rgba(255, 255, 255, 0.12);
     background: rgba(0, 0, 0, 0.2);
