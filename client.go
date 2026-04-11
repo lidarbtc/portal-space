@@ -15,7 +15,7 @@ const (
 	writeWait  = 10 * time.Second
 	pongWait   = 60 * time.Second
 	pingPeriod = 20 * time.Second
-	maxMsgSize = 4096
+	maxMsgSize = 16 * 1024 * 1024
 )
 
 var upgrader = websocket.Upgrader{
@@ -132,7 +132,7 @@ func (c *Client) readPump() {
 			c.room.handleStatus(c, msg.Status)
 
 		case MsgChat:
-			c.room.handleChat(c, msg.Text)
+			c.room.handleChat(c, msg.Text, msg.Image)
 
 		case MsgEmote:
 			c.room.handleEmote(c, msg.Emoji)

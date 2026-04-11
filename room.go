@@ -356,17 +356,27 @@ func (r *Room) handleCustomStatus(client *Client, text string) {
 	}
 }
 
-func (r *Room) handleChat(client *Client, text string) {
+func (r *Room) handleChat(client *Client, text string, image *ChatImage) {
 	text = sanitizeChat(text)
-	if text == "" {
+	normalizedImage := normalizeChatImage(image)
+
+	if (text == "" && normalizedImage == nil) || (text != "" && normalizedImage != nil) {
 		return
 	}
-	r.broadcast <- &OutgoingMessage{
+
+	msg := &OutgoingMessage{
 		Type:     MsgChat,
 		ID:       client.id,
 		Nickname: client.nickname,
-		Text:     text,
 	}
+
+	if normalizedImage != nil {
+		msg.Image = normalizedImage
+	} else {
+		msg.Text = text
+	}
+
+	r.broadcast <- msg
 }
 
 func (r *Room) handleAction(client *Client, raw json.RawMessage) {
