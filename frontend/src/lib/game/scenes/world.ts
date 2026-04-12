@@ -43,6 +43,7 @@ const DASH_DURATION = 200; // ms
 const DASH_COOLDOWN = 1500; // ms
 
 interface PlayerObject {
+  container: Phaser.GameObjects.Container;
   sprite: Phaser.GameObjects.Sprite;
   nameText: Phaser.GameObjects.Text;
   statusDot: Phaser.GameObjects.Graphics;
@@ -63,6 +64,7 @@ interface PlayerObject {
 export class WorldScene extends Phaser.Scene {
   private playerObjects: Map<string, PlayerObject> = new Map();
   private gameObjects: Map<string, GameInteractiveObject> = new Map();
+  private entityContainer!: Phaser.GameObjects.Container;
   private localPlayerId: string | null = null;
   private tileSize = 32;
   private unsubscribers: Array<() => void> = [];
@@ -108,6 +110,13 @@ export class WorldScene extends Phaser.Scene {
     this.createMap();
 
     this.cameras.main.setBounds(0, 0, MAP_WIDTH * this.tileSize, MAP_HEIGHT * this.tileSize);
+
+    // Declarative y-sort layer: all y-sortable entities go here
+    this.entityContainer = this.add.container(0, 0);
+    this.entityContainer.setDepth(10);
+    this.events.on('postupdate', () => {
+      this.entityContainer.sort('y');
+    });
 
     const currentPlayers = get(players);
     const currentSelfId = get(selfId);
@@ -454,7 +463,7 @@ export class WorldScene extends Phaser.Scene {
 
         const localObj = this.playerObjects.get(msg.self.id);
         if (localObj) {
-          this.cameras.main.startFollow(localObj.sprite, true, 0.1, 0.1);
+          this.cameras.main.startFollow(localObj.container, true, 0.1, 0.1);
         }
       }
       players.set(newMap);
@@ -535,11 +544,11 @@ export class WorldScene extends Phaser.Scene {
     const dirFrame: Record<Direction, number> = { down: 0, up: 1, right: 2, left: 3 };
     const frameIndex = dirFrame[info.dir] ?? 0;
 
-    const sprite = this.add.sprite(px, py, textureKey, frameIndex);
-    sprite.setDepth(10);
+    // All positions are relative to the character container
+    const sprite = this.add.sprite(0, 0, textureKey, frameIndex);
 
     const nameText = this.add
-      .text(px, py - this.tileSize / 2 - 14, info.nickname, {
+      .text(0, -this.tileSize / 2 - 14, info.nickname, {
         fontSize: '12px',
         color: '#e0e0ff',
         fontFamily: 'MulmaruMono',
@@ -547,19 +556,23 @@ export class WorldScene extends Phaser.Scene {
         padding: { left: 14, right: 4, top: 2, bottom: 2 }
       })
       .setOrigin(0.5)
-      .setDepth(11)
       .setResolution(1);
 
-    const statusDot = this.add.graphics().setDepth(12);
+    const statusDot = this.add.graphics();
     const dotColor = Phaser.Display.Color.HexStringToColor(this.getStatusColor(info.status)).color;
     statusDot.fillStyle(dotColor, 1);
     statusDot.fillCircle(0, 0, 3);
     statusDot.setPosition(
-      nameText.x - nameText.width / 2 + 8,
-      nameText.y
+      -nameText.width / 2 + 8,
+      -this.tileSize / 2 - 14
     );
 
+    // Container groups character elements; entityContainer auto-sorts by y
+    const container = this.add.container(px, py, [sprite, nameText, statusDot]);
+    this.entityContainer.add(container);
+
     this.playerObjects.set(info.id, {
+      container,
       sprite,
       nameText,
       statusDot,
@@ -582,16 +595,14 @@ export class WorldScene extends Phaser.Scene {
     }
 
     if (info.id === this.localPlayerId) {
-      this.cameras.main.startFollow(sprite, true, 0.1, 0.1);
+      this.cameras.main.startFollow(container, true, 0.1, 0.1);
     }
   }
 
   private removePlayer(id: string): void {
     const p = this.playerObjects.get(id);
     if (!p) return;
-    p.sprite.destroy();
-    p.nameText.destroy();
-    p.statusDot.destroy();
+    p.container.destroy(); // destroys sprite, nameText, statusDot together
     if (p.bubbleText) {
       this.tweens.killTweensOf(p.bubbleText);
       p.bubbleText.destroy();
@@ -656,12 +667,14 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private updatePlayerVisuals(p: PlayerObject): void {
-    p.sprite.setPosition(p.x, p.y);
-    p.nameText.setPosition(p.x, p.y - this.tileSize / 2 - 14);
+    p.container.setPosition(p.x, p.y);
+    // Sub-elements use relative coords within the container — no individual updates needed
+    // StatusDot tracks nameText width (fixed after creation, but kept for safety)
     p.statusDot.setPosition(
-      p.nameText.x - p.nameText.width / 2 + 8,
-      p.nameText.y
+      -p.nameText.width / 2 + 8,
+      -this.tileSize / 2 - 14
     );
+    // UI elements remain on the main display list with absolute positions
     if (p.customStatusBubble) {
       p.customStatusBubble.setPosition(p.x, p.y - this.tileSize / 2 - 34);
     }
@@ -671,6 +684,16 @@ export class WorldScene extends Phaser.Scene {
     if (p.emoteText) {
       p.emoteText.setPosition(p.x, p.y - this.tileSize - 34);
     }
+  }
+
+  /** Add a game object to the y-sorted entity layer. */
+  addToSortLayer(obj: Phaser.GameObjects.GameObject): void {
+    this.entityContainer.add(obj);
+  }
+
+  /** Remove a game object from the y-sorted entity layer. */
+  removeFromSortLayer(obj: Phaser.GameObjects.GameObject): void {
+    this.entityContainer.remove(obj);
   }
 
   private updateCharacterFrame(p: PlayerObject, dir: Direction): void {
