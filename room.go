@@ -401,6 +401,11 @@ func (r *Room) handleChat(client *Client, text string, image *ChatImage) {
 	}
 
 	msg := &OutgoingMessage{
+		Type:     MsgChat,
+		ID:       client.id,
+		Nickname: client.nickname,
+	}
+
 	if client.currentZoneID != "" {
 		// Zone chat: direct-send to zone members only (bypass broadcast)
 		// Hold r.mu.RLock for the entire operation to safely access r.objects
@@ -432,13 +437,6 @@ func (r *Room) handleChat(client *Client, text string, image *ChatImage) {
 		return
 	}
 
-	// Global chat: broadcast to all (existing behavior)
-	r.broadcast <- &OutgoingMessage{
-		Type:     MsgChat,
-		ID:       client.id,
-		Nickname: client.nickname,
-	}
-
 	if text != "" {
 		msg.Text = text
 	}
@@ -446,6 +444,7 @@ func (r *Room) handleChat(client *Client, text string, image *ChatImage) {
 		msg.Image = normalizedImage
 	}
 
+	// Global chat: broadcast to all (existing behavior)
 	r.broadcast <- msg
 }
 
