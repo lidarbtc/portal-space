@@ -36,14 +36,16 @@ type Client struct {
 	colors       *ColorPalette
 	customStatus string
 
-	reconnect bool
+	reconnect     bool
+	currentZoneID string
 
-	lastMove         time.Time
-	lastEmote        time.Time
-	lastProfile      time.Time
-	lastCustomStatus time.Time
-	lastDash         time.Time
-	dashUntil        time.Time
+	lastMove           time.Time
+	lastEmote          time.Time
+	lastProfile        time.Time
+	lastCustomStatus   time.Time
+	lastSettingsUpdate time.Time
+	lastDash           time.Time
+	dashUntil          time.Time
 
 	send chan []byte
 	once sync.Once

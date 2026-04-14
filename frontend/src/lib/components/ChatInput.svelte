@@ -3,6 +3,7 @@
   import { useEventListener } from 'runed';
   import { chatInputActive } from '$lib/stores/game';
   import { MAX_CHAT_IMAGE_BYTES } from '$lib/types';
+  import { activeChatTab, currentZoneId, currentZoneName } from '$lib/stores/regional-chat';
 
   let {
     onSend,
@@ -23,6 +24,10 @@
   let isSendingImage = $state(false);
 
   const MAX_CHAT_IMAGE_SOURCE_BYTES = 10 * 1024 * 1024;
+
+  let isInZone = $derived(!!$currentZoneId);
+  let isRegionalTab = $derived($activeChatTab === 'regional');
+  let isReadOnly = $derived(isInZone && !isRegionalTab);
 
   onMount(() => {
     if (mobile) {
@@ -180,6 +185,24 @@
         onblur={handleBlur}
         disabled={isSendingImage}
       />
+      {#if isInZone && isRegionalTab}
+        <span class="zone-badge">{$currentZoneName}</span>
+      {/if}
+      {#if isReadOnly}
+        <div class="chat-readonly-indicator">(읽기 전용)</div>
+      {:else}
+        <input
+          id="chat-input"
+          type="text"
+          placeholder={alwaysActive ? '메시지를 입력해주세요 (J)' : '메시지 입력...'}
+          maxlength={500}
+          bind:this={inputEl}
+          bind:value={inputValue}
+          onkeydown={handleKeydown}
+          onfocus={handleFocus}
+          onblur={handleBlur}
+        />
+      {/if}
       {#if mobile}
         <button class="chat-send-btn" onclick={sendMessage} aria-label="전송" disabled={isSendingImage}>↑</button>
       {/if}
@@ -255,5 +278,28 @@
   .chat-send-btn:active,
   .chat-attach-btn:active {
     background: var(--color-primary-hover);
+  }
+
+  .zone-badge {
+    flex: 0 0 auto;
+    font-family: 'MulmaruMono', monospace;
+    font-size: 0.6875rem;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: rgba(102, 204, 255, 0.15);
+    color: #66ccff;
+    border: 1px solid rgba(102, 204, 255, 0.3);
+    white-space: nowrap;
+  }
+
+  .chat-readonly-indicator {
+    flex: 1;
+    font-family: 'MulmaruMono', monospace;
+    font-size: 0.8125rem;
+    color: #666677;
+    padding: 6px 10px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 4px;
   }
 </style>

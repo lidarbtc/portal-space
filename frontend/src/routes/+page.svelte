@@ -4,6 +4,7 @@
   import ActionBar from '$lib/components/ActionBar.svelte';
   import SettingsModal from '$lib/components/SettingsModal.svelte';
   import Whiteboard from '$lib/components/Whiteboard.svelte';
+  import RegionalChatSettings from '$lib/components/RegionalChatSettings.svelte';
   import ChatLog from '$lib/components/ChatLog.svelte';
   import ChatInput from '$lib/components/ChatInput.svelte';
 
@@ -307,6 +308,7 @@
 {#if inGame}
   <SettingsModal bind:open={settingsOpen} />
   <Whiteboard />
+  <RegionalChatSettings />
 {/if}
 
 {#if inGame && $connectionState === 'reconnecting'}

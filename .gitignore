@@ -16,8 +16,9 @@ identity.json
 # Claude
 .claude/
 
-# OMC state
+# OMC/OMX state
 .omc/
+.omx/
 static.bak/
 
 # Frontend

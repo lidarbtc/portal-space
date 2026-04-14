@@ -15,11 +15,19 @@ import { createPlaceholderTileset } from '../tileset';
 import { createAvatarSpritesheet } from '../spritesheet';
 import { createTintedSpritesheet } from '../palette-swap';
 import { resolveNicknameColor } from '$lib/utils/nickname-colors';
-import type { PlayerInfo, Direction, InteractiveObject } from '$lib/types';
+import type { PlayerInfo, Direction, InteractiveObject, RegionalChatState } from '$lib/types';
 import { MAP_WIDTH, MAP_HEIGHT } from '$lib/types';
 import { zoomLevel, zoomIn, zoomOut, computeMinZoom, clampZoom } from '$lib/stores/zoom';
 import { interactiveObjects, nearbyObjectId, activeObjectId } from '$lib/stores/objects';
 import { whiteboardOpen, currentBoardId } from '$lib/stores/whiteboard';
+import {
+  enterZone,
+  exitZone,
+  addRegionalMessage,
+  currentZoneId,
+  regionalChatSettingsOpen,
+  currentRegionalChatId,
+} from '$lib/stores/regional-chat';
 import {
   createInteractiveObject,
   updateNearbyState,
@@ -36,6 +44,7 @@ const DASH_COOLDOWN = 1500; // ms
 const ALLOWED_CHAT_IMAGE_MIMES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp']);
 
 interface PlayerObject {
+  container: Phaser.GameObjects.Container;
   sprite: Phaser.GameObjects.Sprite;
   nameText: Phaser.GameObjects.Text;
   statusDot: Phaser.GameObjects.Graphics;
@@ -56,6 +65,7 @@ interface PlayerObject {
 export class WorldScene extends Phaser.Scene {
   private playerObjects: Map<string, PlayerObject> = new Map();
   private gameObjects: Map<string, GameInteractiveObject> = new Map();
+  private entityContainer!: Phaser.GameObjects.Container;
   private localPlayerId: string | null = null;
   private tileSize = 32;
   private unsubscribers: Array<() => void> = [];
@@ -93,6 +103,7 @@ export class WorldScene extends Phaser.Scene {
       this.load.setBaseURL(match[1]);
     }
     this.load.image('gopher-src', 'assets/gopher.png');
+    this.load.image('ward-stone', 'assets/ward-stone.png');
   }
 
   create(): void {
@@ -100,6 +111,13 @@ export class WorldScene extends Phaser.Scene {
     this.createMap();
 
     this.cameras.main.setBounds(0, 0, MAP_WIDTH * this.tileSize, MAP_HEIGHT * this.tileSize);
+
+    // Declarative y-sort layer: all y-sortable entities go here
+    this.entityContainer = this.add.container(0, 0);
+    this.entityContainer.setDepth(10);
+    this.events.on('postupdate', () => {
+      this.entityContainer.sort('y');
+    });
 
     const currentPlayers = get(players);
     const currentSelfId = get(selfId);
@@ -340,6 +358,42 @@ export class WorldScene extends Phaser.Scene {
         if (msg.id !== this.localPlayerId && get(currentStatus) !== 'dnd') {
           notifyAudio.playIfHidden();
         }
+      // Zone enter/exit system messages
+      if (msg.isSystem && msg.zoneId) {
+        const text = msg.text || '';
+        if (msg.zoneEvent === 'enter') {
+          enterZone(msg.zoneId, msg.zoneName || '');
+        } else if (msg.zoneEvent === 'exit') {
+          exitZone();
+        }
+        // Add to regional messages
+        addRegionalMessage({ text, isSystem: true });
+        return;
+      }
+
+      // Regional chat message
+      if (msg.zoneId) {
+        if (msg.id !== this.localPlayerId && get(currentStatus) !== 'dnd') {
+          notifyAudio.playIfHidden();
+        }
+        if (msg.id && msg.nickname && msg.text) {
+          const senderColors = get(players).get(msg.id)?.colors;
+          this.showChatBubble(msg.id, msg.text, msg.nickname);
+          addRegionalMessage({
+            senderId: msg.id,
+            nickname: msg.nickname,
+            nicknameColor: resolveNicknameColor(msg.id, senderColors),
+            text: msg.text,
+          });
+        }
+        return;
+      }
+
+      // Global chat message (existing behavior)
+      if (msg.id !== this.localPlayerId && get(currentStatus) !== 'dnd') {
+        notifyAudio.playIfHidden();
+      }
+      if (msg.id && msg.nickname && msg.text) {
         const senderColors = get(players).get(msg.id)?.colors;
         const bubbleText = image && msg.text ? `[사진] ${msg.text}` : (msg.text ?? '[사진]');
         this.showChatBubble(msg.id, bubbleText, msg.nickname);
@@ -418,7 +472,7 @@ export class WorldScene extends Phaser.Scene {
 
         const localObj = this.playerObjects.get(msg.self.id);
         if (localObj) {
-          this.cameras.main.startFollow(localObj.sprite, true, 0.1, 0.1);
+          this.cameras.main.startFollow(localObj.container, true, 0.1, 0.1);
         }
       }
       players.set(newMap);
@@ -439,6 +493,48 @@ export class WorldScene extends Phaser.Scene {
         interactiveObjects.set(objMap);
       }
     });
+
+    network.on('action', (msg) => {
+      const ap = msg.actionPayload;
+      if (!ap || ap.domain !== 'regional_chat' || ap.action !== 'state_updated') return;
+      if (!ap.objectId) return;
+
+      const gObj = this.gameObjects.get(ap.objectId);
+      if (!gObj || gObj.data.type !== 'regional_chat') return;
+
+      const newState = ap.payload as RegionalChatState | undefined;
+      if (!newState) return;
+
+      // Update stored data
+      gObj.data = { ...gObj.data, state: newState };
+
+      // Redraw zone fill circle
+      if (gObj.zoneCircle) {
+        gObj.zoneCircle.clear();
+        gObj.zoneCircle.fillStyle(0x06b6d4, 0.08);
+        gObj.zoneCircle.fillCircle(0, 0, newState.radius);
+      }
+
+      // Redraw stroke circle (keep current alpha for tween)
+      if (gObj.zoneStroke) {
+        const currentAlpha = gObj.zoneStroke.alpha;
+        gObj.zoneStroke.clear();
+        gObj.zoneStroke.lineStyle(2, 0x06b6d4, 0.3);
+        gObj.zoneStroke.strokeCircle(0, 0, newState.radius);
+        gObj.zoneStroke.setAlpha(currentAlpha);
+      }
+
+      // Update label text
+      if (gObj.zoneLabel) {
+        gObj.zoneLabel.setText(newState.name);
+      }
+
+      // Update interactiveObjects store
+      interactiveObjects.update((m) => {
+        m.set(ap.objectId!, gObj.data);
+        return m;
+      });
+    });
   }
 
   private addPlayer(info: PlayerInfo): void {
@@ -457,11 +553,11 @@ export class WorldScene extends Phaser.Scene {
     const dirFrame: Record<Direction, number> = { down: 0, up: 1, right: 2, left: 3 };
     const frameIndex = dirFrame[info.dir] ?? 0;
 
-    const sprite = this.add.sprite(px, py, textureKey, frameIndex);
-    sprite.setDepth(10);
+    // All positions are relative to the character container
+    const sprite = this.add.sprite(0, 0, textureKey, frameIndex);
 
     const nameText = this.add
-      .text(px, py - this.tileSize / 2 - 14, info.nickname, {
+      .text(0, -this.tileSize / 2 - 14, info.nickname, {
         fontSize: '12px',
         color: '#e0e0ff',
         fontFamily: 'MulmaruMono',
@@ -469,19 +565,23 @@ export class WorldScene extends Phaser.Scene {
         padding: { left: 14, right: 4, top: 2, bottom: 2 }
       })
       .setOrigin(0.5)
-      .setDepth(11)
       .setResolution(1);
 
-    const statusDot = this.add.graphics().setDepth(12);
+    const statusDot = this.add.graphics();
     const dotColor = Phaser.Display.Color.HexStringToColor(this.getStatusColor(info.status)).color;
     statusDot.fillStyle(dotColor, 1);
     statusDot.fillCircle(0, 0, 3);
     statusDot.setPosition(
-      nameText.x - nameText.width / 2 + 8,
-      nameText.y
+      -nameText.width / 2 + 8,
+      -this.tileSize / 2 - 14
     );
 
+    // Container groups character elements; entityContainer auto-sorts by y
+    const container = this.add.container(px, py, [sprite, nameText, statusDot]);
+    this.entityContainer.add(container);
+
     this.playerObjects.set(info.id, {
+      container,
       sprite,
       nameText,
       statusDot,
@@ -504,16 +604,14 @@ export class WorldScene extends Phaser.Scene {
     }
 
     if (info.id === this.localPlayerId) {
-      this.cameras.main.startFollow(sprite, true, 0.1, 0.1);
+      this.cameras.main.startFollow(container, true, 0.1, 0.1);
     }
   }
 
   private removePlayer(id: string): void {
     const p = this.playerObjects.get(id);
     if (!p) return;
-    p.sprite.destroy();
-    p.nameText.destroy();
-    p.statusDot.destroy();
+    p.container.destroy(); // destroys sprite, nameText, statusDot together
     if (p.bubbleText) {
       this.tweens.killTweensOf(p.bubbleText);
       p.bubbleText.destroy();
@@ -578,12 +676,14 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private updatePlayerVisuals(p: PlayerObject): void {
-    p.sprite.setPosition(p.x, p.y);
-    p.nameText.setPosition(p.x, p.y - this.tileSize / 2 - 14);
+    p.container.setPosition(p.x, p.y);
+    // Sub-elements use relative coords within the container — no individual updates needed
+    // StatusDot tracks nameText width (fixed after creation, but kept for safety)
     p.statusDot.setPosition(
-      p.nameText.x - p.nameText.width / 2 + 8,
-      p.nameText.y
+      -p.nameText.width / 2 + 8,
+      -this.tileSize / 2 - 14
     );
+    // UI elements remain on the main display list with absolute positions
     if (p.customStatusBubble) {
       p.customStatusBubble.setPosition(p.x, p.y - this.tileSize / 2 - 34);
     }
@@ -593,6 +693,16 @@ export class WorldScene extends Phaser.Scene {
     if (p.emoteText) {
       p.emoteText.setPosition(p.x, p.y - this.tileSize - 34);
     }
+  }
+
+  /** Add a game object to the y-sorted entity layer. */
+  addToSortLayer(obj: Phaser.GameObjects.GameObject): void {
+    this.entityContainer.add(obj);
+  }
+
+  /** Remove a game object from the y-sorted entity layer. */
+  removeFromSortLayer(obj: Phaser.GameObjects.GameObject): void {
+    this.entityContainer.remove(obj);
   }
 
   private updateCharacterFrame(p: PlayerObject, dir: Direction): void {
@@ -932,6 +1042,9 @@ export class WorldScene extends Phaser.Scene {
     if (obj.type === 'whiteboard') {
       currentBoardId.set(obj.id);
       whiteboardOpen.set(true);
+    } else if (obj.type === 'regional_chat') {
+      currentRegionalChatId.set(obj.id);
+      regionalChatSettingsOpen.set(true);
     }
   }
 

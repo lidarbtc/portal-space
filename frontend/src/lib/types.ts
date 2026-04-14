@@ -78,6 +78,10 @@ export interface OutgoingMessage {
   reconnect?: boolean;
   objects?: InteractiveObject[];
   actionPayload?: ActionMessage;
+  zoneId?: string;
+  zoneName?: string;
+  zoneEvent?: 'enter' | 'exit';
+  isSystem?: boolean;
 }
 
 // Matches protocol.go PlayerInfo (no omitempty — all fields required)
@@ -101,6 +105,9 @@ export const MAX_CHAT_LEN = 500;
 export const MAX_CUSTOM_STATUS_LEN = 20;
 export const MAX_CHAT_IMAGE_BYTES = 2 * 1024 * 1024;
 
+// Chat channel type
+export type ChatChannel = 'global' | 'regional';
+
 // Chat message for UI
 export interface ChatMessage {
   senderId?: string;
@@ -110,4 +117,12 @@ export interface ChatMessage {
   image?: ChatImage;
   isSystem: boolean;
   timestamp: number;
+  channel?: ChatChannel;
+}
+
+// Regional chat zone state (matches Go RegionalChatState)
+export interface RegionalChatState {
+  name: string;
+  radius: number;
+  retainHistory: boolean;
 }

@@ -195,7 +195,37 @@ func (r *Room) run() {
 			}
 			r.mu.RUnlock()
 
+			// Evaluate zone membership on join/reconnect
+			r.updateZoneMembership(client)
+
 		case client := <-r.unregister:
+			// Notify zone members if player was in a zone
+			if client.currentZoneID != "" {
+				obj := r.objects[client.currentZoneID]
+				var zoneName string
+				if obj != nil {
+					var state RegionalChatState
+					if err := json.Unmarshal(obj.State, &state); err == nil {
+						zoneName = state.Name
+					}
+				}
+				exitNotify := &OutgoingMessage{
+					Type:     MsgChat,
+					IsSystem: true,
+					ZoneID:   client.currentZoneID,
+					ZoneName: zoneName,
+					Text:     client.nickname + "님이 퇴장했습니다",
+				}
+				r.mu.RLock()
+				for _, c := range r.players {
+					if c.id != client.id && c.currentZoneID == client.currentZoneID {
+						c.sendMsg(exitNotify)
+					}
+				}
+				r.mu.RUnlock()
+				client.currentZoneID = ""
+			}
+
 			r.mu.Lock()
 			_, ok := r.players[client.id]
 			if ok {
@@ -262,6 +292,8 @@ func (r *Room) handleMove(client *Client, x, y float64, dir string) {
 		Y:    y,
 		Dir:  dir,
 	}
+
+	r.updateZoneMembership(client)
 }
 
 func (r *Room) handleStatus(client *Client, status string) {
@@ -369,6 +401,39 @@ func (r *Room) handleChat(client *Client, text string, image *ChatImage) {
 	}
 
 	msg := &OutgoingMessage{
+	if client.currentZoneID != "" {
+		// Zone chat: direct-send to zone members only (bypass broadcast)
+		// Hold r.mu.RLock for the entire operation to safely access r.objects
+		// and other clients' currentZoneID fields
+		r.mu.RLock()
+		zoneID := client.currentZoneID
+		obj := r.objects[zoneID]
+		var zoneName string
+		if obj != nil {
+			var state RegionalChatState
+			if err := json.Unmarshal(obj.State, &state); err == nil {
+				zoneName = state.Name
+			}
+		}
+		msg := &OutgoingMessage{
+			Type:     MsgChat,
+			ID:       client.id,
+			Nickname: client.nickname,
+			Text:     text,
+			ZoneID:   zoneID,
+			ZoneName: zoneName,
+		}
+		for _, c := range r.players {
+			if c.currentZoneID == zoneID {
+				c.sendMsg(msg)
+			}
+		}
+		r.mu.RUnlock()
+		return
+	}
+
+	// Global chat: broadcast to all (existing behavior)
+	r.broadcast <- &OutgoingMessage{
 		Type:     MsgChat,
 		ID:       client.id,
 		Nickname: client.nickname,
@@ -392,8 +457,199 @@ func (r *Room) handleAction(client *Client, raw json.RawMessage) {
 	}
 
 	switch action.Domain {
+	case DomainRegionalChat:
+		r.handleRegionalChatAction(client, action)
 	default:
 		log.Debug().Str("domain", action.Domain).Msg("unknown action domain")
+	}
+}
+
+// updateZoneMembership checks if a client has entered or left a regional chat zone.
+// Called from readPump goroutines (handleMove) and run() goroutine (register, re-eval).
+// Uses r.mu to protect access to r.objects and other clients' fields.
+func (r *Room) updateZoneMembership(client *Client) {
+	// If player is already in a zone, check if they left it
+	if client.currentZoneID != "" {
+		r.mu.RLock()
+		obj, exists := r.objects[client.currentZoneID]
+		var stillInside bool
+		var zoneName string
+		if exists {
+			var state RegionalChatState
+			if err := json.Unmarshal(obj.State, &state); err == nil {
+				zoneName = state.Name
+				dx := client.x - obj.X
+				dy := client.y - obj.Y
+				dist := math.Sqrt(dx*dx + dy*dy)
+				stillInside = dist <= state.Radius
+			}
+		}
+		r.mu.RUnlock()
+
+		if stillInside {
+			return
+		}
+
+		// Left the zone — notify player
+		client.sendMsg(&OutgoingMessage{
+			Type:      MsgChat,
+			IsSystem:  true,
+			ZoneID:    client.currentZoneID,
+			ZoneName:  zoneName,
+			ZoneEvent: "exit",
+			Text:      zoneName + "에서 퇴장했습니다",
+		})
+		// Notify remaining zone members
+		exitNotify := &OutgoingMessage{
+			Type:     MsgChat,
+			IsSystem: true,
+			ZoneID:   client.currentZoneID,
+			ZoneName: zoneName,
+			Text:     client.nickname + "님이 퇴장했습니다",
+		}
+		r.mu.RLock()
+		for _, c := range r.players {
+			if c.id != client.id && c.currentZoneID == client.currentZoneID {
+				c.sendMsg(exitNotify)
+			}
+		}
+		r.mu.RUnlock()
+
+		client.currentZoneID = ""
+	}
+
+	// Try to enter a new zone (only if not currently in any zone)
+	r.mu.RLock()
+	var enterObj *InteractiveObject
+	var enterState RegionalChatState
+	for _, obj := range r.objects {
+		if obj.Type != "regional_chat" {
+			continue
+		}
+		var state RegionalChatState
+		if err := json.Unmarshal(obj.State, &state); err != nil {
+			continue
+		}
+		dx := client.x - obj.X
+		dy := client.y - obj.Y
+		dist := math.Sqrt(dx*dx + dy*dy)
+		if dist <= state.Radius {
+			enterObj = obj
+			enterState = state
+			break
+		}
+	}
+	r.mu.RUnlock()
+
+	if enterObj == nil {
+		return
+	}
+
+	client.currentZoneID = enterObj.ID
+	// Notify the player
+	client.sendMsg(&OutgoingMessage{
+		Type:      MsgChat,
+		IsSystem:  true,
+		ZoneID:    enterObj.ID,
+		ZoneName:  enterState.Name,
+		ZoneEvent: "enter",
+		Text:      enterState.Name + "에 입장했습니다",
+	})
+	// Notify existing zone members
+	enterNotify := &OutgoingMessage{
+		Type:     MsgChat,
+		IsSystem: true,
+		ZoneID:   enterObj.ID,
+		ZoneName: enterState.Name,
+		Text:     client.nickname + "님이 입장했습니다",
+	}
+	r.mu.RLock()
+	for _, c := range r.players {
+		if c.id != client.id && c.currentZoneID == enterObj.ID {
+			c.sendMsg(enterNotify)
+		}
+	}
+	r.mu.RUnlock()
+}
+
+// handleRegionalChatAction processes settings updates for regional chat objects.
+func (r *Room) handleRegionalChatAction(client *Client, action ActionMessage) {
+	if action.Action != ActionUpdateSettings {
+		return
+	}
+
+	r.mu.RLock()
+	obj, exists := r.objects[action.ObjectID]
+	r.mu.RUnlock()
+	if !exists || obj.Type != "regional_chat" {
+		return
+	}
+
+	// Rate limit
+	now := time.Now()
+	if now.Sub(client.lastSettingsUpdate) < time.Duration(settingsCooldown)*time.Second {
+		return
+	}
+	client.lastSettingsUpdate = now
+
+	// Proximity check for settings access
+	dx := client.x - obj.X
+	dy := client.y - obj.Y
+	dist := math.Sqrt(dx*dx + dy*dy)
+	if dist > 1.5*32 { // Same interaction radius as whiteboard
+		return
+	}
+
+	// Parse new settings from payload
+	var newSettings RegionalChatState
+	if err := json.Unmarshal(action.Payload, &newSettings); err != nil {
+		return
+	}
+
+	// Validate
+	newSettings.Name = sanitizeString(newSettings.Name, maxNicknameLen)
+	if newSettings.Name == "" {
+		newSettings.Name = "결계석"
+	}
+	if newSettings.Radius < minZoneRadius {
+		newSettings.Radius = minZoneRadius
+	}
+	if newSettings.Radius > maxZoneRadius {
+		newSettings.Radius = maxZoneRadius
+	}
+
+	// Update object state (write-lock to prevent concurrent reads of obj.State)
+	r.mu.Lock()
+	stateJSON, err := json.Marshal(newSettings)
+	if err != nil {
+		r.mu.Unlock()
+		return
+	}
+	obj.State = stateJSON
+	r.mu.Unlock()
+
+	// Broadcast updated object to all players (include payload for frontend reactivity)
+	apBytes, _ := json.Marshal(map[string]interface{}{
+		"domain":   DomainRegionalChat,
+		"action":   "state_updated",
+		"objectId": obj.ID,
+		"payload":  newSettings,
+	})
+	r.broadcast <- &OutgoingMessage{
+		Type:          MsgAction,
+		ActionPayload: json.RawMessage(apBytes),
+		Objects:       []*InteractiveObject{obj},
+	}
+
+	// Re-evaluate all players' zone membership after radius change
+	r.mu.RLock()
+	players := make([]*Client, 0, len(r.players))
+	for _, c := range r.players {
+		players = append(players, c)
+	}
+	r.mu.RUnlock()
+	for _, c := range players {
+		r.updateZoneMembership(c)
 	}
 }
 

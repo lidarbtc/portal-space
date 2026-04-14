@@ -48,7 +48,24 @@ const (
 	emoteRateLimit       = 2
 	profileCooldown      = 2
 	customStatusCooldown = 2
+	settingsCooldown     = 2
+
+	// Regional chat zone radius bounds (in pixels)
+	defaultZoneRadius = 160.0 // 5 tiles
+	maxZoneRadius     = 320.0 // 10 tiles
+	minZoneRadius     = 64.0  // 2 tiles
+
+	// Action domains and actions
+	DomainRegionalChat   = "regional_chat"
+	ActionUpdateSettings = "update_settings"
 )
+
+// RegionalChatState is the per-object state for regional chat zones.
+type RegionalChatState struct {
+	Name          string  `json:"name"`
+	Radius        float64 `json:"radius"`
+	RetainHistory bool    `json:"retainHistory"`
+}
 
 // Client → Server messages
 
@@ -90,6 +107,10 @@ type OutgoingMessage struct {
 	Reconnect     bool                 `json:"reconnect,omitempty"`
 	Objects       []*InteractiveObject `json:"objects,omitempty"`
 	ActionPayload json.RawMessage      `json:"actionPayload,omitempty"`
+	ZoneID        string               `json:"zoneId,omitempty"`
+	ZoneName      string               `json:"zoneName,omitempty"`
+	ZoneEvent     string               `json:"zoneEvent,omitempty"` // "enter" or "exit"
+	IsSystem      bool                 `json:"isSystem,omitempty"`
 }
 
 type ColorPalette struct {

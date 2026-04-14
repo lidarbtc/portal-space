@@ -263,6 +263,10 @@ class NetworkClient {
     return this.send({ type: 'profile', nickname, colors });
   }
 
+  sendRegionalChatAction(objectId: string, settings: { name: string; radius: number; retainHistory: boolean }): void {
+    this.sendAction('regional_chat', 'update_settings', objectId, settings);
+  }
+
   sendAction(domain: string, action: string, objectId?: string, payload?: unknown): void {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       const envelope: Record<string, unknown> = { domain, action };
