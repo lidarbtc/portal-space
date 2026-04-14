@@ -93,7 +93,7 @@
     });
 
     $effect(() => {
-        const msgs = displayMessages;
+        displayMessages;
         if (atBottom && chatLogEl) {
             requestAnimationFrame(() => {
                 if (chatLogEl) {
