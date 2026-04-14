@@ -15,7 +15,6 @@ const (
 	writeWait  = 10 * time.Second
 	pongWait   = 60 * time.Second
 	pingPeriod = 20 * time.Second
-	maxMsgSize = 16 * 1024 * 1024
 )
 
 var upgrader = websocket.Upgrader{
@@ -82,7 +81,7 @@ func (c *Client) readPump() {
 		c.conn.Close()
 	}()
 
-	c.conn.SetReadLimit(maxMsgSize)
+	c.conn.SetReadLimit(maxIncomingWSMessageBytes)
 	_ = c.conn.SetReadDeadline(time.Now().Add(pongWait))
 	c.conn.SetPongHandler(func(string) error {
 		_ = c.conn.SetReadDeadline(time.Now().Add(pongWait))

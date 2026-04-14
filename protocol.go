@@ -116,12 +116,14 @@ const (
 	maxNicknameLen     = 20
 	maxChatLen         = 500
 	maxCustomStatusLen = 20
-	maxChatImageBytes  = 10 * 1024 * 1024
+	maxChatImageBytes  = 2 * 1024 * 1024
 	mapWidth           = 60
 	mapHeight          = 45
 )
 
 const maxChatImageBase64Len = ((maxChatImageBytes + 2) / 3) * 4
+
+const maxIncomingWSMessageBytes = maxChatImageBase64Len + 8*1024
 
 var validStatuses = map[string]bool{
 	"online": true,
