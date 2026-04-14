@@ -1,5 +1,7 @@
 <script lang="ts">
+  import { onDestroy } from 'svelte';
   import { chatMessages } from '$lib/stores/game';
+  import type { ChatImage, ChatMessage } from '$lib/types';
   import { parseTextWithUrls } from '$lib/utils/linkify';
   import { AlertDialog } from 'bits-ui';
 
@@ -7,6 +9,40 @@
   let atBottom = $state(true);
   let openLinkDialog = $state(false);
   let pendingUrl = $state('');
+  const chatImageUrls = new Map<ChatImage, string>();
+
+  function base64ToBlob(data: string, mime: string): Blob {
+    const binary = atob(data);
+    const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+    return new Blob([bytes], { type: mime });
+  }
+
+  function ensureChatImageUrl(image: ChatImage): string {
+    const existingUrl = chatImageUrls.get(image);
+    if (existingUrl) {
+      return existingUrl;
+    }
+
+    const objectUrl = URL.createObjectURL(base64ToBlob(image.data, image.mime));
+    chatImageUrls.set(image, objectUrl);
+    return objectUrl;
+  }
+
+  function syncChatImageUrls(messages: ChatMessage[]) {
+    const activeImages = new Set<ChatImage>();
+
+    for (const message of messages) {
+      if (!message.image) continue;
+      activeImages.add(message.image);
+      ensureChatImageUrl(message.image);
+    }
+
+    for (const [image, objectUrl] of chatImageUrls) {
+      if (activeImages.has(image)) continue;
+      URL.revokeObjectURL(objectUrl);
+      chatImageUrls.delete(image);
+    }
+  }
 
   function formatTime(ts: number): string {
     const d = new Date(ts);
@@ -30,6 +66,10 @@
   }
 
   $effect(() => {
+    syncChatImageUrls($chatMessages);
+  });
+
+  $effect(() => {
     const msgs = $chatMessages;
     if (atBottom && chatLogEl) {
       requestAnimationFrame(() => {
@@ -38,6 +78,13 @@
         }
       });
     }
+  });
+
+  onDestroy(() => {
+    for (const objectUrl of chatImageUrls.values()) {
+      URL.revokeObjectURL(objectUrl);
+    }
+    chatImageUrls.clear();
   });
 </script>
 
@@ -52,7 +99,7 @@
           <div class="chat-image-message">
             <img
               class="chat-image"
-              src={`data:${message.image.mime};base64,${message.image.data}`}
+              src={ensureChatImageUrl(message.image)}
               alt={message.image.name ?? 'shared image'}
               loading="lazy"
             />
