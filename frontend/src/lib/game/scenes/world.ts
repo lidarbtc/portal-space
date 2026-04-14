@@ -451,14 +451,16 @@ export class WorldScene extends Phaser.Scene {
           if (msg.id !== this.localPlayerId && get(currentStatus) !== "dnd") {
             notifyAudio.playIfHidden();
           }
-          if (msg.id && msg.nickname && msg.text) {
+          if (msg.id && msg.nickname && (msg.text || image)) {
             const senderColors = get(players).get(msg.id)?.colors;
-            this.showChatBubble(msg.id, msg.text, msg.nickname);
+            const bubbleText = image && msg.text ? `[사진] ${msg.text}` : (msg.text ?? "[사진]");
+            this.showChatBubble(msg.id, bubbleText, msg.nickname);
             addRegionalMessage({
               senderId: msg.id,
               nickname: msg.nickname,
               nicknameColor: resolveNicknameColor(msg.id, senderColors),
               text: msg.text,
+              image,
             });
           }
           return;
@@ -468,7 +470,7 @@ export class WorldScene extends Phaser.Scene {
         if (msg.id !== this.localPlayerId && get(currentStatus) !== "dnd") {
           notifyAudio.playIfHidden();
         }
-        if (msg.id && msg.nickname && msg.text) {
+        if (msg.id && msg.nickname && (msg.text || image)) {
           const senderColors = get(players).get(msg.id)?.colors;
           const bubbleText =
             image && msg.text ? `[사진] ${msg.text}` : (msg.text ?? "[사진]");

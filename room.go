@@ -424,9 +424,14 @@ func (r *Room) handleChat(client *Client, text string, image *ChatImage) {
 			Type:     MsgChat,
 			ID:       client.id,
 			Nickname: client.nickname,
-			Text:     text,
 			ZoneID:   zoneID,
 			ZoneName: zoneName,
+		}
+		if text != "" {
+			msg.Text = text
+		}
+		if normalizedImage != nil {
+			msg.Image = normalizedImage
 		}
 		for _, c := range r.players {
 			if c.currentZoneID == zoneID {
