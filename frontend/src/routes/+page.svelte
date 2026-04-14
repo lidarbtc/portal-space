@@ -15,12 +15,21 @@
   import { connectionState } from '$lib/stores/connection';
   import { isMobile } from '$lib/stores/mobile';
   import { get } from 'svelte/store';
-  import { MAX_CHAT_IMAGE_BYTES, type OutgoingMessage, type ColorPalette } from '$lib/types';
+  import {
+    MAX_CHAT_IMAGE_BYTES,
+    type OutgoingMessage,
+    type ColorPalette
+  } from '$lib/types';
 
   let inGame = $state(false);
   let gameData: OutgoingMessage | null = $state(null);
   let isWideDesktop = $state(false);
   let settingsOpen = $state(false);
+
+  const MAX_CHAT_IMAGE_SOURCE_BYTES = 10 * 1024 * 1024;
+  const TARGET_CHAT_IMAGE_BYTES = Math.floor(MAX_CHAT_IMAGE_BYTES * 0.8);
+  const CHAT_IMAGE_MAX_LONG_EDGE = 1600;
+  const CHAT_IMAGE_DEFAULT_QUALITY = 0.78;
 
   $effect(() => {
     if ($isMobile) {
@@ -81,6 +90,147 @@
     });
   }
 
+  function loadImageElement(file: File): Promise<HTMLImageElement> {
+    return new Promise((resolve, reject) => {
+      const imageUrl = URL.createObjectURL(file);
+      const image = new Image();
+
+      image.onload = () => {
+        URL.revokeObjectURL(imageUrl);
+        resolve(image);
+      };
+
+      image.onerror = () => {
+        URL.revokeObjectURL(imageUrl);
+        reject(new Error('이미지를 읽지 못했습니다.'));
+      };
+
+      image.src = imageUrl;
+    });
+  }
+
+  function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality?: number): Promise<Blob> {
+    return new Promise((resolve, reject) => {
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          reject(new Error('이미지 변환에 실패했습니다.'));
+          return;
+        }
+
+        resolve(blob);
+      }, type, quality);
+    });
+  }
+
+  function getResizedDimensions(width: number, height: number, maxLongEdge: number) {
+    const longEdge = Math.max(width, height);
+    if (longEdge <= maxLongEdge) {
+      return { width, height };
+    }
+
+    const scale = maxLongEdge / longEdge;
+    return {
+      width: Math.max(1, Math.round(width * scale)),
+      height: Math.max(1, Math.round(height * scale))
+    };
+  }
+
+  function withExtension(name: string, extension: string) {
+    const sanitizedExtension = extension.startsWith('.') ? extension : `.${extension}`;
+    if (!name.includes('.')) {
+      return `${name}${sanitizedExtension}`;
+    }
+
+    return name.replace(/\.[^.]+$/, sanitizedExtension);
+  }
+
+  function createProcessedImageFile(blob: Blob, originalFile: File): File {
+    const mime = blob.type || 'image/webp';
+    const extension = mime === 'image/png' ? '.png' : mime === 'image/jpeg' ? '.jpg' : '.webp';
+
+    return new File([blob], withExtension(originalFile.name, extension), {
+      type: mime,
+      lastModified: originalFile.lastModified
+    });
+  }
+
+  async function compressChatRasterImage(file: File): Promise<File> {
+    const image = await loadImageElement(file);
+    const baseDimensions = getResizedDimensions(
+      image.naturalWidth,
+      image.naturalHeight,
+      CHAT_IMAGE_MAX_LONG_EDGE
+    );
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+
+    if (!context) {
+      throw new Error('이미지 압축을 초기화하지 못했습니다.');
+    }
+
+    const qualitySteps = [
+      CHAT_IMAGE_DEFAULT_QUALITY,
+      0.7,
+      0.62,
+      0.54,
+      0.46
+    ];
+    let bestBlob: Blob | null = null;
+    let bestAcceptedBlob: Blob | null = null;
+    let scale = 1;
+
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      const width = Math.max(1, Math.round(baseDimensions.width * scale));
+      const height = Math.max(1, Math.round(baseDimensions.height * scale));
+
+      canvas.width = width;
+      canvas.height = height;
+      context.clearRect(0, 0, width, height);
+      context.drawImage(image, 0, 0, width, height);
+
+      for (const quality of qualitySteps) {
+        const blob = await canvasToBlob(canvas, 'image/webp', quality);
+
+        if (!bestBlob || blob.size < bestBlob.size) {
+          bestBlob = blob;
+        }
+
+        if (blob.size <= MAX_CHAT_IMAGE_BYTES && (!bestAcceptedBlob || blob.size < bestAcceptedBlob.size)) {
+          bestAcceptedBlob = blob;
+        }
+
+        if (blob.size <= TARGET_CHAT_IMAGE_BYTES) {
+          return createProcessedImageFile(blob, file);
+        }
+      }
+
+      scale *= 0.85;
+    }
+
+    const finalBlob = bestAcceptedBlob ?? bestBlob;
+    if (!finalBlob || finalBlob.size > MAX_CHAT_IMAGE_BYTES) {
+      throw new Error('이미지를 2MB 이하로 압축하지 못했습니다.');
+    }
+
+    return createProcessedImageFile(finalBlob, file);
+  }
+
+  async function preprocessChatImage(file: File): Promise<File> {
+    if (file.type === 'image/gif') {
+      if (file.size > MAX_CHAT_IMAGE_BYTES) {
+        throw new Error('GIF 이미지는 2MB 이하만 전송할 수 있습니다.');
+      }
+
+      return file;
+    }
+
+    if (file.size > MAX_CHAT_IMAGE_SOURCE_BYTES) {
+      throw new Error('이미지는 원본 10MB 이하 파일만 업로드할 수 있습니다.');
+    }
+
+    return compressChatRasterImage(file);
+  }
+
   async function handleChatImageSend(file: File) {
     const id = get(selfId);
     if (!id) throw new Error('플레이어 정보를 찾을 수 없습니다.');
@@ -89,20 +239,21 @@
       throw new Error('이미지 파일만 전송할 수 있습니다.');
     }
 
-    if (file.size > MAX_CHAT_IMAGE_BYTES) {
-      throw new Error('이미지는 10MB 이하만 전송할 수 있습니다.');
-    }
-
     const currentPlayers = get(players);
     const self = currentPlayers.get(id);
     if (!self) throw new Error('내 플레이어 정보를 찾을 수 없습니다.');
 
-    const data = await fileToBase64(file);
+    const processedFile = await preprocessChatImage(file);
+    if (processedFile.size > MAX_CHAT_IMAGE_BYTES) {
+      throw new Error('이미지는 2MB 이하만 전송할 수 있습니다.');
+    }
+
+    const data = await fileToBase64(processedFile);
     network.sendChatImage(
       {
-        mime: file.type,
-        name: file.name,
-        size: file.size,
+        mime: processedFile.type,
+        name: processedFile.name,
+        size: processedFile.size,
         data,
       },
       self.x,

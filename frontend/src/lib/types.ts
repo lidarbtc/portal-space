@@ -99,7 +99,7 @@ export const MAP_HEIGHT = 45;
 export const MAX_NICKNAME_LEN = 20;
 export const MAX_CHAT_LEN = 500;
 export const MAX_CUSTOM_STATUS_LEN = 20;
-export const MAX_CHAT_IMAGE_BYTES = 10 * 1024 * 1024;
+export const MAX_CHAT_IMAGE_BYTES = 2 * 1024 * 1024;
 
 // Chat message for UI
 export interface ChatMessage {

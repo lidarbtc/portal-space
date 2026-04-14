@@ -22,6 +22,8 @@
   let imageError = $state('');
   let isSendingImage = $state(false);
 
+  const MAX_CHAT_IMAGE_SOURCE_BYTES = 10 * 1024 * 1024;
+
   onMount(() => {
     if (mobile) {
       chatInputActive.set(true);
@@ -122,8 +124,14 @@
       return;
     }
 
-    if (file.size > MAX_CHAT_IMAGE_BYTES) {
-      imageError = '이미지는 10MB 이하만 전송할 수 있습니다.';
+    if (file.type === 'image/gif' && file.size > MAX_CHAT_IMAGE_BYTES) {
+      imageError = 'GIF 이미지는 2MB 이하만 전송할 수 있습니다.';
+      target.value = '';
+      return;
+    }
+
+    if (file.type !== 'image/gif' && file.size > MAX_CHAT_IMAGE_SOURCE_BYTES) {
+      imageError = '이미지는 원본 10MB 이하 파일만 업로드할 수 있습니다.';
       target.value = '';
       return;
     }
@@ -175,7 +183,7 @@
       {/if}
     </div>
     {#if isSendingImage}
-      <div class="chat-upload-status">이미지 전송 중...</div>
+      <div class="chat-upload-status">이미지 처리 중...</div>
     {:else if imageError}
       <div class="chat-upload-error">{imageError}</div>
     {/if}
