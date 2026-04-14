@@ -388,10 +388,22 @@ func (r *Room) handleCustomStatus(client *Client, text string) {
 	}
 }
 
-func (r *Room) handleChat(client *Client, text string) {
+func (r *Room) handleChat(client *Client, text string, image *ChatImage) {
 	text = sanitizeChat(text)
-	if text == "" {
+	normalizedImage := normalizeChatImage(image)
+
+	if image != nil && normalizedImage == nil {
 		return
+	}
+
+	if text == "" && normalizedImage == nil {
+		return
+	}
+
+	msg := &OutgoingMessage{
+		Type:     MsgChat,
+		ID:       client.id,
+		Nickname: client.nickname,
 	}
 
 	if client.currentZoneID != "" {
@@ -412,9 +424,14 @@ func (r *Room) handleChat(client *Client, text string) {
 			Type:     MsgChat,
 			ID:       client.id,
 			Nickname: client.nickname,
-			Text:     text,
 			ZoneID:   zoneID,
 			ZoneName: zoneName,
+		}
+		if text != "" {
+			msg.Text = text
+		}
+		if normalizedImage != nil {
+			msg.Image = normalizedImage
 		}
 		for _, c := range r.players {
 			if c.currentZoneID == zoneID {
@@ -425,13 +442,15 @@ func (r *Room) handleChat(client *Client, text string) {
 		return
 	}
 
-	// Global chat: broadcast to all (existing behavior)
-	r.broadcast <- &OutgoingMessage{
-		Type:     MsgChat,
-		ID:       client.id,
-		Nickname: client.nickname,
-		Text:     text,
+	if text != "" {
+		msg.Text = text
 	}
+	if normalizedImage != nil {
+		msg.Image = normalizedImage
+	}
+
+	// Global chat: broadcast to all (existing behavior)
+	r.broadcast <- msg
 }
 
 func (r *Room) handleAction(client *Client, raw json.RawMessage) {

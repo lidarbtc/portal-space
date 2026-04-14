@@ -1,5 +1,5 @@
 import { writable } from 'svelte/store';
-import type { ChatMessage, ChatChannel } from '$lib/types';
+import type { ChatMessage, ChatChannel, ChatImage } from '$lib/types';
 
 const MAX_REGIONAL_MESSAGES = 50;
 
@@ -22,18 +22,22 @@ export function addRegionalMessage({
   nickname,
   nicknameColor,
   text,
+  image,
   isSystem = false,
 }: {
   senderId?: string;
   nickname?: string;
   nicknameColor?: string;
-  text: string;
+  text?: string;
+  image?: ChatImage;
   isSystem?: boolean;
 }): void {
+  if (!text && !image) return;
+
   regionalMessages.update((msgs) => {
     const updated = [
       ...msgs,
-      { senderId, nickname, nicknameColor, text, isSystem, timestamp: Date.now(), channel: 'regional' as ChatChannel },
+      { senderId, nickname, nicknameColor, text, image, isSystem, timestamp: Date.now(), channel: 'regional' as ChatChannel },
     ];
     if (updated.length > MAX_REGIONAL_MESSAGES) {
       return updated.slice(updated.length - MAX_REGIONAL_MESSAGES);

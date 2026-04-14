@@ -1,5 +1,5 @@
 import { writable, derived } from 'svelte/store';
-import type { PlayerInfo, PlayerStatus, ChatMessage } from '$lib/types';
+import type { PlayerInfo, PlayerStatus, ChatImage, ChatMessage } from '$lib/types';
 
 // Players map: id -> PlayerInfo
 export const players = writable<Map<string, PlayerInfo>>(new Map());
@@ -19,16 +19,20 @@ export function addChatMessage({
   nickname,
   nicknameColor,
   text,
+  image,
 }: {
   senderId?: string;
   nickname: string;
   nicknameColor?: string;
-  text: string;
+  text?: string;
+  image?: ChatImage;
 }): void {
+  if (!text && !image) return;
+
   chatMessages.update((msgs) => {
     const updated = [
       ...msgs,
-      { senderId, nickname, nicknameColor, text, isSystem: false, timestamp: Date.now() }
+      { senderId, nickname, nicknameColor, text, image, isSystem: false, timestamp: Date.now() }
     ];
     if (updated.length > MAX_CHAT_MESSAGES) {
       return updated.slice(updated.length - MAX_CHAT_MESSAGES);

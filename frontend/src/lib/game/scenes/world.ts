@@ -1,25 +1,40 @@
-import Phaser from 'phaser';
-import { get } from 'svelte/store';
-import { network } from '$lib/network';
+import Phaser from "phaser";
+import { get } from "svelte/store";
+import { network } from "$lib/network";
 import {
   players,
   selfId,
   addChatMessage,
   addSystemMessage,
   currentStatus,
-  chatInputActive
-} from '$lib/stores/game';
-import { dpadDirection } from '$lib/stores/dpad';
-import { notifyAudio } from '$lib/audio';
-import { createPlaceholderTileset } from '../tileset';
-import { createAvatarSpritesheet } from '../spritesheet';
-import { createTintedSpritesheet } from '../palette-swap';
-import { resolveNicknameColor } from '$lib/utils/nickname-colors';
-import type { PlayerInfo, Direction, InteractiveObject, RegionalChatState } from '$lib/types';
-import { MAP_WIDTH, MAP_HEIGHT } from '$lib/types';
-import { zoomLevel, zoomIn, zoomOut, computeMinZoom, clampZoom } from '$lib/stores/zoom';
-import { interactiveObjects, nearbyObjectId, activeObjectId } from '$lib/stores/objects';
-import { whiteboardOpen, currentBoardId } from '$lib/stores/whiteboard';
+  chatInputActive,
+} from "$lib/stores/game";
+import { dpadDirection } from "$lib/stores/dpad";
+import { notifyAudio } from "$lib/audio";
+import { createPlaceholderTileset } from "../tileset";
+import { createAvatarSpritesheet } from "../spritesheet";
+import { createTintedSpritesheet } from "../palette-swap";
+import { resolveNicknameColor } from "$lib/utils/nickname-colors";
+import type {
+  PlayerInfo,
+  Direction,
+  InteractiveObject,
+  RegionalChatState,
+} from "$lib/types";
+import { MAP_WIDTH, MAP_HEIGHT } from "$lib/types";
+import {
+  zoomLevel,
+  zoomIn,
+  zoomOut,
+  computeMinZoom,
+  clampZoom,
+} from "$lib/stores/zoom";
+import {
+  interactiveObjects,
+  nearbyObjectId,
+  activeObjectId,
+} from "$lib/stores/objects";
+import { whiteboardOpen, currentBoardId } from "$lib/stores/whiteboard";
 import {
   enterZone,
   exitZone,
@@ -27,13 +42,13 @@ import {
   currentZoneId,
   regionalChatSettingsOpen,
   currentRegionalChatId,
-} from '$lib/stores/regional-chat';
+} from "$lib/stores/regional-chat";
 import {
   createInteractiveObject,
   updateNearbyState,
   destroyInteractiveObject,
-  type GameInteractiveObject
-} from '../objects/interactive-object';
+  type GameInteractiveObject,
+} from "../objects/interactive-object";
 
 const MOVE_SPEED = 200; // px/sec
 const NETWORK_SEND_INTERVAL = 100; // ms (10Hz)
@@ -41,6 +56,12 @@ const REMOTE_LERP_FACTOR = 0.15;
 const DASH_SPEED = 800; // px/sec during dash
 const DASH_DURATION = 200; // ms
 const DASH_COOLDOWN = 1500; // ms
+const ALLOWED_CHAT_IMAGE_MIMES = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/gif",
+  "image/webp",
+]);
 
 interface PlayerObject {
   container: Phaser.GameObjects.Container;
@@ -48,10 +69,10 @@ interface PlayerObject {
   nameText: Phaser.GameObjects.Text;
   statusDot: Phaser.GameObjects.Graphics;
   nickname: string;
-  x: number;       // pixel coordinate
-  y: number;       // pixel coordinate
-  targetX: number;  // remote player interpolation target
-  targetY: number;  // remote player interpolation target
+  x: number; // pixel coordinate
+  y: number; // pixel coordinate
+  targetX: number; // remote player interpolation target
+  targetY: number; // remote player interpolation target
   dir: Direction;
   textureKey: string;
   bubbleText: Phaser.GameObjects.Text | null;
@@ -91,7 +112,7 @@ export class WorldScene extends Phaser.Scene {
   private spaceKey!: Phaser.Input.Keyboard.Key;
 
   constructor() {
-    super({ key: 'WorldScene' });
+    super({ key: "WorldScene" });
   }
 
   preload(): void {
@@ -101,21 +122,26 @@ export class WorldScene extends Phaser.Scene {
     if (match) {
       this.load.setBaseURL(match[1]);
     }
-    this.load.image('gopher-src', 'assets/gopher.png');
-    this.load.image('ward-stone', 'assets/ward-stone.png');
+    this.load.image("gopher-src", "assets/gopher.png");
+    this.load.image("ward-stone", "assets/ward-stone.png");
   }
 
   create(): void {
     createAvatarSpritesheet(this);
     this.createMap();
 
-    this.cameras.main.setBounds(0, 0, MAP_WIDTH * this.tileSize, MAP_HEIGHT * this.tileSize);
+    this.cameras.main.setBounds(
+      0,
+      0,
+      MAP_WIDTH * this.tileSize,
+      MAP_HEIGHT * this.tileSize,
+    );
 
     // Declarative y-sort layer: all y-sortable entities go here
     this.entityContainer = this.add.container(0, 0);
     this.entityContainer.setDepth(10);
-    this.events.on('postupdate', () => {
-      this.entityContainer.sort('y');
+    this.events.on("postupdate", () => {
+      this.entityContainer.sort("y");
     });
 
     const currentPlayers = get(players);
@@ -127,19 +153,25 @@ export class WorldScene extends Phaser.Scene {
     });
 
     this.cursors = this.input.keyboard!.createCursorKeys();
-    this.wasd = this.input.keyboard!.addKeys({
-      up: Phaser.Input.Keyboard.KeyCodes.W,
-      down: Phaser.Input.Keyboard.KeyCodes.S,
-      left: Phaser.Input.Keyboard.KeyCodes.A,
-      right: Phaser.Input.Keyboard.KeyCodes.D
-    }, false) as {
+    this.wasd = this.input.keyboard!.addKeys(
+      {
+        up: Phaser.Input.Keyboard.KeyCodes.W,
+        down: Phaser.Input.Keyboard.KeyCodes.S,
+        left: Phaser.Input.Keyboard.KeyCodes.A,
+        right: Phaser.Input.Keyboard.KeyCodes.D,
+      },
+      false,
+    ) as {
       up: Phaser.Input.Keyboard.Key;
       down: Phaser.Input.Keyboard.Key;
       left: Phaser.Input.Keyboard.Key;
       right: Phaser.Input.Keyboard.Key;
     };
 
-    this.spaceKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE, false);
+    this.spaceKey = this.input.keyboard!.addKey(
+      Phaser.Input.Keyboard.KeyCodes.SPACE,
+      false,
+    );
 
     this.setupNetwork();
     this.setupZoom();
@@ -151,7 +183,7 @@ export class WorldScene extends Phaser.Scene {
       if (!this.gameObjects.has(id)) {
         const gameObj = createInteractiveObject(this, obj);
         this.gameObjects.set(id, gameObj);
-        gameObj.container.on('pointerdown', () => {
+        gameObj.container.on("pointerdown", () => {
           this.onObjectInteract(obj);
         });
       }
@@ -176,7 +208,7 @@ export class WorldScene extends Phaser.Scene {
     });
     this.unsubscribers.push(unsubPlayers);
 
-    this.events.on('shutdown', () => {
+    this.events.on("shutdown", () => {
       this.unsubscribers.forEach((unsub) => unsub());
       this.unsubscribers = [];
     });
@@ -188,10 +220,15 @@ export class WorldScene extends Phaser.Scene {
     const map = this.make.tilemap({
       data: mapData,
       tileWidth: this.tileSize,
-      tileHeight: this.tileSize
+      tileHeight: this.tileSize,
     });
 
-    const tileset = map.addTilesetImage('tileset', 'tileset', this.tileSize, this.tileSize)!;
+    const tileset = map.addTilesetImage(
+      "tileset",
+      "tileset",
+      this.tileSize,
+      this.tileSize,
+    )!;
     const layer = map.createLayer(0, tileset, 0, 0)!;
     layer.setCollision([1, 2]);
 
@@ -214,9 +251,24 @@ export class WorldScene extends Phaser.Scene {
     }
 
     const baseTables: [number, number][] = [
-      [4, 4], [5, 4], [4, 7], [5, 7], [4, 10], [5, 10],
-      [10, 4], [11, 4], [10, 7], [11, 7], [10, 10], [11, 10],
-      [16, 4], [17, 4], [16, 7], [17, 7], [16, 10], [17, 10]
+      [4, 4],
+      [5, 4],
+      [4, 7],
+      [5, 7],
+      [4, 10],
+      [5, 10],
+      [10, 4],
+      [11, 4],
+      [10, 7],
+      [11, 7],
+      [10, 10],
+      [11, 10],
+      [16, 4],
+      [17, 4],
+      [16, 7],
+      [17, 7],
+      [16, 10],
+      [17, 10],
     ];
     for (let blockY = 0; blockY < Math.floor(MAP_HEIGHT / 15); blockY++) {
       for (let blockX = 0; blockX < Math.floor(MAP_WIDTH / 20); blockX++) {
@@ -242,7 +294,12 @@ export class WorldScene extends Phaser.Scene {
 
     // Subscribe to zoom store — apply camera zoom on change
     const unsubZoom = zoomLevel.subscribe((level) => {
-      const minZoom = computeMinZoom(cam.width, cam.height, mapPixelW, mapPixelH);
+      const minZoom = computeMinZoom(
+        cam.width,
+        cam.height,
+        mapPixelW,
+        mapPixelH,
+      );
       const clamped = clampZoom(level, minZoom);
 
       if (clamped !== level) {
@@ -259,73 +316,89 @@ export class WorldScene extends Phaser.Scene {
     this.unsubscribers.push(unsubZoom);
 
     // Mouse wheel zoom
-    this.input.on('wheel', (
-      _pointer: Phaser.Input.Pointer,
-      _gameObjects: Phaser.GameObjects.GameObject[],
-      _deltaX: number,
-      deltaY: number
-    ) => {
-      if (deltaY < 0) zoomIn();
-      else if (deltaY > 0) zoomOut();
-    });
+    this.input.on(
+      "wheel",
+      (
+        _pointer: Phaser.Input.Pointer,
+        _gameObjects: Phaser.GameObjects.GameObject[],
+        _deltaX: number,
+        deltaY: number,
+      ) => {
+        if (deltaY < 0) zoomIn();
+        else if (deltaY > 0) zoomOut();
+      },
+    );
 
     // Recalculate min-zoom on viewport resize
     const onResize = (gameSize: Phaser.Structs.Size) => {
-      const minZoom = computeMinZoom(gameSize.width, gameSize.height, mapPixelW, mapPixelH);
+      const minZoom = computeMinZoom(
+        gameSize.width,
+        gameSize.height,
+        mapPixelW,
+        mapPixelH,
+      );
       const current = get(zoomLevel);
       const clamped = clampZoom(current, minZoom);
       if (clamped !== current) {
         zoomLevel.set(clamped);
       }
     };
-    this.scale.on('resize', onResize);
-    this.unsubscribers.push(() => this.scale.off('resize', onResize));
+    this.scale.on("resize", onResize);
+    this.unsubscribers.push(() => this.scale.off("resize", onResize));
   }
 
   private setupNetwork(): void {
-    network.on('join', (msg) => {
+    network.on("join", (msg) => {
       if (msg.player) {
         this.addPlayer(msg.player);
         players.update((m) => {
           m.set(msg.player!.id, msg.player!);
           return m;
         });
-        addSystemMessage(msg.player.nickname + (msg.reconnect ? '님이 재접속했습니다.' : '님이 입장했습니다.'));
+        addSystemMessage(
+          msg.player.nickname +
+            (msg.reconnect ? "님이 재접속했습니다." : "님이 입장했습니다."),
+        );
       }
     });
 
-    network.on('leave', (msg) => {
+    network.on("leave", (msg) => {
       if (!msg.id) return;
       const obj = this.playerObjects.get(msg.id);
-      const nickname = obj?.nickname ?? '알 수 없는 유저';
+      const nickname = obj?.nickname ?? "알 수 없는 유저";
       this.removePlayer(msg.id);
       players.update((m) => {
         m.delete(msg.id!);
         return m;
       });
-      addSystemMessage(nickname + '님이 퇴장했습니다.');
+      addSystemMessage(nickname + "님이 퇴장했습니다.");
     });
 
-    network.on('move', (msg) => {
+    network.on("move", (msg) => {
       if (msg.id && msg.id !== this.localPlayerId) {
         const p = this.playerObjects.get(msg.id);
         if (p) {
           p.targetX = msg.x;
           p.targetY = msg.y;
-          p.dir = msg.dir ?? 'down';
+          p.dir = msg.dir ?? "down";
           this.updateCharacterFrame(p, p.dir);
         }
         players.update((m) => {
           const info = m.get(msg.id!);
           if (info) {
-            m.set(msg.id!, { ...info, x: msg.x, y: msg.y, dir: msg.dir ?? 'down' });
+            m.set(msg.id!, {
+              ...info,
+              x: msg.x,
+              y: msg.y,
+              dir: msg.dir ?? "down",
+            });
           }
           return m;
         });
       }
     });
 
-    network.on('status', (msg) => {
+    network.on("status", (msg) => {
       if (msg.id && msg.status) {
         this.updatePlayerStatus(msg.id, msg.status);
         players.update((m) => {
@@ -338,192 +411,228 @@ export class WorldScene extends Phaser.Scene {
       }
     });
 
-    network.on('customStatus', (msg) => {
+    network.on("customStatus", (msg) => {
       if (msg.id) {
-        this.updateCustomStatus(msg.id, msg.customStatus ?? '');
+        this.updateCustomStatus(msg.id, msg.customStatus ?? "");
       }
     });
 
-    network.on('emote', (msg) => {
+    network.on("emote", (msg) => {
       if (msg.id && msg.emoji) {
         this.showEmote(msg.id, msg.emoji);
       }
     });
 
-    network.on('chat', (msg) => {
-      // Zone enter/exit system messages
-      if (msg.isSystem && msg.zoneId) {
-        const text = msg.text || '';
-        if (msg.zoneEvent === 'enter') {
-          enterZone(msg.zoneId, msg.zoneName || '');
-        } else if (msg.zoneEvent === 'exit') {
-          exitZone();
-        }
-        // Add to regional messages
-        addRegionalMessage({ text, isSystem: true });
-        return;
-      }
+    network.on("chat", (msg) => {
+      const image =
+        msg.image && ALLOWED_CHAT_IMAGE_MIMES.has(msg.image.mime)
+          ? msg.image
+          : undefined;
 
-      // Regional chat message
-      if (msg.zoneId) {
-        if (msg.id !== this.localPlayerId && get(currentStatus) !== 'dnd') {
+      if (msg.id && msg.nickname && (msg.text || image)) {
+        if (msg.id !== this.localPlayerId && get(currentStatus) !== "dnd") {
           notifyAudio.playIfHidden();
         }
-        if (msg.id && msg.nickname && msg.text) {
+        // Zone enter/exit system messages
+        if (msg.isSystem && msg.zoneId) {
+          const text = msg.text || "";
+          if (msg.zoneEvent === "enter") {
+            enterZone(msg.zoneId, msg.zoneName || "");
+          } else if (msg.zoneEvent === "exit") {
+            exitZone();
+          }
+          // Add to regional messages
+          addRegionalMessage({ text, isSystem: true });
+          return;
+        }
+
+        // Regional chat message
+        if (msg.zoneId) {
+          if (msg.id !== this.localPlayerId && get(currentStatus) !== "dnd") {
+            notifyAudio.playIfHidden();
+          }
+          if (msg.id && msg.nickname && (msg.text || image)) {
+            const senderColors = get(players).get(msg.id)?.colors;
+            const bubbleText = image && msg.text ? `[사진] ${msg.text}` : (msg.text ?? "[사진]");
+            this.showChatBubble(msg.id, bubbleText, msg.nickname);
+            addRegionalMessage({
+              senderId: msg.id,
+              nickname: msg.nickname,
+              nicknameColor: resolveNicknameColor(msg.id, senderColors),
+              text: msg.text,
+              image,
+            });
+          }
+          return;
+        }
+
+        // Global chat message (existing behavior)
+        if (msg.id !== this.localPlayerId && get(currentStatus) !== "dnd") {
+          notifyAudio.playIfHidden();
+        }
+        if (msg.id && msg.nickname && (msg.text || image)) {
           const senderColors = get(players).get(msg.id)?.colors;
-          this.showChatBubble(msg.id, msg.text, msg.nickname);
-          addRegionalMessage({
+          const bubbleText =
+            image && msg.text ? `[사진] ${msg.text}` : (msg.text ?? "[사진]");
+          this.showChatBubble(msg.id, bubbleText, msg.nickname);
+          addChatMessage({
             senderId: msg.id,
             nickname: msg.nickname,
             nicknameColor: resolveNicknameColor(msg.id, senderColors),
             text: msg.text,
+            image,
           });
         }
-        return;
       }
 
-      // Global chat message (existing behavior)
-      if (msg.id !== this.localPlayerId && get(currentStatus) !== 'dnd') {
-        notifyAudio.playIfHidden();
-      }
-      if (msg.id && msg.nickname && msg.text) {
-        const senderColors = get(players).get(msg.id)?.colors;
-        this.showChatBubble(msg.id, msg.text, msg.nickname);
-        addChatMessage({
-          senderId: msg.id,
-          nickname: msg.nickname,
-          nicknameColor: resolveNicknameColor(msg.id, senderColors),
-          text: msg.text,
-        });
-      }
-    });
+      network.on("profile", (msg) => {
+        if (!msg.id || !msg.player) return;
+        const p = this.playerObjects.get(msg.id);
+        if (!p) return;
 
-    network.on('profile', (msg) => {
-      if (!msg.id || !msg.player) return;
-      const p = this.playerObjects.get(msg.id);
-      if (!p) return;
-
-      // Update nickname
-      if (msg.nickname) {
-        p.nickname = msg.nickname;
-        p.nameText.setText(msg.nickname);
-        p.statusDot.setPosition(
-          p.nameText.x - p.nameText.width / 2 + 8,
-          p.nameText.y
-        );
-      }
-
-      // Update colors — handle 'characters' -> 'player_' + id texture key transition
-      if (msg.player.colors) {
-        const newTextureKey = 'player_' + msg.id;
-        createTintedSpritesheet(this, newTextureKey, msg.player.colors);
-        p.textureKey = newTextureKey;
-        p.sprite.setTexture(newTextureKey);
-        const dirFrame: Record<Direction, number> = { down: 0, up: 1, right: 2, left: 3 };
-        p.sprite.setFrame(dirFrame[p.dir] ?? 0);
-      }
-
-      // Update players store (for PlayerList)
-      players.update((m) => {
-        const info = m.get(msg.id!);
-        if (info) {
-          m.set(msg.id!, {
-            ...info,
-            nickname: msg.nickname ?? info.nickname,
-            colors: msg.player!.colors ?? info.colors,
-          });
+        // Update nickname
+        if (msg.nickname) {
+          p.nickname = msg.nickname;
+          p.nameText.setText(msg.nickname);
+          p.statusDot.setPosition(
+            p.nameText.x - p.nameText.width / 2 + 8,
+            p.nameText.y,
+          );
         }
-        return m;
-      });
-    });
 
-    network.on('dash', (msg) => {
-      if (!msg.id || msg.id === this.localPlayerId) return;
-      const p = this.playerObjects.get(msg.id);
-      if (!p) return;
-      const dir = (msg.dir as Direction) ?? 'down';
-      const dirFrame: Record<Direction, number> = { down: 0, up: 1, right: 2, left: 3 };
-      this.spawnDashAfterimages(msg.x, msg.y, dir, p.textureKey, dirFrame[dir]);
-    });
-
-    network.on('snapshot', (msg) => {
-      this.lastNetworkSendTime = 0;
-      this.wasMoving = false;
-
-      const newMap = new Map<string, PlayerInfo>();
-      if (msg.players) {
-        msg.players.forEach((p) => {
-          newMap.set(p.id, p);
-        });
-      }
-      if (msg.self) {
-        newMap.set(msg.self.id, msg.self);
-        selfId.set(msg.self.id);
-        this.localPlayerId = msg.self.id;
-
-        const localObj = this.playerObjects.get(msg.self.id);
-        if (localObj) {
-          this.cameras.main.startFollow(localObj.container, true, 0.1, 0.1);
+        // Update colors — handle 'characters' -> 'player_' + id texture key transition
+        if (msg.player.colors) {
+          const newTextureKey = "player_" + msg.id;
+          createTintedSpritesheet(this, newTextureKey, msg.player.colors);
+          p.textureKey = newTextureKey;
+          p.sprite.setTexture(newTextureKey);
+          const dirFrame: Record<Direction, number> = {
+            down: 0,
+            up: 1,
+            right: 2,
+            left: 3,
+          };
+          p.sprite.setFrame(dirFrame[p.dir] ?? 0);
         }
-      }
-      players.set(newMap);
 
-      // Load interactive objects from snapshot
-      if (msg.objects) {
-        const objMap = new Map<string, InteractiveObject>();
-        msg.objects.forEach((obj) => {
-          objMap.set(obj.id, obj);
-          if (!this.gameObjects.has(obj.id)) {
-            const gameObj = createInteractiveObject(this, obj);
-            this.gameObjects.set(obj.id, gameObj);
-            gameObj.container.on('pointerdown', () => {
-              this.onObjectInteract(obj);
+        // Update players store (for PlayerList)
+        players.update((m) => {
+          const info = m.get(msg.id!);
+          if (info) {
+            m.set(msg.id!, {
+              ...info,
+              nickname: msg.nickname ?? info.nickname,
+              colors: msg.player!.colors ?? info.colors,
             });
           }
+          return m;
         });
-        interactiveObjects.set(objMap);
-      }
-    });
+      });
 
-    network.on('action', (msg) => {
-      const ap = msg.actionPayload;
-      if (!ap || ap.domain !== 'regional_chat' || ap.action !== 'state_updated') return;
-      if (!ap.objectId) return;
+      network.on("dash", (msg) => {
+        if (!msg.id || msg.id === this.localPlayerId) return;
+        const p = this.playerObjects.get(msg.id);
+        if (!p) return;
+        const dir = (msg.dir as Direction) ?? "down";
+        const dirFrame: Record<Direction, number> = {
+          down: 0,
+          up: 1,
+          right: 2,
+          left: 3,
+        };
+        this.spawnDashAfterimages(
+          msg.x,
+          msg.y,
+          dir,
+          p.textureKey,
+          dirFrame[dir],
+        );
+      });
 
-      const gObj = this.gameObjects.get(ap.objectId);
-      if (!gObj || gObj.data.type !== 'regional_chat') return;
+      network.on("snapshot", (msg) => {
+        this.lastNetworkSendTime = 0;
+        this.wasMoving = false;
 
-      const newState = ap.payload as RegionalChatState | undefined;
-      if (!newState) return;
+        const newMap = new Map<string, PlayerInfo>();
+        if (msg.players) {
+          msg.players.forEach((p) => {
+            newMap.set(p.id, p);
+          });
+        }
+        if (msg.self) {
+          newMap.set(msg.self.id, msg.self);
+          selfId.set(msg.self.id);
+          this.localPlayerId = msg.self.id;
 
-      // Update stored data
-      gObj.data = { ...gObj.data, state: newState };
+          const localObj = this.playerObjects.get(msg.self.id);
+          if (localObj) {
+            this.cameras.main.startFollow(localObj.container, true, 0.1, 0.1);
+          }
+        }
+        players.set(newMap);
 
-      // Redraw zone fill circle
-      if (gObj.zoneCircle) {
-        gObj.zoneCircle.clear();
-        gObj.zoneCircle.fillStyle(0x06b6d4, 0.08);
-        gObj.zoneCircle.fillCircle(0, 0, newState.radius);
-      }
+        // Load interactive objects from snapshot
+        if (msg.objects) {
+          const objMap = new Map<string, InteractiveObject>();
+          msg.objects.forEach((obj) => {
+            objMap.set(obj.id, obj);
+            if (!this.gameObjects.has(obj.id)) {
+              const gameObj = createInteractiveObject(this, obj);
+              this.gameObjects.set(obj.id, gameObj);
+              gameObj.container.on("pointerdown", () => {
+                this.onObjectInteract(obj);
+              });
+            }
+          });
+          interactiveObjects.set(objMap);
+        }
+      });
 
-      // Redraw stroke circle (keep current alpha for tween)
-      if (gObj.zoneStroke) {
-        const currentAlpha = gObj.zoneStroke.alpha;
-        gObj.zoneStroke.clear();
-        gObj.zoneStroke.lineStyle(2, 0x06b6d4, 0.3);
-        gObj.zoneStroke.strokeCircle(0, 0, newState.radius);
-        gObj.zoneStroke.setAlpha(currentAlpha);
-      }
+      network.on("action", (msg) => {
+        const ap = msg.actionPayload;
+        if (
+          !ap ||
+          ap.domain !== "regional_chat" ||
+          ap.action !== "state_updated"
+        )
+          return;
+        if (!ap.objectId) return;
 
-      // Update label text
-      if (gObj.zoneLabel) {
-        gObj.zoneLabel.setText(newState.name);
-      }
+        const gObj = this.gameObjects.get(ap.objectId);
+        if (!gObj || gObj.data.type !== "regional_chat") return;
 
-      // Update interactiveObjects store
-      interactiveObjects.update((m) => {
-        m.set(ap.objectId!, gObj.data);
-        return m;
+        const newState = ap.payload as RegionalChatState | undefined;
+        if (!newState) return;
+
+        // Update stored data
+        gObj.data = { ...gObj.data, state: newState };
+
+        // Redraw zone fill circle
+        if (gObj.zoneCircle) {
+          gObj.zoneCircle.clear();
+          gObj.zoneCircle.fillStyle(0x06b6d4, 0.08);
+          gObj.zoneCircle.fillCircle(0, 0, newState.radius);
+        }
+
+        // Redraw stroke circle (keep current alpha for tween)
+        if (gObj.zoneStroke) {
+          const currentAlpha = gObj.zoneStroke.alpha;
+          gObj.zoneStroke.clear();
+          gObj.zoneStroke.lineStyle(2, 0x06b6d4, 0.3);
+          gObj.zoneStroke.strokeCircle(0, 0, newState.radius);
+          gObj.zoneStroke.setAlpha(currentAlpha);
+        }
+
+        // Update label text
+        if (gObj.zoneLabel) {
+          gObj.zoneLabel.setText(newState.name);
+        }
+
+        // Update interactiveObjects store
+        interactiveObjects.update((m) => {
+          m.set(ap.objectId!, gObj.data);
+          return m;
+        });
       });
     });
   }
@@ -536,12 +645,17 @@ export class WorldScene extends Phaser.Scene {
     const py = info.y;
 
     // Create per-player tinted texture or use default
-    const textureKey = info.colors ? 'player_' + info.id : 'characters';
+    const textureKey = info.colors ? "player_" + info.id : "characters";
     if (info.colors) {
       createTintedSpritesheet(this, textureKey, info.colors);
     }
 
-    const dirFrame: Record<Direction, number> = { down: 0, up: 1, right: 2, left: 3 };
+    const dirFrame: Record<Direction, number> = {
+      down: 0,
+      up: 1,
+      right: 2,
+      left: 3,
+    };
     const frameIndex = dirFrame[info.dir] ?? 0;
 
     // All positions are relative to the character container
@@ -549,23 +663,22 @@ export class WorldScene extends Phaser.Scene {
 
     const nameText = this.add
       .text(0, -this.tileSize / 2 - 14, info.nickname, {
-        fontSize: '12px',
-        color: '#e0e0ff',
-        fontFamily: 'MulmaruMono',
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        padding: { left: 14, right: 4, top: 2, bottom: 2 }
+        fontSize: "12px",
+        color: "#e0e0ff",
+        fontFamily: "MulmaruMono",
+        backgroundColor: "rgba(0, 0, 0, 0.5)",
+        padding: { left: 14, right: 4, top: 2, bottom: 2 },
       })
       .setOrigin(0.5)
       .setResolution(1);
 
     const statusDot = this.add.graphics();
-    const dotColor = Phaser.Display.Color.HexStringToColor(this.getStatusColor(info.status)).color;
+    const dotColor = Phaser.Display.Color.HexStringToColor(
+      this.getStatusColor(info.status),
+    ).color;
     statusDot.fillStyle(dotColor, 1);
     statusDot.fillCircle(0, 0, 3);
-    statusDot.setPosition(
-      -nameText.width / 2 + 8,
-      -this.tileSize / 2 - 14
-    );
+    statusDot.setPosition(-nameText.width / 2 + 8, -this.tileSize / 2 - 14);
 
     // Container groups character elements; entityContainer auto-sorts by y
     const container = this.add.container(px, py, [sprite, nameText, statusDot]);
@@ -581,13 +694,13 @@ export class WorldScene extends Phaser.Scene {
       y: py,
       targetX: px,
       targetY: py,
-      dir: info.dir ?? 'down',
+      dir: info.dir ?? "down",
       textureKey,
       bubbleText: null,
       bubbleTimer: null,
       emoteText: null,
       emoteTimer: null,
-      customStatusBubble: null
+      customStatusBubble: null,
     });
 
     if (info.customStatus) {
@@ -616,7 +729,7 @@ export class WorldScene extends Phaser.Scene {
     if (p.customStatusBubble) p.customStatusBubble.destroy();
 
     // Clean up per-player texture to prevent memory leak
-    const playerTexKey = 'player_' + id;
+    const playerTexKey = "player_" + id;
     if (this.textures.exists(playerTexKey)) {
       this.textures.remove(playerTexKey);
     }
@@ -625,37 +738,41 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private isTileBlocked(tileX: number, tileY: number): boolean {
-    if (tileX < 0 || tileX >= MAP_WIDTH || tileY < 0 || tileY >= MAP_HEIGHT) return true;
+    if (tileX < 0 || tileX >= MAP_WIDTH || tileY < 0 || tileY >= MAP_HEIGHT)
+      return true;
     const tile = this.mapData[tileY][tileX];
     return tile === 1 || tile === 2;
   }
 
   private checkCollision(
-    p: PlayerObject, newPx: number, newPy: number, dir: Direction
+    p: PlayerObject,
+    newPx: number,
+    newPy: number,
+    dir: Direction,
   ): { x: number; y: number } {
     const ts = this.tileSize;
     const curTileX = Math.floor(p.x / ts);
     const curTileY = Math.floor(p.y / ts);
 
-    if (dir === 'right') {
+    if (dir === "right") {
       const newTileX = Math.floor(newPx / ts);
       const checkTileY = Math.round((p.y - ts / 2) / ts);
       if (newTileX !== curTileX && this.isTileBlocked(newTileX, checkTileY)) {
         newPx = newTileX * ts - 0.5;
       }
-    } else if (dir === 'left') {
+    } else if (dir === "left") {
       const newTileX = Math.floor(newPx / ts);
       const checkTileY = Math.round((p.y - ts / 2) / ts);
       if (newTileX !== curTileX && this.isTileBlocked(newTileX, checkTileY)) {
         newPx = (newTileX + 1) * ts + 0.5;
       }
-    } else if (dir === 'down') {
+    } else if (dir === "down") {
       const newTileY = Math.floor(newPy / ts);
       const checkTileX = Math.round((p.x - ts / 2) / ts);
       if (newTileY !== curTileY && this.isTileBlocked(checkTileX, newTileY)) {
         newPy = newTileY * ts - 0.5;
       }
-    } else if (dir === 'up') {
+    } else if (dir === "up") {
       const newTileY = Math.floor(newPy / ts);
       const checkTileX = Math.round((p.x - ts / 2) / ts);
       if (newTileY !== curTileY && this.isTileBlocked(checkTileX, newTileY)) {
@@ -670,10 +787,7 @@ export class WorldScene extends Phaser.Scene {
     p.container.setPosition(p.x, p.y);
     // Sub-elements use relative coords within the container — no individual updates needed
     // StatusDot tracks nameText width (fixed after creation, but kept for safety)
-    p.statusDot.setPosition(
-      -p.nameText.width / 2 + 8,
-      -this.tileSize / 2 - 14
-    );
+    p.statusDot.setPosition(-p.nameText.width / 2 + 8, -this.tileSize / 2 - 14);
     // UI elements remain on the main display list with absolute positions
     if (p.customStatusBubble) {
       p.customStatusBubble.setPosition(p.x, p.y - this.tileSize / 2 - 34);
@@ -697,22 +811,33 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private updateCharacterFrame(p: PlayerObject, dir: Direction): void {
-    const dirFrame: Record<Direction, number> = { down: 0, up: 1, right: 2, left: 3 };
+    const dirFrame: Record<Direction, number> = {
+      down: 0,
+      up: 1,
+      right: 2,
+      left: 3,
+    };
     p.sprite.setFrame(dirFrame[dir] ?? 0);
   }
 
   private updatePlayerStatus(id: string, status: string): void {
     const p = this.playerObjects.get(id);
     if (!p) return;
-    const dotColor = Phaser.Display.Color.HexStringToColor(this.getStatusColor(status)).color;
+    const dotColor = Phaser.Display.Color.HexStringToColor(
+      this.getStatusColor(status),
+    ).color;
     p.statusDot.clear();
     p.statusDot.fillStyle(dotColor, 1);
     p.statusDot.fillCircle(0, 0, 3);
   }
 
   private getStatusColor(status: string): string {
-    const colors: Record<string, string> = { online: '#4ade80', away: '#eab308', dnd: '#ef4444' };
-    return colors[status] ?? '#4ade80';
+    const colors: Record<string, string> = {
+      online: "#4ade80",
+      away: "#eab308",
+      dnd: "#ef4444",
+    };
+    return colors[status] ?? "#4ade80";
   }
 
   private updateCustomStatus(id: string, text: string): void {
@@ -728,12 +853,12 @@ export class WorldScene extends Phaser.Scene {
 
     p.customStatusBubble = this.add
       .text(p.x, p.y - this.tileSize / 2 - 34, text, {
-        fontSize: '12px',
-        color: '#ffffff',
-        fontFamily: 'MulmaruMono',
-        backgroundColor: '#445588cc',
+        fontSize: "12px",
+        color: "#ffffff",
+        fontFamily: "MulmaruMono",
+        backgroundColor: "#445588cc",
         padding: { x: 6, y: 3 },
-        stroke: '#000',
+        stroke: "#000",
         strokeThickness: 1,
       })
       .setOrigin(0.5)
@@ -754,18 +879,18 @@ export class WorldScene extends Phaser.Scene {
     const px = p.x;
     const py = p.y - this.tileSize - 10;
 
-    const displayText = text.length > 40 ? text.substring(0, 40) + '...' : text;
+    const displayText = text.length > 40 ? text.substring(0, 40) + "..." : text;
 
     p.bubbleText = this.add
       .text(px, py, displayText, {
-        fontSize: '12px',
-        color: '#ffffff',
-        fontFamily: 'MulmaruMono',
-        backgroundColor: '#333355dd',
+        fontSize: "12px",
+        color: "#ffffff",
+        fontFamily: "MulmaruMono",
+        backgroundColor: "#333355dd",
         padding: { x: 6, y: 4 },
-        stroke: '#000',
+        stroke: "#000",
         strokeThickness: 1,
-        wordWrap: { width: 200 }
+        wordWrap: { width: 200 },
       })
       .setOrigin(0.5)
       .setDepth(100)
@@ -782,7 +907,7 @@ export class WorldScene extends Phaser.Scene {
               p.bubbleText.destroy();
               p.bubbleText = null;
             }
-          }
+          },
         });
       }
     }, 3000);
@@ -803,10 +928,10 @@ export class WorldScene extends Phaser.Scene {
 
     p.emoteText = this.add
       .text(px, py, emoji, {
-        fontSize: '20px',
-        fontFamily: 'MulmaruMono',
-        stroke: '#000',
-        strokeThickness: 2
+        fontSize: "20px",
+        fontFamily: "MulmaruMono",
+        stroke: "#000",
+        strokeThickness: 2,
       })
       .setOrigin(0.5)
       .setDepth(101)
@@ -814,9 +939,9 @@ export class WorldScene extends Phaser.Scene {
 
     this.tweens.add({
       targets: p.emoteText,
-      y: '-=8',
+      y: "-=8",
       duration: 600,
-      ease: 'Power1'
+      ease: "Power1",
     });
 
     p.emoteTimer = setTimeout(() => {
@@ -830,17 +955,24 @@ export class WorldScene extends Phaser.Scene {
               p.emoteText.destroy();
               p.emoteText = null;
             }
-          }
+          },
         });
       }
     }, 3000);
   }
 
   private spawnDashAfterimages(
-    x: number, y: number, dir: Direction, textureKey: string, frame: number
+    x: number,
+    y: number,
+    dir: Direction,
+    textureKey: string,
+    frame: number,
   ): void {
     const dirVec: Record<Direction, [number, number]> = {
-      up: [0, 1], down: [0, -1], left: [1, 0], right: [-1, 0]
+      up: [0, 1],
+      down: [0, -1],
+      left: [1, 0],
+      right: [-1, 0],
     };
     const [ox, oy] = dirVec[dir];
     const count = 6;
@@ -850,7 +982,8 @@ export class WorldScene extends Phaser.Scene {
       const ghost = this.add.sprite(
         x + ox * spacing * (i + 1),
         y + oy * spacing * (i + 1),
-        textureKey, frame
+        textureKey,
+        frame,
       );
       ghost.setDepth(9);
       ghost.setTintFill(0xffffff);
@@ -860,8 +993,8 @@ export class WorldScene extends Phaser.Scene {
         targets: ghost,
         alpha: 0,
         duration: 300 + i * 100,
-        ease: 'Power2',
-        onComplete: () => ghost.destroy()
+        ease: "Power2",
+        onComplete: () => ghost.destroy(),
       });
     }
   }
@@ -876,7 +1009,10 @@ export class WorldScene extends Phaser.Scene {
       const dy = p.targetY - p.y;
       if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) {
         const clampedDelta = Math.min(delta, 50);
-        const t = Math.min(1, 1 - Math.pow(1 - REMOTE_LERP_FACTOR, clampedDelta / 16.67));
+        const t = Math.min(
+          1,
+          1 - Math.pow(1 - REMOTE_LERP_FACTOR, clampedDelta / 16.67),
+        );
         p.x += dx * t;
         p.y += dy * t;
         this.updatePlayerVisuals(p);
@@ -893,10 +1029,14 @@ export class WorldScene extends Phaser.Scene {
 
     const dpad = get(dpadDirection);
     const activeEl = document.activeElement;
-    const isTyping = activeEl?.tagName === 'INPUT' || activeEl?.tagName === 'TEXTAREA' || (activeEl as HTMLElement)?.isContentEditable;
+    const isTyping =
+      activeEl?.tagName === "INPUT" ||
+      activeEl?.tagName === "TEXTAREA" ||
+      (activeEl as HTMLElement)?.isContentEditable;
     if ((get(chatInputActive) || isTyping) && !dpad) return;
 
-    let dx = 0, dy = 0;
+    let dx = 0,
+      dy = 0;
     let dir: Direction | null = null;
 
     // 축별 독립 합산 — 반대 방향 상쇄
@@ -908,30 +1048,46 @@ export class WorldScene extends Phaser.Scene {
     // 방향 결정 (4방향만, X축 우선)
     if (dx !== 0) {
       dy = 0;
-      dir = dx > 0 ? 'right' : 'left';
+      dir = dx > 0 ? "right" : "left";
     } else if (dy !== 0) {
-      dir = dy > 0 ? 'down' : 'up';
+      dir = dy > 0 ? "down" : "up";
     }
 
     if (!dir && dpad) {
       dir = dpad;
-      dx = dpad === 'left' ? -1 : dpad === 'right' ? 1 : 0;
-      dy = dpad === 'up' ? -1 : dpad === 'down' ? 1 : 0;
+      dx = dpad === "left" ? -1 : dpad === "right" ? 1 : 0;
+      dy = dpad === "up" ? -1 : dpad === "down" ? 1 : 0;
     }
 
     const isMovingNow = dir !== null;
     const now = performance.now();
 
     // Dash trigger: spacebar while moving, respecting cooldown
-    if (dir && !this.isDashing && Phaser.Input.Keyboard.JustDown(this.spaceKey) && now - this.lastDashTime >= DASH_COOLDOWN) {
+    if (
+      dir &&
+      !this.isDashing &&
+      Phaser.Input.Keyboard.JustDown(this.spaceKey) &&
+      now - this.lastDashTime >= DASH_COOLDOWN
+    ) {
       this.isDashing = true;
       this.dashDir = dir;
       this.dashStartTime = now;
       this.lastDashTime = now;
       network.sendDash(dir);
 
-      const dirFrame: Record<Direction, number> = { down: 0, up: 1, right: 2, left: 3 };
-      this.spawnDashAfterimages(localPlayer.x, localPlayer.y, dir, localPlayer.textureKey, dirFrame[dir]);
+      const dirFrame: Record<Direction, number> = {
+        down: 0,
+        up: 1,
+        right: 2,
+        left: 3,
+      };
+      this.spawnDashAfterimages(
+        localPlayer.x,
+        localPlayer.y,
+        dir,
+        localPlayer.textureKey,
+        dirFrame[dir],
+      );
     }
 
     // End dash if duration expired
@@ -945,8 +1101,9 @@ export class WorldScene extends Phaser.Scene {
     const effectiveSpeed = this.isDashing ? DASH_SPEED : MOVE_SPEED;
 
     if (effectiveDir) {
-      const eDx = effectiveDir === 'right' ? 1 : effectiveDir === 'left' ? -1 : 0;
-      const eDy = effectiveDir === 'down' ? 1 : effectiveDir === 'up' ? -1 : 0;
+      const eDx =
+        effectiveDir === "right" ? 1 : effectiveDir === "left" ? -1 : 0;
+      const eDy = effectiveDir === "down" ? 1 : effectiveDir === "up" ? -1 : 0;
       const moveAmount = effectiveSpeed * (delta / 1000);
       let newX = localPlayer.x + eDx * moveAmount;
       let newY = localPlayer.y + eDy * moveAmount;
@@ -980,7 +1137,12 @@ export class WorldScene extends Phaser.Scene {
         players.update((m) => {
           const info = m.get(this.localPlayerId!);
           if (info) {
-            m.set(this.localPlayerId!, { ...info, x: newX, y: newY, dir: effectiveDir });
+            m.set(this.localPlayerId!, {
+              ...info,
+              x: newX,
+              y: newY,
+              dir: effectiveDir,
+            });
           }
           return m;
         });
@@ -992,7 +1154,12 @@ export class WorldScene extends Phaser.Scene {
       players.update((m) => {
         const info = m.get(this.localPlayerId!);
         if (info) {
-          m.set(this.localPlayerId!, { ...info, x: localPlayer.x, y: localPlayer.y, dir: localPlayer.dir });
+          m.set(this.localPlayerId!, {
+            ...info,
+            x: localPlayer.x,
+            y: localPlayer.y,
+            dir: localPlayer.dir,
+          });
         }
         return m;
       });
@@ -1005,10 +1172,16 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private setupInteractiveObjects(): void {
-    const eKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.E, false);
-    eKey.on('down', () => {
+    const eKey = this.input.keyboard!.addKey(
+      Phaser.Input.Keyboard.KeyCodes.E,
+      false,
+    );
+    eKey.on("down", () => {
       const activeEl = document.activeElement;
-      const isTyping = activeEl?.tagName === 'INPUT' || activeEl?.tagName === 'TEXTAREA' || (activeEl as HTMLElement)?.isContentEditable;
+      const isTyping =
+        activeEl?.tagName === "INPUT" ||
+        activeEl?.tagName === "TEXTAREA" ||
+        (activeEl as HTMLElement)?.isContentEditable;
       if (get(chatInputActive) || isTyping) return;
 
       const nearId = get(nearbyObjectId);
@@ -1030,10 +1203,10 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private onObjectInteract(obj: InteractiveObject): void {
-    if (obj.type === 'whiteboard') {
+    if (obj.type === "whiteboard") {
       currentBoardId.set(obj.id);
       whiteboardOpen.set(true);
-    } else if (obj.type === 'regional_chat') {
+    } else if (obj.type === "regional_chat") {
       currentRegionalChatId.set(obj.id);
       regionalChatSettingsOpen.set(true);
     }

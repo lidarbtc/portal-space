@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
+	"net/http"
 	"regexp"
 	"strings"
 	"unicode"
@@ -30,6 +32,13 @@ type ActionMessage struct {
 	Action   string          `json:"action"`
 	ObjectID string          `json:"objectId,omitempty"`
 	Payload  json.RawMessage `json:"payload,omitempty"`
+}
+
+type ChatImage struct {
+	Mime string `json:"mime"`
+	Data string `json:"data"`
+	Size int    `json:"size"`
+	Name string `json:"name,omitempty"`
 }
 
 const (
@@ -68,6 +77,7 @@ type IncomingMessage struct {
 	Dir          string          `json:"dir,omitempty"`
 	Status       string          `json:"status,omitempty"`
 	Text         string          `json:"text,omitempty"`
+	Image        *ChatImage      `json:"image,omitempty"`
 	Avatar       int             `json:"avatar"`
 	Colors       *ColorPalette   `json:"colors,omitempty"`
 	Emoji        string          `json:"emoji,omitempty"`
@@ -87,6 +97,7 @@ type OutgoingMessage struct {
 	Dir           string               `json:"dir,omitempty"`
 	Status        string               `json:"status,omitempty"`
 	Text          string               `json:"text,omitempty"`
+	Image         *ChatImage           `json:"image,omitempty"`
 	Message       string               `json:"message,omitempty"`
 	Emoji         string               `json:"emoji,omitempty"`
 	CustomStatus  string               `json:"customStatus,omitempty"`
@@ -126,9 +137,14 @@ const (
 	maxNicknameLen     = 20
 	maxChatLen         = 500
 	maxCustomStatusLen = 20
+	maxChatImageBytes  = 2 * 1024 * 1024
 	mapWidth           = 60
 	mapHeight          = 45
 )
+
+const maxChatImageBase64Len = ((maxChatImageBytes + 2) / 3) * 4
+
+const maxIncomingWSMessageBytes = maxChatImageBase64Len + 8*1024
 
 var validStatuses = map[string]bool{
 	"online": true,
@@ -172,6 +188,49 @@ func sanitizeNickname(s string) string {
 
 func sanitizeChat(s string) string {
 	return sanitizeString(s, maxChatLen)
+}
+
+func sanitizeFileName(s string) string {
+	s = sanitizeString(s, 100)
+	s = strings.ReplaceAll(s, "/", "")
+	s = strings.ReplaceAll(s, "\\", "")
+	return s
+}
+
+var allowedChatImageMIMEs = map[string]bool{
+	"image/png":  true,
+	"image/jpeg": true,
+	"image/gif":  true,
+	"image/webp": true,
+}
+
+func normalizeChatImage(img *ChatImage) *ChatImage {
+	if img == nil {
+		return nil
+	}
+	if img.Data == "" || len(img.Data) > maxChatImageBase64Len {
+		return nil
+	}
+
+	decoded, err := base64.StdEncoding.DecodeString(img.Data)
+	if err != nil {
+		return nil
+	}
+	if len(decoded) == 0 || len(decoded) > maxChatImageBytes {
+		return nil
+	}
+
+	detectedMime := http.DetectContentType(decoded)
+	if !allowedChatImageMIMEs[detectedMime] {
+		return nil
+	}
+
+	return &ChatImage{
+		Mime: detectedMime,
+		Data: img.Data,
+		Size: len(decoded),
+		Name: sanitizeFileName(img.Name),
+	}
 }
 
 const (
