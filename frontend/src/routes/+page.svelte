@@ -231,7 +231,7 @@
     return compressChatRasterImage(file);
   }
 
-  async function handleChatImageSend(file: File) {
+  async function handleChatImageSend(file: File, text?: string) {
     const id = get(selfId);
     if (!id) throw new Error('플레이어 정보를 찾을 수 없습니다.');
 
@@ -249,15 +249,16 @@
     }
 
     const data = await fileToBase64(processedFile);
-    network.sendChatImage(
+    network.sendChatMessage(
+      self.x,
+      self.y,
+      text,
       {
         mime: processedFile.type,
         name: processedFile.name,
         size: processedFile.size,
         data,
-      },
-      self.x,
-      self.y
+      }
     );
   }
 </script>

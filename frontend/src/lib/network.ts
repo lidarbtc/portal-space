@@ -234,8 +234,15 @@ class NetworkClient {
     this.send({ type: 'chat', text, x, y });
   }
 
-  sendChatImage(image: ChatImage, x: number, y: number): void {
-    this.send({ type: 'chat', image, x, y });
+  sendChatMessage(x: number, y: number, text?: string, image?: ChatImage): void {
+    const payload: IncomingMessage = { type: 'chat', x, y };
+    if (text) {
+      payload.text = text;
+    }
+    if (image) {
+      payload.image = image;
+    }
+    this.send(payload);
   }
 
   sendDash(dir: Direction): void {

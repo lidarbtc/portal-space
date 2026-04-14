@@ -337,26 +337,16 @@ export class WorldScene extends Phaser.Scene {
         notifyAudio.playIfHidden();
       }
 
-      if (msg.id && msg.nickname && msg.image) {
+      if (msg.id && msg.nickname && (msg.text || msg.image)) {
         const senderColors = get(players).get(msg.id)?.colors;
-        this.showChatBubble(msg.id, '[사진]', msg.nickname);
-        addChatMessage({
-          senderId: msg.id,
-          nickname: msg.nickname,
-          nicknameColor: resolveNicknameColor(msg.id, senderColors),
-          image: msg.image,
-        });
-        return;
-      }
-
-      if (msg.id && msg.nickname && msg.text) {
-        const senderColors = get(players).get(msg.id)?.colors;
-        this.showChatBubble(msg.id, msg.text, msg.nickname);
+        const bubbleText = msg.image && msg.text ? `[사진] ${msg.text}` : (msg.text ?? '[사진]');
+        this.showChatBubble(msg.id, bubbleText, msg.nickname);
         addChatMessage({
           senderId: msg.id,
           nickname: msg.nickname,
           nicknameColor: resolveNicknameColor(msg.id, senderColors),
           text: msg.text,
+          image: msg.image,
         });
       }
     });

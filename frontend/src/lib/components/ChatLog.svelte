@@ -95,6 +95,9 @@
     {:else}
       <div class="chat-entry">
         <span class="chat-time">{formatTime(message.timestamp)}</span><span class="chat-name" style:color={message.nicknameColor ?? undefined}>{message.nickname}</span>
+        {#if message.text}
+          <span class="chat-text"> {#each parseTextWithUrls(message.text) as segment}{#if segment.type === 'url'}<a href={segment.value} onclick={(e) => handleLinkClick(e, segment.value)}>{segment.value}</a>{:else}{segment.value}{/if}{/each}</span>
+        {/if}
         {#if message.image}
           <div class="chat-image-message">
             <img
@@ -107,8 +110,6 @@
               <span class="chat-image-name">{message.image.name}</span>
             {/if}
           </div>
-        {:else if message.text}
-          <span class="chat-text"> {#each parseTextWithUrls(message.text) as segment}{#if segment.type === 'url'}<a href={segment.value} onclick={(e) => handleLinkClick(e, segment.value)}>{segment.value}</a>{:else}{segment.value}{/if}{/each}</span>
         {/if}
       </div>
     {/if}

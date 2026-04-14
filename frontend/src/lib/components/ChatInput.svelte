@@ -11,7 +11,7 @@
     alwaysActive = false
   }: {
     onSend: (text: string) => void;
-    onSendImage: (file: File) => void | Promise<void>;
+    onSendImage: (file: File, text?: string) => void | Promise<void>;
     mobile?: boolean;
     alwaysActive?: boolean;
   } = $props();
@@ -138,7 +138,9 @@
 
     isSendingImage = true;
     try {
-      await onSendImage(file);
+      const text = inputValue.trim();
+      await onSendImage(file, text || undefined);
+      inputValue = '';
       if (mobile) {
         inputEl?.blur();
       }

@@ -360,7 +360,11 @@ func (r *Room) handleChat(client *Client, text string, image *ChatImage) {
 	text = sanitizeChat(text)
 	normalizedImage := normalizeChatImage(image)
 
-	if (text == "" && normalizedImage == nil) || (text != "" && normalizedImage != nil) {
+	if image != nil && normalizedImage == nil {
+		return
+	}
+
+	if text == "" && normalizedImage == nil {
 		return
 	}
 
@@ -370,10 +374,11 @@ func (r *Room) handleChat(client *Client, text string, image *ChatImage) {
 		Nickname: client.nickname,
 	}
 
+	if text != "" {
+		msg.Text = text
+	}
 	if normalizedImage != nil {
 		msg.Image = normalizedImage
-	} else {
-		msg.Text = text
 	}
 
 	r.broadcast <- msg
