@@ -88,19 +88,23 @@
             10;
     }
 
+    function scrollToBottom() {
+        if (!atBottom || !chatLogEl) return;
+
+        requestAnimationFrame(() => {
+            if (chatLogEl) {
+                chatLogEl.scrollTop = chatLogEl.scrollHeight;
+            }
+        });
+    }
+
     $effect(() => {
         syncChatImageUrls($chatMessages);
     });
 
     $effect(() => {
         displayMessages;
-        if (atBottom && chatLogEl) {
-            requestAnimationFrame(() => {
-                if (chatLogEl) {
-                    chatLogEl.scrollTop = chatLogEl.scrollHeight;
-                }
-            });
-        }
+        scrollToBottom();
     });
 
     onDestroy(() => {
@@ -169,6 +173,11 @@
                             src={ensureChatImageUrl(message.image)}
                             alt={message.image.name ?? "shared image"}
                             loading="lazy"
+                            onload={() => {
+                                if (atBottom) {
+                                    scrollToBottom();
+                                }
+                            }}
                         />
                         {#if message.image.name}
                             <span class="chat-image-name"
