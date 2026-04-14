@@ -64,6 +64,18 @@
 		},
 	)
 
+	useEventListener(
+		() => document,
+		'pointerdown',
+		(e: PointerEvent) => {
+			if (!gameState.chatInputActive) return
+			const target = e.target as HTMLElement | null
+			if (!target?.closest('#game-container')) return
+
+			hideInput()
+		},
+	)
+
 	function showInput() {
 		gameState.chatInputActive = true
 		requestAnimationFrame(() => {
