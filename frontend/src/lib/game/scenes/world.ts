@@ -33,6 +33,7 @@ const REMOTE_LERP_FACTOR = 0.15;
 const DASH_SPEED = 800; // px/sec during dash
 const DASH_DURATION = 200; // ms
 const DASH_COOLDOWN = 1500; // ms
+const ALLOWED_CHAT_IMAGE_MIMES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp']);
 
 interface PlayerObject {
   sprite: Phaser.GameObjects.Sprite;
@@ -333,20 +334,21 @@ export class WorldScene extends Phaser.Scene {
     });
 
     network.on('chat', (msg) => {
-      if (msg.id !== this.localPlayerId && get(currentStatus) !== 'dnd') {
-        notifyAudio.playIfHidden();
-      }
+      const image = msg.image && ALLOWED_CHAT_IMAGE_MIMES.has(msg.image.mime) ? msg.image : undefined;
 
-      if (msg.id && msg.nickname && (msg.text || msg.image)) {
+      if (msg.id && msg.nickname && (msg.text || image)) {
+        if (msg.id !== this.localPlayerId && get(currentStatus) !== 'dnd') {
+          notifyAudio.playIfHidden();
+        }
         const senderColors = get(players).get(msg.id)?.colors;
-        const bubbleText = msg.image && msg.text ? `[사진] ${msg.text}` : (msg.text ?? '[사진]');
+        const bubbleText = image && msg.text ? `[사진] ${msg.text}` : (msg.text ?? '[사진]');
         this.showChatBubble(msg.id, bubbleText, msg.nickname);
         addChatMessage({
           senderId: msg.id,
           nickname: msg.nickname,
           nicknameColor: resolveNicknameColor(msg.id, senderColors),
           text: msg.text,
-          image: msg.image,
+          image,
         });
       }
     });
