@@ -5,6 +5,7 @@
   import type { PlayerStatus, Emoji } from '$lib/types';
   import { CircleUserRound, SmilePlus, Settings } from '@lucide/svelte';
   import CustomStatusModal from './CustomStatusModal.svelte';
+  import { customStatusModalOpen } from '$lib/stores/modal';
 
   let { onOpenSettings }: { onOpenSettings?: () => void } = $props();
 
@@ -42,7 +43,7 @@
     network.sendEmote(emoji);
   }
 
-  let customStatusModalOpen = $state(false);
+  // customStatusModalOpen is now managed by the global store
 
   let containerEl: HTMLDivElement | undefined = $state(undefined);
 
@@ -76,7 +77,7 @@
       </ToggleGroup.Root>
       <button
         class="dropdown-item custom-status-btn"
-        onclick={() => { openPanel = null; customStatusModalOpen = true; }}
+        onclick={() => { openPanel = null; $customStatusModalOpen = true; }}
       >
         ✏️ 상태 설정
       </button>
@@ -118,7 +119,7 @@
   </div>
 </div>
 
-<CustomStatusModal bind:open={customStatusModalOpen} />
+<CustomStatusModal bind:open={$customStatusModalOpen} />
 
 <style>
   .action-bar-wrapper {

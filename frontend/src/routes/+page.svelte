@@ -15,6 +15,7 @@
   import { players, selfId } from '$lib/stores/game';
   import { connectionState } from '$lib/stores/connection';
   import { isMobile } from '$lib/stores/mobile';
+  import { settingsModalOpen } from '$lib/stores/modal';
   import { get } from 'svelte/store';
   import {
     MAX_CHAT_IMAGE_BYTES,
@@ -25,7 +26,7 @@
   let inGame = $state(false);
   let gameData: OutgoingMessage | null = $state(null);
   let isWideDesktop = $state(false);
-  let settingsOpen = $state(false);
+  // settingsOpen is now managed by the global settingsModalOpen store
 
   const MAX_CHAT_IMAGE_SOURCE_BYTES = 10 * 1024 * 1024;
   const TARGET_CHAT_IMAGE_BYTES = Math.floor(MAX_CHAT_IMAGE_BYTES * 0.8);
@@ -269,7 +270,7 @@
 {:else if $isMobile}
   <div class="mobile-layout">
     <div class="mobile-header">
-      <button class="mobile-settings-btn" onclick={() => (settingsOpen = true)}>
+      <button class="mobile-settings-btn" onclick={() => ($settingsModalOpen = true)}>
         ⚙
       </button>
     </div>
@@ -288,7 +289,7 @@
       <div id="game-container">
         <GameCanvas snapshot={gameData} />
       </div>
-      <ActionBar onOpenSettings={() => (settingsOpen = true)} />
+      <ActionBar onOpenSettings={() => ($settingsModalOpen = true)} />
     </div>
     <div class="chat-panel">
       <PlayerList />
@@ -300,13 +301,13 @@
   <div id="game-container">
     <GameCanvas snapshot={gameData} />
   </div>
-  <ActionBar onOpenSettings={() => (settingsOpen = true)} />
+  <ActionBar onOpenSettings={() => ($settingsModalOpen = true)} />
   <ChatLog />
   <ChatInput onSend={handleChatSend} onSendImage={handleChatImageSend} />
 {/if}
 
 {#if inGame}
-  <SettingsModal bind:open={settingsOpen} />
+  <SettingsModal bind:open={$settingsModalOpen} />
   <Whiteboard />
   <RegionalChatSettings />
 {/if}

@@ -35,6 +35,7 @@ import {
   activeObjectId,
 } from "$lib/stores/objects";
 import { whiteboardOpen, currentBoardId } from "$lib/stores/whiteboard";
+import { anyModalOpen } from "$lib/stores/modal";
 import {
   enterZone,
   exitZone,
@@ -107,6 +108,7 @@ export class WorldScene extends Phaser.Scene {
   // Dash state
   private isDashing = false;
   private dashDir: Direction | null = null;
+  private modalOpen = false;
   private dashStartTime = 0;
   private lastDashTime = 0;
   private spaceKey!: Phaser.Input.Keyboard.Key;
@@ -172,6 +174,22 @@ export class WorldScene extends Phaser.Scene {
       Phaser.Input.Keyboard.KeyCodes.SPACE,
       false,
     );
+
+    const cursorCaptureCodes = [
+      Phaser.Input.Keyboard.KeyCodes.LEFT,
+      Phaser.Input.Keyboard.KeyCodes.RIGHT,
+      Phaser.Input.Keyboard.KeyCodes.UP,
+      Phaser.Input.Keyboard.KeyCodes.DOWN,
+    ];
+    const unsubModal = anyModalOpen.subscribe((v) => {
+      this.modalOpen = v;
+      if (v) {
+        this.input.keyboard?.removeCapture(cursorCaptureCodes);
+      } else {
+        this.input.keyboard?.addCapture(cursorCaptureCodes);
+      }
+    });
+    this.unsubscribers.push(unsubModal);
 
     this.setupNetwork();
     this.setupZoom();
@@ -962,39 +980,37 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private spawnDashAfterimages(
-    x: number,
-    y: number,
+    _x: number,
+    _y: number,
     dir: Direction,
     textureKey: string,
     frame: number,
   ): void {
-    const dirVec: Record<Direction, [number, number]> = {
-      up: [0, 1],
-      down: [0, -1],
-      left: [1, 0],
-      right: [-1, 0],
-    };
-    const [ox, oy] = dirVec[dir];
     const count = 6;
-    const spacing = 28;
+    const delayPerGhost = DASH_DURATION / count;
 
     for (let i = 0; i < count; i++) {
-      const ghost = this.add.sprite(
-        x + ox * spacing * (i + 1),
-        y + oy * spacing * (i + 1),
-        textureKey,
-        frame,
-      );
-      ghost.setDepth(9);
-      ghost.setTintFill(0xffffff);
-      ghost.setAlpha(0.8 - i * 0.12);
+      this.time.delayedCall(delayPerGhost * (i + 1), () => {
+        const localPlayer = this.playerObjects.get(this.localPlayerId);
+        if (!localPlayer) return;
 
-      this.tweens.add({
-        targets: ghost,
-        alpha: 0,
-        duration: 300 + i * 100,
-        ease: "Power2",
-        onComplete: () => ghost.destroy(),
+        const ghost = this.add.sprite(
+          localPlayer.x,
+          localPlayer.y,
+          textureKey,
+          frame,
+        );
+        ghost.setDepth(9);
+        ghost.setTintFill(0xffffff);
+        ghost.setAlpha(0.7 - i * 0.1);
+
+        this.tweens.add({
+          targets: ghost,
+          alpha: 0,
+          duration: 250,
+          ease: "Power2",
+          onComplete: () => ghost.destroy(),
+        });
       });
     }
   }
@@ -1026,6 +1042,15 @@ export class WorldScene extends Phaser.Scene {
     // Local player movement
     const localPlayer = this.playerObjects.get(this.localPlayerId);
     if (!localPlayer) return;
+
+    // Block all input (including mobile dpad) when any modal is open
+    if (this.modalOpen) {
+      if (this.isDashing) {
+        this.isDashing = false;
+        this.dashDir = null;
+      }
+      return;
+    }
 
     const dpad = get(dpadDirection);
     const activeEl = document.activeElement;
@@ -1182,7 +1207,7 @@ export class WorldScene extends Phaser.Scene {
         activeEl?.tagName === "INPUT" ||
         activeEl?.tagName === "TEXTAREA" ||
         (activeEl as HTMLElement)?.isContentEditable;
-      if (get(chatInputActive) || isTyping) return;
+      if (this.modalOpen || get(chatInputActive) || isTyping) return;
 
       const nearId = get(nearbyObjectId);
       if (nearId) {

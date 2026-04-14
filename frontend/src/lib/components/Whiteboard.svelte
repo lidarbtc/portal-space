@@ -372,6 +372,7 @@
   }
 
   function handleKeydown(e: KeyboardEvent) {
+    if (!$whiteboardOpen) return;
     if (e.key === ' ' && !e.repeat) {
       e.preventDefault();
       spaceHeld = true;
@@ -390,6 +391,7 @@
   }
 
   function handleKeyup(e: KeyboardEvent) {
+    if (!$whiteboardOpen) return;
     if (e.key === ' ') {
       spaceHeld = false;
       isPanning = false;
