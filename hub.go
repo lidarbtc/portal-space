@@ -26,26 +26,28 @@ func newHub(storage *Storage) *Hub {
 	h.rooms["default"] = defaultRoom
 
 	// Place whiteboards near map center for visibility
+	// Positions snap to tile boundaries for grid alignment (2x3 tile sprites)
 	defaultRoom.addObject(&InteractiveObject{
 		ID:   "wb-1",
 		Type: "whiteboard",
-		X:    float64(27*32 + 16),
-		Y:    float64(22*32 + 16),
+		X:    float64(28 * tileSize),
+		Y:    float64(24 * tileSize),
 	})
 	defaultRoom.addObject(&InteractiveObject{
 		ID:   "wb-2",
 		Type: "whiteboard",
-		X:    float64(33*32 + 16),
-		Y:    float64(22*32 + 16),
+		X:    float64(34 * tileSize),
+		Y:    float64(24 * tileSize),
 	})
 
 	// Place a regional chat zone
+	// ward-stone is 32x48 (2x3 tiles), origin(0.5, 1) → position at tile boundary
 	defaultRoom.addObject(&InteractiveObject{
 		ID:    "rc-1",
 		Type:  "regional_chat",
-		X:     float64(20*32 + 16),
-		Y:     float64(15*32 + 16),
-		State: json.RawMessage(`{"name":"결계석","radius":160,"retainHistory":false}`),
+		X:     float64(21 * tileSize),
+		Y:     float64(16 * tileSize),
+		State: json.RawMessage(`{"name":"결계석","radius":80,"retainHistory":false}`),
 	})
 
 	return h

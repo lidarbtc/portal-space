@@ -3,14 +3,17 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "dev": "vite dev --port 5173",
-    "build": "vite build",
+    "build:tileset": "bun run scripts/build-tileset.ts",
+    "dev": "bun run build:tileset && vite dev --port 5173",
+    "build": "bun run build:tileset && vite build",
     "preview": "vite preview",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json"
   },
   "devDependencies": {
     "@sveltejs/adapter-static": "^3.0.0",
     "@sveltejs/kit": "^2.0.0",
+    "@types/pngjs": "^6.0.5",
+    "pngjs": "^7.0.0",
     "svelte": "^5.0.0",
     "svelte-check": "^4.0.0",
     "typescript": "^6.0.0",

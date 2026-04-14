@@ -107,17 +107,17 @@ func (r *Room) findSpawnPoint() (float64, float64) {
 	}
 	for _, c := range candidates {
 		if r.isWalkable(c[0], c[1]) {
-			return float64(c[0]*32 + 16), float64(c[1]*32 + 16)
+			return float64(c[0]*tileSize + tileSize/2), float64(c[1]*tileSize + tileSize/2)
 		}
 	}
 	for y := 1; y < r.height-1; y++ {
 		for x := 1; x < r.width-1; x++ {
 			if r.isWalkable(x, y) {
-				return float64(x*32 + 16), float64(y*32 + 16)
+				return float64(x*tileSize + tileSize/2), float64(y*tileSize + tileSize/2)
 			}
 		}
 	}
-	return float64(1*32 + 16), float64(1*32 + 16)
+	return float64(1*tileSize + tileSize/2), float64(1*tileSize + tileSize/2)
 }
 
 func (r *Room) addObject(obj *InteractiveObject) {
@@ -600,7 +600,7 @@ func (r *Room) handleRegionalChatAction(client *Client, action ActionMessage) {
 	dx := client.x - obj.X
 	dy := client.y - obj.Y
 	dist := math.Sqrt(dx*dx + dy*dy)
-	if dist > 1.5*32 { // Same interaction radius as whiteboard
+	if dist > 1.5*tileSize { // Same interaction radius as whiteboard
 		return
 	}
 
@@ -658,8 +658,8 @@ func (r *Room) handleRegionalChatAction(client *Client, action ActionMessage) {
 }
 
 func (r *Room) validateMove(x, y float64) bool {
-	pw := float64(r.width * 32)
-	ph := float64(r.height * 32)
+	pw := float64(r.width * tileSize)
+	ph := float64(r.height * tileSize)
 	return x >= 0 && x < pw && y >= 0 && y < ph
 }
 

@@ -11,7 +11,7 @@
   let radius = $state(128);
   let retainHistory = $state(false);
 
-  let tileDisplay = $derived(Math.round(radius / 32));
+  let tileDisplay = $derived(Math.round(radius / 16));
 
   $effect(() => {
     if ($regionalChatSettingsOpen && $currentRegionalChatId) {
@@ -70,14 +70,14 @@
           <input
             type="range"
             bind:value={radius}
-            min={64}
-            max={320}
-            step={32}
+            min={32}
+            max={128}
+            step={16}
             class="rcs-range"
           />
           <span class="rcs-range-labels">
             <span>2 타일</span>
-            <span>10 타일</span>
+            <span>8 타일</span>
           </span>
         </label>
 

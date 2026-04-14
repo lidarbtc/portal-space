@@ -11,7 +11,7 @@ import {
 } from "$lib/stores/game";
 import { dpadDirection } from "$lib/stores/dpad";
 import { notifyAudio } from "$lib/audio";
-import { createPlaceholderTileset } from "../tileset";
+import { loadTileset } from "../tileset";
 import { createAvatarSpritesheet } from "../spritesheet";
 import { createTintedSpritesheet } from "../palette-swap";
 import { resolveNicknameColor } from "$lib/utils/nickname-colors";
@@ -88,7 +88,7 @@ export class WorldScene extends Phaser.Scene {
   private gameObjects: Map<string, GameInteractiveObject> = new Map();
   private entityContainer!: Phaser.GameObjects.Container;
   private localPlayerId: string | null = null;
-  private tileSize = 32;
+  private tileSize = 16;
   private unsubscribers: Array<() => void> = [];
 
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
@@ -98,8 +98,9 @@ export class WorldScene extends Phaser.Scene {
     left: Phaser.Input.Keyboard.Key;
     right: Phaser.Input.Keyboard.Key;
   };
-  private mapLayer!: Phaser.Tilemaps.TilemapLayer;
-  private mapData!: number[][];
+  private collisionLayers: Phaser.Tilemaps.TilemapLayer[] = [];
+  private mapWidth = MAP_WIDTH;
+  private mapHeight = MAP_HEIGHT;
 
   // Network send throttle
   private lastNetworkSendTime = 0;
@@ -118,12 +119,11 @@ export class WorldScene extends Phaser.Scene {
   }
 
   preload(): void {
-    createPlaceholderTileset(this);
-
     const match = location.pathname.match(/^(\/peer\/[^/]+\/)/);
     if (match) {
       this.load.setBaseURL(match[1]);
     }
+    loadTileset(this);
     this.load.image("gopher-src", "assets/gopher.png");
     this.load.image("ward-stone", "assets/ward-stone.png");
   }
@@ -135,8 +135,8 @@ export class WorldScene extends Phaser.Scene {
     this.cameras.main.setBounds(
       0,
       0,
-      MAP_WIDTH * this.tileSize,
-      MAP_HEIGHT * this.tileSize,
+      this.mapWidth * this.tileSize,
+      this.mapHeight * this.tileSize,
     );
 
     // Declarative y-sort layer: all y-sortable entities go here
@@ -233,80 +233,34 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private createMap(): void {
-    const mapData = this.generateMapData();
+    const map = this.make.tilemap({ key: "map" });
+    const tileset = map.addTilesetImage("tileset", "tileset")!;
 
-    const map = this.make.tilemap({
-      data: mapData,
-      tileWidth: this.tileSize,
-      tileHeight: this.tileSize,
-    });
+    // Read map dimensions from Tiled JSON
+    this.mapWidth = map.width;
+    this.mapHeight = map.height;
 
-    const tileset = map.addTilesetImage(
-      "tileset",
-      "tileset",
-      this.tileSize,
-      this.tileSize,
-    )!;
-    const layer = map.createLayer(0, tileset, 0, 0)!;
-    layer.setCollision([1, 2]);
+    // Ground layer (floor tiles)
+    map.createLayer("ground", tileset, 0, 0)!;
 
-    this.mapLayer = layer;
-    this.mapData = mapData;
-  }
+    // Walls layer (collides)
+    const wallsLayer = map.createLayer("walls", tileset, 0, 0)!;
+    wallsLayer.setCollisionByProperty({ collides: true });
 
-  private generateMapData(): number[][] {
-    const data: number[][] = [];
-    for (let y = 0; y < MAP_HEIGHT; y++) {
-      const row: number[] = [];
-      for (let x = 0; x < MAP_WIDTH; x++) {
-        if (y === 0 || y === MAP_HEIGHT - 1 || x === 0 || x === MAP_WIDTH - 1) {
-          row.push(1);
-        } else {
-          row.push(0);
-        }
-      }
-      data.push(row);
-    }
+    // Furniture layer (tables, collides)
+    const furnitureLayer = map.createLayer("furniture", tileset, 0, 0)!;
+    furnitureLayer.setCollisionByProperty({ collides: true });
 
-    const baseTables: [number, number][] = [
-      [4, 4],
-      [5, 4],
-      [4, 7],
-      [5, 7],
-      [4, 10],
-      [5, 10],
-      [10, 4],
-      [11, 4],
-      [10, 7],
-      [11, 7],
-      [10, 10],
-      [11, 10],
-      [16, 4],
-      [17, 4],
-      [16, 7],
-      [17, 7],
-      [16, 10],
-      [17, 10],
-    ];
-    for (let blockY = 0; blockY < Math.floor(MAP_HEIGHT / 15); blockY++) {
-      for (let blockX = 0; blockX < Math.floor(MAP_WIDTH / 20); blockX++) {
-        baseTables.forEach(([bx, by]) => {
-          const x = bx + blockX * 20;
-          const y = by + blockY * 15;
-          if (x >= 0 && x < MAP_WIDTH && y >= 0 && y < MAP_HEIGHT) {
-            data[y][x] = 2;
-          }
-        });
-      }
-    }
+    // Decoration layer (plants, no collision)
+    map.createLayer("decoration", tileset, 0, 0);
 
-    return data;
+    this.collisionLayers = [wallsLayer, furnitureLayer];
   }
 
   private setupZoom(): void {
     const cam = this.cameras.main;
-    const mapPixelW = MAP_WIDTH * this.tileSize;
-    const mapPixelH = MAP_HEIGHT * this.tileSize;
+    const mapPixelW = this.mapWidth * this.tileSize;
+    const mapPixelH = this.mapHeight * this.tileSize;
 
     let lastAppliedZoom = 1;
 
@@ -756,10 +710,12 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private isTileBlocked(tileX: number, tileY: number): boolean {
-    if (tileX < 0 || tileX >= MAP_WIDTH || tileY < 0 || tileY >= MAP_HEIGHT)
+    if (tileX < 0 || tileX >= this.mapWidth || tileY < 0 || tileY >= this.mapHeight)
       return true;
-    const tile = this.mapData[tileY][tileX];
-    return tile === 1 || tile === 2;
+    return this.collisionLayers.some((layer) => {
+      const tile = layer.getTileAt(tileX, tileY);
+      return tile !== null && tile.properties?.collides === true;
+    });
   }
 
   private checkCollision(
