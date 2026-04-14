@@ -129,22 +129,14 @@
         }
     }
 
-    async function handleFileChange(e: Event) {
-        const target = e.currentTarget as HTMLInputElement | null;
-        const file = target?.files?.[0];
-        if (!file) return;
-
-        imageError = "";
-
+    function processImageFile(file: File) {
         if (!file.type.startsWith("image/")) {
             imageError = "이미지 파일만 전송할 수 있습니다.";
-            target.value = "";
             return;
         }
 
         if (file.type === "image/gif" && file.size > MAX_CHAT_IMAGE_BYTES) {
             imageError = "GIF 이미지는 2MB 이하만 전송할 수 있습니다.";
-            target.value = "";
             return;
         }
 
@@ -153,27 +145,49 @@
             file.size > MAX_CHAT_IMAGE_SOURCE_BYTES
         ) {
             imageError = "이미지는 원본 10MB 이하 파일만 업로드할 수 있습니다.";
-            target.value = "";
             return;
         }
 
-        isSendingImage = true;
         try {
             const text = inputValue.trim();
-            await onSendImage(file, text || undefined);
+            onSendImage(file, text);
             inputValue = "";
             if (mobile) {
                 inputEl?.blur();
             }
-        } catch (error) {
-            imageError =
-                error instanceof Error
-                    ? error.message
-                    : "이미지 전송에 실패했습니다.";
+        } catch (err) {
+            console.error("이미지 업로드 중 오류 발생:", err);
+            imageError = "이미지 업로드에 실패했습니다. 다시 시도해주세요.";
         } finally {
             isSendingImage = false;
-            target.value = "";
         }
+    }
+
+    function handlePaste(e: ClipboardEvent) {
+        const items = e.clipboardData?.items;
+        if (!items) return;
+
+        for (const item of items) {
+            if (!item.type.startsWith("image/")) continue;
+            const file = item.getAsFile();
+            if (!file) return;
+
+            e.preventDefault();
+            processImageFile(file);
+            return;
+        }
+    }
+
+    async function handleFileChange(e: Event) {
+        const target = e.currentTarget as HTMLInputElement | null;
+        const file = target?.files?.[0];
+        if (!file) return;
+
+        imageError = "";
+
+        processImageFile(file);
+
+        isSendingImage = true;
     }
 </script>
 
@@ -216,6 +230,7 @@
                     onkeydown={handleKeydown}
                     onfocus={handleFocus}
                     onblur={handleBlur}
+                    onpaste={handlePaste}
                     disabled={isSendingImage}
                 />
             {/if}
