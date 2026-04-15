@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { ToggleGroup } from 'bits-ui'
-	import { currentStatus } from '$lib/stores/game'
+	import { gameState } from '$lib/stores/game.svelte'
 	import { network } from '$lib/network'
 	import type { PlayerStatus } from '$lib/types'
 
@@ -14,11 +14,11 @@
 <ToggleGroup.Root
 	type="single"
 	id="status-bar"
-	value={$currentStatus}
+	value={gameState.currentStatus}
 	onValueChange={(value) => {
 		if (value) {
 			const status = value as PlayerStatus
-			currentStatus.set(status)
+			gameState.currentStatus = status
 			network.sendStatus(status)
 		}
 	}}

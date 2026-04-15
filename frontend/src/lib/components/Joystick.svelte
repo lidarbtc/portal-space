@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { dpadDirection } from '$lib/stores/dpad'
+	import { dpadState } from '$lib/stores/dpad.svelte'
 	import type { Direction } from '$lib/types'
 
 	const BASE_SIZE = 120
@@ -48,7 +48,7 @@
 		visible = true
 		thumbX = 0
 		thumbY = 0
-		dpadDirection.set(null)
+		dpadState.direction = null
 	}
 
 	function handleTouchMove(e: TouchEvent) {
@@ -79,7 +79,7 @@
 			thumbY = dy
 		}
 
-		dpadDirection.set(getDirection(dx, dy))
+		dpadState.direction = getDirection(dx, dy)
 	}
 
 	function handleTouchEnd(e: TouchEvent) {
@@ -101,7 +101,7 @@
 		activeTouchId = null
 		thumbX = 0
 		thumbY = 0
-		dpadDirection.set(null)
+		dpadState.direction = null
 	}
 </script>
 

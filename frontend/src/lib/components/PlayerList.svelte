@@ -1,12 +1,12 @@
 <script lang="ts">
-	import { players, selfId } from '$lib/stores/game'
+	import { gameState } from '$lib/stores/game.svelte'
 	import { DEFAULT_COLORS } from '$lib/game/palette-swap'
 
 	let openDropdown: 'online' | 'away' | 'dnd' | null = $state(null)
 
-	let onlinePlayers = $derived([...$players.values()].filter((p) => p.status === 'online'))
-	let awayPlayers = $derived([...$players.values()].filter((p) => p.status === 'away'))
-	let dndPlayers = $derived([...$players.values()].filter((p) => p.status === 'dnd'))
+	let onlinePlayers = $derived([...gameState.players.values()].filter((p) => p.status === 'online'))
+	let awayPlayers = $derived([...gameState.players.values()].filter((p) => p.status === 'away'))
+	let dndPlayers = $derived([...gameState.players.values()].filter((p) => p.status === 'dnd'))
 
 	function toggle(group: 'online' | 'away' | 'dnd') {
 		openDropdown = openDropdown === group ? null : group
@@ -31,7 +31,7 @@
 		{#if openDropdown === 'online'}
 			<div class="player-dropdown">
 				{#each onlinePlayers as player (player.id)}
-					<div class="player-item" class:is-self={player.id === $selfId}>
+					<div class="player-item" class:is-self={player.id === gameState.selfId}>
 						<span
 							class="player-avatar-dot"
 							style="background: {player.colors?.body ?? DEFAULT_COLORS.body}"
@@ -54,7 +54,7 @@
 		{#if openDropdown === 'away'}
 			<div class="player-dropdown">
 				{#each awayPlayers as player (player.id)}
-					<div class="player-item" class:is-self={player.id === $selfId}>
+					<div class="player-item" class:is-self={player.id === gameState.selfId}>
 						<span
 							class="player-avatar-dot"
 							style="background: {player.colors?.body ?? DEFAULT_COLORS.body}"
@@ -77,7 +77,7 @@
 		{#if openDropdown === 'dnd'}
 			<div class="player-dropdown">
 				{#each dndPlayers as player (player.id)}
-					<div class="player-item" class:is-self={player.id === $selfId}>
+					<div class="player-item" class:is-self={player.id === gameState.selfId}>
 						<span
 							class="player-avatar-dot"
 							style="background: {player.colors?.body ?? DEFAULT_COLORS.body}"

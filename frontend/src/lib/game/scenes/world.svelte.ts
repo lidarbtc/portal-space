@@ -1,15 +1,8 @@
 import Phaser from 'phaser'
-import { get } from 'svelte/store'
+import { SvelteMap } from 'svelte/reactivity'
 import { network } from '$lib/network'
-import {
-	players,
-	selfId,
-	addChatMessage,
-	addSystemMessage,
-	currentStatus,
-	chatInputActive,
-} from '$lib/stores/game'
-import { dpadDirection } from '$lib/stores/dpad'
+import { gameState } from '$lib/stores/game.svelte'
+import { dpadState } from '$lib/stores/dpad.svelte'
 import { notifyAudio } from '$lib/audio'
 import { loadTileset } from '../tileset'
 import { createAvatarSpritesheet } from '../spritesheet'
@@ -17,17 +10,11 @@ import { createTintedSpritesheet } from '../palette-swap'
 import { resolveNicknameColor } from '$lib/utils/nickname-colors'
 import type { PlayerInfo, Direction, InteractiveObject, RegionalChatState } from '$lib/types'
 import { MAP_WIDTH, MAP_HEIGHT } from '$lib/types'
-import { zoomLevel, zoomIn, zoomOut, computeMinZoom, clampZoom } from '$lib/stores/zoom'
-import { interactiveObjects, nearbyObjectId } from '$lib/stores/objects'
-import { whiteboardOpen, currentBoardId } from '$lib/stores/whiteboard'
-import { anyModalOpen } from '$lib/stores/modal'
-import {
-	enterZone,
-	exitZone,
-	addRegionalMessage,
-	regionalChatSettingsOpen,
-	currentRegionalChatId,
-} from '$lib/stores/regional-chat'
+import { zoomState, computeMinZoom, clampZoom } from '$lib/stores/zoom.svelte'
+import { objectsState } from '$lib/stores/objects.svelte'
+import { whiteboardState } from '$lib/stores/whiteboard.svelte'
+import { modalState } from '$lib/stores/modal.svelte'
+import { regionalChatState } from '$lib/stores/regional-chat.svelte'
 import {
 	createInteractiveObject,
 	updateNearbyState,
@@ -68,7 +55,7 @@ export class WorldScene extends Phaser.Scene {
 	private entityContainer!: Phaser.GameObjects.Container
 	private localPlayerId: string | null = null
 	private tileSize = 16
-	private unsubscribers: Array<() => void> = []
+	private effectCleanups: Array<() => void> = []
 
 	private cursors!: Phaser.Types.Input.Keyboard.CursorKeys
 	private wasd!: {
@@ -120,8 +107,8 @@ export class WorldScene extends Phaser.Scene {
 			this.entityContainer.sort('y')
 		})
 
-		const currentPlayers = get(players)
-		const currentSelfId = get(selfId)
+		const currentPlayers = gameState.players
+		const currentSelfId = gameState.selfId
 		this.localPlayerId = currentSelfId
 
 		currentPlayers.forEach((info) => {
@@ -152,22 +139,25 @@ export class WorldScene extends Phaser.Scene {
 			Phaser.Input.Keyboard.KeyCodes.UP,
 			Phaser.Input.Keyboard.KeyCodes.DOWN,
 		]
-		const unsubModal = anyModalOpen.subscribe((v) => {
-			this.modalOpen = v
-			if (v) {
-				this.input.keyboard?.removeCapture(cursorCaptureCodes)
-			} else {
-				this.input.keyboard?.addCapture(cursorCaptureCodes)
-			}
-		})
-		this.unsubscribers.push(unsubModal)
+		this.effectCleanups.push(
+			$effect.root(() => {
+				$effect(() => {
+					this.modalOpen = modalState.anyModalOpen
+					if (this.modalOpen) {
+						this.input.keyboard?.removeCapture(cursorCaptureCodes)
+					} else {
+						this.input.keyboard?.addCapture(cursorCaptureCodes)
+					}
+				})
+			}),
+		)
 
 		this.setupNetwork()
 		this.setupZoom()
 		this.setupInteractiveObjects()
 
 		// Render objects already in store (from initial snapshot)
-		const currentObjects = get(interactiveObjects)
+		const currentObjects = objectsState.objects
 		currentObjects.forEach((obj, id) => {
 			if (!this.gameObjects.has(id)) {
 				const gameObj = createInteractiveObject(this, obj)
@@ -178,28 +168,35 @@ export class WorldScene extends Phaser.Scene {
 			}
 		})
 
-		const unsubSelfId = selfId.subscribe((id) => {
-			this.localPlayerId = id
-		})
-		this.unsubscribers.push(unsubSelfId)
+		this.effectCleanups.push(
+			$effect.root(() => {
+				$effect(() => {
+					this.localPlayerId = gameState.selfId
+				})
+			}),
+		)
 
-		const unsubPlayers = players.subscribe((currentMap) => {
-			currentMap.forEach((info, id) => {
-				if (!this.playerObjects.has(id)) {
-					this.addPlayer(info)
-				}
-			})
-			this.playerObjects.forEach((_, id) => {
-				if (!currentMap.has(id)) {
-					this.removePlayer(id)
-				}
-			})
-		})
-		this.unsubscribers.push(unsubPlayers)
+		this.effectCleanups.push(
+			$effect.root(() => {
+				$effect(() => {
+					const currentMap = gameState.players
+					currentMap.forEach((info, id) => {
+						if (!this.playerObjects.has(id)) {
+							this.addPlayer(info)
+						}
+					})
+					this.playerObjects.forEach((_, id) => {
+						if (!currentMap.has(id)) {
+							this.removePlayer(id)
+						}
+					})
+				})
+			}),
+		)
 
 		this.events.on('shutdown', () => {
-			this.unsubscribers.forEach((unsub) => unsub())
-			this.unsubscribers = []
+			this.effectCleanups.forEach((fn) => fn())
+			this.effectCleanups = []
 		})
 	}
 
@@ -235,23 +232,27 @@ export class WorldScene extends Phaser.Scene {
 
 		let lastAppliedZoom = 1
 
-		// Subscribe to zoom store — apply camera zoom on change
-		const unsubZoom = zoomLevel.subscribe((level) => {
-			const minZoom = computeMinZoom(cam.width, cam.height, mapPixelW, mapPixelH)
-			const clamped = clampZoom(level, minZoom)
+		// React to zoom store changes — apply camera zoom
+		this.effectCleanups.push(
+			$effect.root(() => {
+				$effect(() => {
+					const level = zoomState.level
+					const minZoom = computeMinZoom(cam.width, cam.height, mapPixelW, mapPixelH)
+					const clamped = clampZoom(level, minZoom)
 
-			if (clamped !== level) {
-				zoomLevel.set(clamped)
-				return
-			}
+					if (clamped !== level) {
+						zoomState.level = clamped
+						return
+					}
 
-			if (clamped !== lastAppliedZoom) {
-				this.tweens.killTweensOf(cam)
-				cam.setZoom(clamped)
-				lastAppliedZoom = clamped
-			}
-		})
-		this.unsubscribers.push(unsubZoom)
+					if (clamped !== lastAppliedZoom) {
+						this.tweens.killTweensOf(cam)
+						cam.setZoom(clamped)
+						lastAppliedZoom = clamped
+					}
+				})
+			}),
+		)
 
 		// Mouse wheel zoom
 		this.input.on(
@@ -262,33 +263,30 @@ export class WorldScene extends Phaser.Scene {
 				_deltaX: number,
 				deltaY: number,
 			) => {
-				if (deltaY < 0) zoomIn()
-				else if (deltaY > 0) zoomOut()
+				if (deltaY < 0) zoomState.zoomIn()
+				else if (deltaY > 0) zoomState.zoomOut()
 			},
 		)
 
 		// Recalculate min-zoom on viewport resize
 		const onResize = (gameSize: Phaser.Structs.Size) => {
 			const minZoom = computeMinZoom(gameSize.width, gameSize.height, mapPixelW, mapPixelH)
-			const current = get(zoomLevel)
+			const current = zoomState.level
 			const clamped = clampZoom(current, minZoom)
 			if (clamped !== current) {
-				zoomLevel.set(clamped)
+				zoomState.level = clamped
 			}
 		}
 		this.scale.on('resize', onResize)
-		this.unsubscribers.push(() => this.scale.off('resize', onResize))
+		this.effectCleanups.push(() => this.scale.off('resize', onResize))
 	}
 
 	private setupNetwork(): void {
 		network.on('join', (msg) => {
 			if (msg.player) {
 				this.addPlayer(msg.player)
-				players.update((m) => {
-					m.set(msg.player!.id, msg.player!)
-					return m
-				})
-				addSystemMessage(
+				gameState.players.set(msg.player.id, msg.player)
+				gameState.addSystemMessage(
 					msg.player.nickname + (msg.reconnect ? '님이 재접속했습니다.' : '님이 입장했습니다.'),
 				)
 			}
@@ -299,11 +297,8 @@ export class WorldScene extends Phaser.Scene {
 			const obj = this.playerObjects.get(msg.id)
 			const nickname = obj?.nickname ?? '알 수 없는 유저'
 			this.removePlayer(msg.id)
-			players.update((m) => {
-				m.delete(msg.id!)
-				return m
-			})
-			addSystemMessage(nickname + '님이 퇴장했습니다.')
+			gameState.players.delete(msg.id)
+			gameState.addSystemMessage(nickname + '님이 퇴장했습니다.')
 		})
 
 		network.on('move', (msg) => {
@@ -315,31 +310,25 @@ export class WorldScene extends Phaser.Scene {
 					p.dir = msg.dir ?? 'down'
 					this.updateCharacterFrame(p, p.dir)
 				}
-				players.update((m) => {
-					const info = m.get(msg.id!)
-					if (info) {
-						m.set(msg.id!, {
-							...info,
-							x: msg.x,
-							y: msg.y,
-							dir: msg.dir ?? 'down',
-						})
-					}
-					return m
-				})
+				const info = gameState.players.get(msg.id)
+				if (info) {
+					gameState.players.set(msg.id, {
+						...info,
+						x: msg.x,
+						y: msg.y,
+						dir: msg.dir ?? 'down',
+					})
+				}
 			}
 		})
 
 		network.on('status', (msg) => {
 			if (msg.id && msg.status) {
 				this.updatePlayerStatus(msg.id, msg.status)
-				players.update((m) => {
-					const p = m.get(msg.id!)
-					if (p) {
-						m.set(msg.id!, { ...p, status: msg.status! })
-					}
-					return m
-				})
+				const p = gameState.players.get(msg.id)
+				if (p) {
+					gameState.players.set(msg.id, { ...p, status: msg.status })
+				}
 			}
 		})
 
@@ -360,32 +349,32 @@ export class WorldScene extends Phaser.Scene {
 				msg.image && ALLOWED_CHAT_IMAGE_MIMES.has(msg.image.mime) ? msg.image : undefined
 
 			if (msg.id && msg.nickname && (msg.text || image)) {
-				if (msg.id !== this.localPlayerId && get(currentStatus) !== 'dnd') {
+				if (msg.id !== this.localPlayerId && gameState.currentStatus !== 'dnd') {
 					notifyAudio.playIfHidden()
 				}
 				// Zone enter/exit system messages
 				if (msg.isSystem && msg.zoneId) {
 					const text = msg.text || ''
 					if (msg.zoneEvent === 'enter') {
-						enterZone(msg.zoneId, msg.zoneName || '')
+						regionalChatState.enterZone(msg.zoneId, msg.zoneName || '')
 					} else if (msg.zoneEvent === 'exit') {
-						exitZone()
+						regionalChatState.exitZone()
 					}
 					// Add to regional messages
-					addRegionalMessage({ text, isSystem: true })
+					regionalChatState.addRegionalMessage({ text, isSystem: true })
 					return
 				}
 
 				// Regional chat message
 				if (msg.zoneId) {
-					if (msg.id !== this.localPlayerId && get(currentStatus) !== 'dnd') {
+					if (msg.id !== this.localPlayerId && gameState.currentStatus !== 'dnd') {
 						notifyAudio.playIfHidden()
 					}
 					if (msg.id && msg.nickname && (msg.text || image)) {
-						const senderColors = get(players).get(msg.id)?.colors
+						const senderColors = gameState.players.get(msg.id)?.colors
 						const bubbleText = image && msg.text ? `[사진] ${msg.text}` : (msg.text ?? '[사진]')
 						this.showChatBubble(msg.id, bubbleText, msg.nickname)
-						addRegionalMessage({
+						regionalChatState.addRegionalMessage({
 							senderId: msg.id,
 							nickname: msg.nickname,
 							nicknameColor: resolveNicknameColor(msg.id, senderColors),
@@ -397,14 +386,14 @@ export class WorldScene extends Phaser.Scene {
 				}
 
 				// Global chat message (existing behavior)
-				if (msg.id !== this.localPlayerId && get(currentStatus) !== 'dnd') {
+				if (msg.id !== this.localPlayerId && gameState.currentStatus !== 'dnd') {
 					notifyAudio.playIfHidden()
 				}
 				if (msg.id && msg.nickname && (msg.text || image)) {
-					const senderColors = get(players).get(msg.id)?.colors
+					const senderColors = gameState.players.get(msg.id)?.colors
 					const bubbleText = image && msg.text ? `[사진] ${msg.text}` : (msg.text ?? '[사진]')
 					this.showChatBubble(msg.id, bubbleText, msg.nickname)
-					addChatMessage({
+					gameState.addChatMessage({
 						senderId: msg.id,
 						nickname: msg.nickname,
 						nicknameColor: resolveNicknameColor(msg.id, senderColors),
@@ -442,17 +431,14 @@ export class WorldScene extends Phaser.Scene {
 				}
 
 				// Update players store (for PlayerList)
-				players.update((m) => {
-					const info = m.get(msg.id!)
-					if (info) {
-						m.set(msg.id!, {
-							...info,
-							nickname: msg.nickname ?? info.nickname,
-							colors: msg.player!.colors ?? info.colors,
-						})
-					}
-					return m
-				})
+				const info = gameState.players.get(msg.id)
+				if (info) {
+					gameState.players.set(msg.id, {
+						...info,
+						nickname: msg.nickname ?? info.nickname,
+						colors: msg.player.colors ?? info.colors,
+					})
+				}
 			})
 
 			network.on('dash', (msg) => {
@@ -473,7 +459,7 @@ export class WorldScene extends Phaser.Scene {
 				this.lastNetworkSendTime = 0
 				this.wasMoving = false
 
-				const newMap = new Map<string, PlayerInfo>()
+				const newMap = new SvelteMap<string, PlayerInfo>()
 				if (msg.players) {
 					msg.players.forEach((p) => {
 						newMap.set(p.id, p)
@@ -481,7 +467,7 @@ export class WorldScene extends Phaser.Scene {
 				}
 				if (msg.self) {
 					newMap.set(msg.self.id, msg.self)
-					selfId.set(msg.self.id)
+					gameState.selfId = msg.self.id
 					this.localPlayerId = msg.self.id
 
 					const localObj = this.playerObjects.get(msg.self.id)
@@ -489,11 +475,11 @@ export class WorldScene extends Phaser.Scene {
 						this.cameras.main.startFollow(localObj.container, true, 0.1, 0.1)
 					}
 				}
-				players.set(newMap)
+				gameState.players = newMap
 
 				// Load interactive objects from snapshot
 				if (msg.objects) {
-					const objMap = new Map<string, InteractiveObject>()
+					const objMap = new SvelteMap<string, InteractiveObject>()
 					msg.objects.forEach((obj) => {
 						objMap.set(obj.id, obj)
 						if (!this.gameObjects.has(obj.id)) {
@@ -504,7 +490,7 @@ export class WorldScene extends Phaser.Scene {
 							})
 						}
 					})
-					interactiveObjects.set(objMap)
+					objectsState.objects = objMap
 				}
 			})
 
@@ -544,10 +530,7 @@ export class WorldScene extends Phaser.Scene {
 				}
 
 				// Update interactiveObjects store
-				interactiveObjects.update((m) => {
-					m.set(ap.objectId!, gObj.data)
-					return m
-				})
+				objectsState.objects.set(ap.objectId, gObj.data)
 			})
 		})
 	}
@@ -885,6 +868,7 @@ export class WorldScene extends Phaser.Scene {
 
 		for (let i = 0; i < count; i++) {
 			this.time.delayedCall(delayPerGhost * (i + 1), () => {
+				if (!this.localPlayerId) return
 				const localPlayer = this.playerObjects.get(this.localPlayerId)
 				if (!localPlayer) return
 
@@ -938,13 +922,13 @@ export class WorldScene extends Phaser.Scene {
 			return
 		}
 
-		const dpad = get(dpadDirection)
+		const dpad = dpadState.direction
 		const activeEl = document.activeElement
 		const isTyping =
 			activeEl?.tagName === 'INPUT' ||
 			activeEl?.tagName === 'TEXTAREA' ||
 			(activeEl as HTMLElement)?.isContentEditable
-		if ((get(chatInputActive) || isTyping) && !dpad) return
+		if ((gameState.chatInputActive || isTyping) && !dpad) return
 
 		let dx = 0,
 			dy = 0
@@ -958,6 +942,7 @@ export class WorldScene extends Phaser.Scene {
 
 		// 방향 결정 (4방향만, X축 우선)
 		if (dx !== 0) {
+			dy = 0
 			dir = dx > 0 ? 'right' : 'left'
 		} else if (dy !== 0) {
 			dir = dy > 0 ? 'down' : 'up'
@@ -965,6 +950,8 @@ export class WorldScene extends Phaser.Scene {
 
 		if (!dir && dpad) {
 			dir = dpad
+			dx = dpad === 'left' ? -1 : dpad === 'right' ? 1 : 0
+			dy = dpad === 'up' ? -1 : dpad === 'down' ? 1 : 0
 		}
 
 		const isMovingNow = dir !== null
@@ -1041,35 +1028,29 @@ export class WorldScene extends Phaser.Scene {
 				this.lastNetworkSendTime = now
 				network.sendMove(newX, newY, effectiveDir)
 
-				players.update((m) => {
-					const info = m.get(this.localPlayerId!)
-					if (info) {
-						m.set(this.localPlayerId!, {
-							...info,
-							x: newX,
-							y: newY,
-							dir: effectiveDir,
-						})
-					}
-					return m
-				})
+				const info = gameState.players.get(this.localPlayerId!)
+				if (info) {
+					gameState.players.set(this.localPlayerId!, {
+						...info,
+						x: newX,
+						y: newY,
+						dir: effectiveDir,
+					})
+				}
 			}
 		} else if (!isMovingNow && !this.isDashing && this.wasMoving) {
 			// Movement ended — send final position immediately
 			network.sendMove(localPlayer.x, localPlayer.y, localPlayer.dir)
 
-			players.update((m) => {
-				const info = m.get(this.localPlayerId!)
-				if (info) {
-					m.set(this.localPlayerId!, {
-						...info,
-						x: localPlayer.x,
-						y: localPlayer.y,
-						dir: localPlayer.dir,
-					})
-				}
-				return m
-			})
+			const info = gameState.players.get(this.localPlayerId!)
+			if (info) {
+				gameState.players.set(this.localPlayerId!, {
+					...info,
+					x: localPlayer.x,
+					y: localPlayer.y,
+					dir: localPlayer.dir,
+				})
+			}
 		}
 
 		this.wasMoving = isMovingNow || this.isDashing
@@ -1086,33 +1067,37 @@ export class WorldScene extends Phaser.Scene {
 				activeEl?.tagName === 'INPUT' ||
 				activeEl?.tagName === 'TEXTAREA' ||
 				(activeEl as HTMLElement)?.isContentEditable
-			if (this.modalOpen || get(chatInputActive) || isTyping) return
+			if (this.modalOpen || gameState.chatInputActive || isTyping) return
 
-			const nearId = get(nearbyObjectId)
+			const nearId = objectsState.nearbyObjectId
 			if (nearId) {
 				const gObj = this.gameObjects.get(nearId)
 				if (gObj) this.onObjectInteract(gObj.data)
 			}
 		})
 
-		const unsubObjects = interactiveObjects.subscribe((objMap) => {
-			this.gameObjects.forEach((gObj, id) => {
-				if (!objMap.has(id)) {
-					destroyInteractiveObject(gObj)
-					this.gameObjects.delete(id)
-				}
-			})
-		})
-		this.unsubscribers.push(unsubObjects)
+		this.effectCleanups.push(
+			$effect.root(() => {
+				$effect(() => {
+					const objMap = objectsState.objects
+					this.gameObjects.forEach((gObj, id) => {
+						if (!objMap.has(id)) {
+							destroyInteractiveObject(gObj)
+							this.gameObjects.delete(id)
+						}
+					})
+				})
+			}),
+		)
 	}
 
 	private onObjectInteract(obj: InteractiveObject): void {
 		if (obj.type === 'whiteboard') {
-			currentBoardId.set(obj.id)
-			whiteboardOpen.set(true)
+			whiteboardState.currentBoardId = obj.id
+			whiteboardState.open = true
 		} else if (obj.type === 'regional_chat') {
-			currentRegionalChatId.set(obj.id)
-			regionalChatSettingsOpen.set(true)
+			regionalChatState.currentRegionalChatId = obj.id
+			regionalChatState.settingsOpen = true
 		}
 	}
 
@@ -1137,6 +1122,6 @@ export class WorldScene extends Phaser.Scene {
 			}
 		})
 
-		nearbyObjectId.set(closestId)
+		objectsState.nearbyObjectId = closestId
 	}
 }

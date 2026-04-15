@@ -4,7 +4,7 @@
 	import { toast } from 'svelte-sonner'
 	import { network } from '$lib/network'
 	import { DEFAULT_COLORS } from '$lib/game/palette-swap'
-	import { volume, muted } from '$lib/stores/settings'
+	import { settingsState } from '$lib/stores/settings.svelte'
 	import type { ColorPalette } from '$lib/types'
 	import { PersistedState } from 'runed'
 	import ColorCustomizer from './ColorCustomizer.svelte'
@@ -30,7 +30,7 @@
 		}
 	})
 
-	let volumePercent = $derived(Math.round($volume * 100))
+	let volumePercent = $derived(Math.round(settingsState.volume * 100))
 
 	function getCurrentColors(): ColorPalette {
 		return {
@@ -133,7 +133,7 @@
 										max={100}
 										step={1}
 										value={volumePercent}
-										onValueChange={(v) => volume.set(v / 100)}
+										onValueChange={(v) => (settingsState.volume = v / 100)}
 										class="volume-slider"
 									>
 										<Slider.Range class="volume-range" />
@@ -147,8 +147,8 @@
 								<div class="audio-toggle-row">
 									<label class="field-label">음소거</label>
 									<Switch.Root
-										checked={$muted}
-										onCheckedChange={(checked) => muted.set(checked)}
+										checked={settingsState.muted}
+										onCheckedChange={(checked) => (settingsState.muted = checked)}
 										class="mute-switch"
 									>
 										<Switch.Thumb class="mute-thumb" />

@@ -1,5 +1,6 @@
-import { connectionState } from './stores/connection'
-import { players, selfId, addSystemMessage } from './stores/game'
+import { SvelteMap } from 'svelte/reactivity'
+import { connectionState } from './stores/connection.svelte'
+import { gameState } from './stores/game.svelte'
 import { retryWithBackoff } from './utils/retry'
 import type {
 	MsgType,
@@ -71,7 +72,7 @@ class NetworkClient {
 
 			this.ws.onopen = () => {
 				this._connected = true
-				connectionState.set('connected')
+				connectionState.state = 'connected'
 				this.send({ type: 'join', nickname, colors, ...position })
 			}
 
@@ -122,7 +123,7 @@ class NetworkClient {
 					return
 				}
 
-				connectionState.set('disconnected')
+				connectionState.state = 'disconnected'
 				const handler = this.handlers.get('disconnect')
 				if (handler) (handler as DisconnectHandler)()
 			}
@@ -161,11 +162,11 @@ class NetworkClient {
 		}
 
 		this.reconnecting = true
-		connectionState.set('reconnecting')
+		connectionState.state = 'reconnecting'
 
 		const onReconnectSnapshot = (msg: OutgoingMessage) => {
 			// Build fresh players map — msg.players can be undefined when alone in room
-			const newMap = new Map<string, PlayerInfo>()
+			const newMap = new SvelteMap<string, PlayerInfo>()
 			if (msg.players) {
 				for (const p of msg.players) {
 					newMap.set(p.id, p)
@@ -174,13 +175,13 @@ class NetworkClient {
 			if (msg.self) {
 				newMap.set(msg.self.id, msg.self)
 			}
-			players.set(newMap)
+			gameState.players = newMap
 			if (msg.self) {
-				selfId.set(msg.self.id)
+				gameState.selfId = msg.self.id
 				this.lastX = msg.self.x
 				this.lastY = msg.self.y
 			}
-			addSystemMessage('재접속되었습니다.')
+			gameState.addSystemMessage('재접속되었습니다.')
 		}
 
 		const { promise, cancel } = retryWithBackoff(
@@ -199,13 +200,13 @@ class NetworkClient {
 			.then(() => {
 				this.reconnecting = false
 				this.cancelRetry = null
-				connectionState.set('connected')
+				connectionState.state = 'connected'
 			})
 			.catch(() => {
 				this.reconnecting = false
 				this.shouldReconnect = false
 				this.cancelRetry = null
-				connectionState.set('disconnected')
+				connectionState.state = 'disconnected'
 				const handler = this.handlers.get('disconnect')
 				if (handler) (handler as DisconnectHandler)()
 			})
@@ -226,7 +227,7 @@ class NetworkClient {
 			this.ws = null
 		}
 		this._connected = false
-		connectionState.set('disconnected')
+		connectionState.state = 'disconnected'
 	}
 
 	send(msg: IncomingMessage): boolean {

@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { WorldScene } from './scenes/world'
+import { WorldScene } from './scenes/world.svelte'
 
 export function createGameConfig(parent: HTMLElement): Phaser.Types.Core.GameConfig {
 	return {

@@ -1,13 +1,12 @@
-import { get } from 'svelte/store'
-import { volume, muted } from './stores/settings'
+import { settingsState } from './stores/settings.svelte'
 
 class NotifyAudio {
 	private audio: HTMLAudioElement | null = null
 	private lastPlay = 0
 
 	playIfHidden(): void {
-		const isMuted = get(muted)
-		const vol = get(volume)
+		const isMuted = settingsState.muted
+		const vol = settingsState.volume
 
 		if ((!document.hidden && document.hasFocus()) || isMuted || vol <= 0) return
 

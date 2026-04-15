@@ -1,16 +1,16 @@
 <script lang="ts">
-	import { dpadDirection } from '$lib/stores/dpad'
+	import { dpadState } from '$lib/stores/dpad.svelte'
 
 	function handleTouchStart(direction: 'up' | 'down' | 'left' | 'right') {
 		return (e: TouchEvent) => {
 			e.preventDefault()
-			dpadDirection.set(direction)
+			dpadState.direction = direction
 		}
 	}
 
 	function handleTouchEnd(e: TouchEvent) {
 		e.preventDefault()
-		dpadDirection.set(null)
+		dpadState.direction = null
 	}
 </script>
 

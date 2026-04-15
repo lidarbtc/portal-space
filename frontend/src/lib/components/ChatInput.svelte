@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { onMount } from 'svelte'
 	import { useEventListener } from 'runed'
-	import { chatInputActive } from '$lib/stores/game'
+	import { gameState } from '$lib/stores/game.svelte'
 	import { MAX_CHAT_IMAGE_BYTES } from '$lib/types'
-	import { activeChatTab, currentZoneId, currentZoneName } from '$lib/stores/regional-chat'
+	import { regionalChatState } from '$lib/stores/regional-chat.svelte'
 
 	let {
 		onSend,
@@ -25,23 +25,23 @@
 
 	const MAX_CHAT_IMAGE_SOURCE_BYTES = 10 * 1024 * 1024
 
-	let isInZone = $derived(!!$currentZoneId)
-	let isRegionalTab = $derived($activeChatTab === 'regional')
+	let isInZone = $derived(!!regionalChatState.currentZoneId)
+	let isRegionalTab = $derived(regionalChatState.activeChatTab === 'regional')
 	let isReadOnly = $derived(isInZone && !isRegionalTab)
 
 	onMount(() => {
 		if (mobile) {
-			chatInputActive.set(true)
+			gameState.chatInputActive = true
 		}
 	})
 
 	function handleFocus() {
-		chatInputActive.set(true)
+		gameState.chatInputActive = true
 	}
 
 	function handleBlur() {
 		if (!mobile) {
-			chatInputActive.set(false)
+			gameState.chatInputActive = false
 		}
 	}
 
@@ -65,7 +65,7 @@
 	)
 
 	function showInput() {
-		chatInputActive.set(true)
+		gameState.chatInputActive = true
 		requestAnimationFrame(() => {
 			inputEl?.focus()
 		})
@@ -77,7 +77,7 @@
 		if (alwaysActive) {
 			inputEl?.blur()
 		} else if (!mobile) {
-			chatInputActive.set(false)
+			gameState.chatInputActive = false
 		}
 	}
 
@@ -108,7 +108,7 @@
 
 	function handleGlobalKeydown(e: KeyboardEvent) {
 		if (mobile || alwaysActive) return
-		if (e.key === 'Enter' && !$chatInputActive) {
+		if (e.key === 'Enter' && !gameState.chatInputActive) {
 			e.preventDefault()
 			if (document.activeElement instanceof HTMLElement) {
 				document.activeElement.blur()
@@ -170,7 +170,7 @@
 <svelte:window onkeydown={handleGlobalKeydown} />
 
 <div id="chat-container" class:mobile>
-	{#if mobile || alwaysActive || $chatInputActive}
+	{#if mobile || alwaysActive || gameState.chatInputActive}
 		<div class="chat-input-row">
 			<button
 				class="chat-attach-btn"
@@ -189,7 +189,7 @@
 				onchange={handleFileChange}
 			/>
 			{#if isInZone && isRegionalTab}
-				<span class="zone-badge">{$currentZoneName}</span>
+				<span class="zone-badge">{regionalChatState.currentZoneName}</span>
 			{/if}
 			{#if isReadOnly}
 				<div class="chat-readonly-indicator">(읽기 전용)</div>

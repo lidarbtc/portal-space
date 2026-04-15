@@ -2,23 +2,15 @@
 	import { Dialog } from 'bits-ui'
 	import { onDestroy } from 'svelte'
 	import Konva from 'konva'
-	import {
-		whiteboardOpen,
-		currentBoardId,
-		currentTool,
-		penColor,
-		penWidth,
-		activeDoc,
-		type WhiteboardTool,
-	} from '$lib/stores/whiteboard'
-	import { selfId, players } from '$lib/stores/game'
-	import { get } from 'svelte/store'
+	import { whiteboardState, type WhiteboardTool } from '$lib/stores/whiteboard.svelte'
+	import { gameState } from '$lib/stores/game.svelte'
 	import { createWhiteboardDoc, type WhiteboardDoc } from '$lib/whiteboard/yjs-doc'
 	import {
 		bindYjsToKonva,
 		addShape,
 		removeShape,
 		generateShapeId,
+		type ShapeType,
 		type BindingHandle,
 	} from '$lib/whiteboard/konva-yjs-binding'
 	import {
@@ -145,14 +137,14 @@
 	}
 
 	function connectYjs(boardId: string) {
-		const myId = get(selfId)
-		const playerMap = get(players)
+		const myId = gameState.selfId
+		const playerMap = gameState.players
 		const myInfo = myId ? playerMap.get(myId) : null
 		const nickname = myInfo?.nickname ?? 'anonymous'
 		const color = myInfo?.colors?.body ?? '#6366f1'
 
 		doc = createWhiteboardDoc(boardId, nickname, color)
-		activeDoc.set(doc)
+		whiteboardState.activeDoc = doc
 
 		if (drawLayer) {
 			bindingHandle = bindYjsToKonva(
@@ -161,7 +153,7 @@
 				(id) => {
 					selectedShapeId = id
 				},
-				() => get(currentTool) === 'select',
+				() => whiteboardState.currentTool === 'select',
 				doc.provider,
 			)
 		}
@@ -179,7 +171,7 @@
 
 	function handlePointerDown(_e: Konva.KonvaEventObject<PointerEvent>) {
 		if (!doc || !drawLayer) return
-		const tool = get(currentTool)
+		const tool = whiteboardState.currentTool
 		const pt = getStagePoint()
 
 		if (tool === 'select') {
@@ -197,8 +189,8 @@
 					y: pt.y,
 					text,
 					fontSize: 18,
-					stroke: get(penColor),
-					strokeWidth: get(penWidth),
+					stroke: whiteboardState.penColor,
+					strokeWidth: whiteboardState.penWidth,
 				})
 			}
 			return
@@ -220,8 +212,8 @@
 			currentPoints = [pt.x, pt.y]
 			drawPreview = new Konva.Line({
 				points: currentPoints,
-				stroke: get(penColor),
-				strokeWidth: get(penWidth),
+				stroke: whiteboardState.penColor,
+				strokeWidth: whiteboardState.penWidth,
 				lineCap: 'round',
 				lineJoin: 'round',
 				tension: 0.3,
@@ -231,8 +223,8 @@
 			currentPoints = [pt.x, pt.y, pt.x, pt.y]
 			drawPreview = new Konva.Line({
 				points: currentPoints,
-				stroke: get(penColor),
-				strokeWidth: get(penWidth),
+				stroke: whiteboardState.penColor,
+				strokeWidth: whiteboardState.penWidth,
 				lineCap: 'round',
 			})
 			drawLayer.add(drawPreview)
@@ -242,8 +234,8 @@
 				y: pt.y,
 				width: 0,
 				height: 0,
-				stroke: get(penColor),
-				strokeWidth: get(penWidth),
+				stroke: whiteboardState.penColor,
+				strokeWidth: whiteboardState.penWidth,
 			})
 			drawLayer.add(drawPreview)
 		} else if (tool === 'circle') {
@@ -251,8 +243,8 @@
 				x: pt.x,
 				y: pt.y,
 				radius: 0,
-				stroke: get(penColor),
-				strokeWidth: get(penWidth),
+				stroke: whiteboardState.penColor,
+				strokeWidth: whiteboardState.penWidth,
 			})
 			drawLayer.add(drawPreview)
 		}
@@ -266,7 +258,7 @@
 		updateLocalCursor(doc.awareness, pt.x, pt.y)
 
 		if (!isDrawing || !drawPreview) return
-		const tool = get(currentTool)
+		const tool = whiteboardState.currentTool
 
 		if (tool === 'pen') {
 			currentPoints = [...currentPoints, pt.x, pt.y]
@@ -274,8 +266,8 @@
 			// Broadcast ephemeral drawing
 			updateLocalDrawing(doc.awareness, {
 				points: currentPoints,
-				color: get(penColor),
-				width: get(penWidth),
+				color: whiteboardState.penColor,
+				width: whiteboardState.penWidth,
 			})
 		} else if (tool === 'line') {
 			currentPoints = [shapeStartPos.x, shapeStartPos.y, pt.x, pt.y]
@@ -305,9 +297,9 @@
 		}
 		isDrawing = false
 
-		const tool = get(currentTool)
-		const color = get(penColor)
-		const width = get(penWidth)
+		const tool = whiteboardState.currentTool
+		const color = whiteboardState.penColor
+		const width = whiteboardState.penWidth
 		const endPt = getStagePoint()
 
 		// Remove preview
@@ -383,7 +375,7 @@
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
-		if (!$whiteboardOpen) return
+		if (!whiteboardState.open) return
 		if (e.key === ' ' && !e.repeat) {
 			e.preventDefault()
 			spaceHeld = true
@@ -402,7 +394,7 @@
 	}
 
 	function handleKeyup(e: KeyboardEvent) {
-		if (!$whiteboardOpen) return
+		if (!whiteboardState.open) return
 		if (e.key === ' ') {
 			spaceHeld = false
 			isPanning = false
@@ -417,25 +409,25 @@
 		cleanupAwareness = null
 		doc?.destroy()
 		doc = null
-		activeDoc.set(null)
+		whiteboardState.activeDoc = null
 		stage?.destroy()
 		stage = null
 		drawLayer = null
 		awarenessLayer = null
 		selectedShapeId = null
 
-		whiteboardOpen.set(false)
-		currentBoardId.set(null)
+		whiteboardState.open = false
+		whiteboardState.currentBoardId = null
 	}
 
 	$effect(() => {
-		const tool = $currentTool
+		const tool = whiteboardState.currentTool
 		bindingHandle?.setAllDraggable(tool === 'select')
 	})
 
 	$effect(() => {
-		const boardId = $currentBoardId
-		if (boardId && $whiteboardOpen && konvaContainer) {
+		const boardId = whiteboardState.currentBoardId
+		if (boardId && whiteboardState.open && konvaContainer) {
 			setTimeout(() => {
 				initKonva()
 				connectYjs(boardId)
@@ -454,7 +446,7 @@
 <svelte:window onkeydown={handleKeydown} onkeyup={handleKeyup} />
 
 <Dialog.Root
-	bind:open={$whiteboardOpen}
+	bind:open={whiteboardState.open}
 	onOpenChange={(open) => {
 		if (!open) close()
 	}}
@@ -475,8 +467,8 @@
 				{#each tools as tool (tool.id)}
 					<button
 						class="wb-tool-btn"
-						class:active={$currentTool === tool.id}
-						onclick={() => currentTool.set(tool.id)}>{tool.label}</button
+						class:active={whiteboardState.currentTool === tool.id}
+						onclick={() => (whiteboardState.currentTool = tool.id)}>{tool.label}</button
 					>
 				{/each}
 
@@ -485,9 +477,9 @@
 				{#each colors as color (color)}
 					<button
 						class="wb-color-btn"
-						class:selected={$penColor === color}
+						class:selected={whiteboardState.penColor === color}
 						style="background-color: {color}"
-						onclick={() => penColor.set(color)}
+						onclick={() => (whiteboardState.penColor = color)}
 						aria-label="색상 {color}"
 					></button>
 				{/each}
@@ -497,8 +489,8 @@
 				{#each widths as w (w)}
 					<button
 						class="wb-width-btn"
-						class:active={$penWidth === w}
-						onclick={() => penWidth.set(w)}
+						class:active={whiteboardState.penWidth === w}
+						onclick={() => (whiteboardState.penWidth = w)}
 						aria-label="펜 굵기 {w}px"
 					>
 						<div class="wb-width-dot" style="width: {w + 2}px; height: {w + 2}px"></div>

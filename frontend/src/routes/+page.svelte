@@ -12,11 +12,12 @@
 
 	import Joystick from '$lib/components/Joystick.svelte'
 	import { network } from '$lib/network'
-	import { players, selfId } from '$lib/stores/game'
-	import { connectionState } from '$lib/stores/connection'
-	import { isMobile } from '$lib/stores/mobile'
-	import { settingsModalOpen } from '$lib/stores/modal'
-	import { get } from 'svelte/store'
+	import { gameState } from '$lib/stores/game.svelte'
+	import { connectionState } from '$lib/stores/connection.svelte'
+	import { IsMobile } from '$lib/hooks/is-mobile.svelte'
+
+	const isMobile = new IsMobile()
+	import { modalState } from '$lib/stores/modal.svelte'
 	import { MAX_CHAT_IMAGE_BYTES, type OutgoingMessage, type ColorPalette } from '$lib/types'
 
 	let inGame = $state(false)
@@ -30,7 +31,7 @@
 	const CHAT_IMAGE_DEFAULT_QUALITY = 0.78
 
 	$effect(() => {
-		if ($isMobile) {
+		if (isMobile.current) {
 			isWideDesktop = false
 			return
 		}
@@ -45,7 +46,7 @@
 
 	// Lobby fallback: when connectionState becomes 'disconnected' while in game, return to lobby
 	$effect(() => {
-		if (inGame && $connectionState === 'disconnected') {
+		if (inGame && connectionState.state === 'disconnected') {
 			inGame = false
 			gameData = null
 		}
@@ -58,10 +59,9 @@
 	}
 
 	function handleChatSend(text: string) {
-		const id = get(selfId)
+		const id = gameState.selfId
 		if (!id) return
-		const currentPlayers = get(players)
-		const self = currentPlayers.get(id)
+		const self = gameState.players.get(id)
 		if (self) {
 			network.sendChat(text, self.x, self.y)
 		}
@@ -233,15 +233,14 @@
 	}
 
 	async function handleChatImageSend(file: File, text?: string) {
-		const id = get(selfId)
+		const id = gameState.selfId
 		if (!id) throw new Error('플레이어 정보를 찾을 수 없습니다.')
 
 		if (!file.type.startsWith('image/')) {
 			throw new Error('이미지 파일만 전송할 수 있습니다.')
 		}
 
-		const currentPlayers = get(players)
-		const self = currentPlayers.get(id)
+		const self = gameState.players.get(id)
 		if (!self) throw new Error('내 플레이어 정보를 찾을 수 없습니다.')
 
 		const processedFile = await preprocessChatImage(file)
@@ -261,10 +260,12 @@
 
 {#if !inGame}
 	<Lobby onJoin={handleJoin} />
-{:else if $isMobile}
+{:else if isMobile.current}
 	<div class="mobile-layout">
 		<div class="mobile-header">
-			<button class="mobile-settings-btn" onclick={() => ($settingsModalOpen = true)}> ⚙ </button>
+			<button class="mobile-settings-btn" onclick={() => (modalState.settingsOpen = true)}>
+				⚙
+			</button>
 		</div>
 		<div id="game-container" class="mobile-game">
 			<GameCanvas snapshot={gameData} />
@@ -281,7 +282,7 @@
 			<div id="game-container">
 				<GameCanvas snapshot={gameData} />
 			</div>
-			<ActionBar onOpenSettings={() => ($settingsModalOpen = true)} />
+			<ActionBar onOpenSettings={() => (modalState.settingsOpen = true)} />
 		</div>
 		<div class="chat-panel">
 			<PlayerList />
@@ -293,18 +294,18 @@
 	<div id="game-container">
 		<GameCanvas snapshot={gameData} />
 	</div>
-	<ActionBar onOpenSettings={() => ($settingsModalOpen = true)} />
+	<ActionBar onOpenSettings={() => (modalState.settingsOpen = true)} />
 	<ChatLog />
 	<ChatInput onSend={handleChatSend} onSendImage={handleChatImageSend} />
 {/if}
 
 {#if inGame}
-	<SettingsModal bind:open={$settingsModalOpen} />
+	<SettingsModal bind:open={modalState.settingsOpen} />
 	<Whiteboard />
 	<RegionalChatSettings />
 {/if}
 
-{#if inGame && $connectionState === 'reconnecting'}
+{#if inGame && connectionState.state === 'reconnecting'}
 	<div class="reconnect-overlay">
 		<div class="reconnect-message">
 			<span class="reconnect-spinner"></span>

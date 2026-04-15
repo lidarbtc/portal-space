@@ -1,14 +1,9 @@
 <script lang="ts">
 	import { SvelteMap, SvelteSet } from 'svelte/reactivity'
 	import { onDestroy } from 'svelte'
-	import { chatMessages } from '$lib/stores/game'
+	import { gameState } from '$lib/stores/game.svelte'
 	import type { ChatImage, ChatMessage } from '$lib/types'
-	import {
-		activeChatTab,
-		currentZoneId,
-		currentZoneName,
-		regionalMessages,
-	} from '$lib/stores/regional-chat'
+	import { regionalChatState } from '$lib/stores/regional-chat.svelte'
 	import type { ChatChannel } from '$lib/types'
 	import { parseTextWithUrls } from '$lib/utils/linkify'
 	import { AlertDialog } from 'bits-ui'
@@ -53,11 +48,13 @@
 	}
 
 	let displayMessages = $derived(
-		$activeChatTab === 'regional' && $currentZoneId ? $regionalMessages : $chatMessages,
+		regionalChatState.activeChatTab === 'regional' && regionalChatState.currentZoneId
+			? regionalChatState.regionalMessages
+			: gameState.chatMessages,
 	)
 
 	function switchTab(tab: ChatChannel) {
-		activeChatTab.set(tab)
+		regionalChatState.activeChatTab = tab
 	}
 
 	function formatTime(ts: number): string {
@@ -82,7 +79,7 @@
 	}
 
 	$effect(() => {
-		syncChatImageUrls($chatMessages)
+		syncChatImageUrls(gameState.chatMessages)
 	})
 
 	$effect(() => {
@@ -107,18 +104,18 @@
 <div class="chat-tab-bar">
 	<button
 		class="chat-tab"
-		class:active={$activeChatTab === 'global'}
+		class:active={regionalChatState.activeChatTab === 'global'}
 		onclick={() => switchTab('global')}
 	>
 		Global
 	</button>
-	{#if $currentZoneId}
+	{#if regionalChatState.currentZoneId}
 		<button
 			class="chat-tab"
-			class:active={$activeChatTab === 'regional'}
+			class:active={regionalChatState.activeChatTab === 'regional'}
 			onclick={() => switchTab('regional')}
 		>
-			{$currentZoneName ?? 'Regional'}
+			{regionalChatState.currentZoneName ?? 'Regional'}
 		</button>
 	{/if}
 </div>

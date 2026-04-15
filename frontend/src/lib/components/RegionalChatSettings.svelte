@@ -1,8 +1,7 @@
 <script lang="ts">
 	import { Dialog } from 'bits-ui'
-	import { get } from 'svelte/store'
-	import { regionalChatSettingsOpen, currentRegionalChatId } from '$lib/stores/regional-chat'
-	import { interactiveObjects } from '$lib/stores/objects'
+	import { regionalChatState } from '$lib/stores/regional-chat.svelte'
+	import { objectsState } from '$lib/stores/objects.svelte'
 	import { network } from '$lib/network'
 	import { toast } from 'svelte-sonner'
 	import type { RegionalChatState } from '$lib/types'
@@ -14,10 +13,9 @@
 	let tileDisplay = $derived(Math.round(radius / 16))
 
 	$effect(() => {
-		if ($regionalChatSettingsOpen && $currentRegionalChatId) {
-			const objectId = $currentRegionalChatId
-			const objects = get(interactiveObjects)
-			const obj = objects.get(objectId)
+		if (regionalChatState.settingsOpen && regionalChatState.currentRegionalChatId) {
+			const objectId = regionalChatState.currentRegionalChatId
+			const obj = objectsState.objects.get(objectId)
 			if (obj) {
 				const state = obj.state as RegionalChatState | undefined
 				name = state?.name ?? ''
@@ -28,21 +26,21 @@
 	})
 
 	function handleSave() {
-		const objectId = $currentRegionalChatId
+		const objectId = regionalChatState.currentRegionalChatId
 		if (!objectId) return
 		network.sendRegionalChatAction(objectId, { name, radius, retainHistory })
 		toast.success('결계석 설정이 저장되었습니다')
-		regionalChatSettingsOpen.set(false)
+		regionalChatState.settingsOpen = false
 	}
 
 	function handleClose() {
-		regionalChatSettingsOpen.set(false)
-		currentRegionalChatId.set(null)
+		regionalChatState.settingsOpen = false
+		regionalChatState.currentRegionalChatId = null
 	}
 </script>
 
 <Dialog.Root
-	bind:open={$regionalChatSettingsOpen}
+	bind:open={regionalChatState.settingsOpen}
 	onOpenChange={(open) => {
 		if (!open) handleClose()
 	}}

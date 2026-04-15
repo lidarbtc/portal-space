@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Dialog } from 'bits-ui'
 	import { network } from '$lib/network'
-	import { currentCustomStatus } from '$lib/stores/game'
+	import { gameState } from '$lib/stores/game.svelte'
 	import { MAX_CUSTOM_STATUS_LEN } from '$lib/types'
 
 	let { open = $bindable(false) }: { open: boolean } = $props()
@@ -10,19 +10,19 @@
 
 	$effect(() => {
 		if (open) {
-			statusInput = $currentCustomStatus
+			statusInput = gameState.currentCustomStatus
 		}
 	})
 
 	function handleSave() {
 		const trimmed = statusInput.trim()
-		currentCustomStatus.set(trimmed)
+		gameState.currentCustomStatus = trimmed
 		network.sendCustomStatus(trimmed)
 		open = false
 	}
 
 	function handleClear() {
-		currentCustomStatus.set('')
+		gameState.currentCustomStatus = ''
 		network.sendCustomStatus('')
 		open = false
 	}

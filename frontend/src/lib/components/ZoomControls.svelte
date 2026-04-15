@@ -1,22 +1,29 @@
 <script lang="ts">
-	import { zoomLevel, zoomIn, zoomOut, resetZoom, ZOOM_STEPS } from '$lib/stores/zoom'
+	import { zoomState, ZOOM_STEPS } from '$lib/stores/zoom.svelte'
 </script>
 
 <div class="zoom-controls">
-	<button class="zoom-btn" onclick={zoomOut} disabled={$zoomLevel <= ZOOM_STEPS[0]} title="줌 아웃">
-		&minus;
-	</button>
-	<span class="zoom-level">{$zoomLevel}x</span>
 	<button
 		class="zoom-btn"
-		onclick={zoomIn}
-		disabled={$zoomLevel >= ZOOM_STEPS[ZOOM_STEPS.length - 1]}
+		onclick={() => zoomState.zoomOut()}
+		disabled={zoomState.level <= ZOOM_STEPS[0]}
+		title="줌 아웃"
+	>
+		&minus;
+	</button>
+	<span class="zoom-level">{zoomState.level}x</span>
+	<button
+		class="zoom-btn"
+		onclick={() => zoomState.zoomIn()}
+		disabled={zoomState.level >= ZOOM_STEPS[ZOOM_STEPS.length - 1]}
 		title="줌 인"
 	>
 		+
 	</button>
-	{#if $zoomLevel !== 1}
-		<button class="zoom-reset" onclick={resetZoom} title="기본 줌으로 리셋"> 1x </button>
+	{#if zoomState.level !== 1}
+		<button class="zoom-reset" onclick={() => zoomState.resetZoom()} title="기본 줌으로 리셋">
+			1x
+		</button>
 	{/if}
 </div>
 

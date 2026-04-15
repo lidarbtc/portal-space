@@ -1,13 +1,15 @@
 <script lang="ts">
 	import ZoomControls from './ZoomControls.svelte'
-	import { isMobile } from '$lib/stores/mobile'
+	import { IsMobile } from '$lib/hooks/is-mobile.svelte'
+
+	const isMobile = new IsMobile()
 </script>
 
 <nav class="gnb">
 	<img src="/favicon.svg" alt="Portal Space" width="24" height="24" />
 	<span class="title">Portal Space</span>
 	<div class="spacer"></div>
-	{#if !$isMobile}
+	{#if !isMobile.current}
 		<ZoomControls />
 	{/if}
 	<a

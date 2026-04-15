@@ -3,9 +3,9 @@
 	import { onMount, onDestroy } from 'svelte'
 	import Phaser from 'phaser'
 	import { createGameConfig } from '$lib/game/config'
-	import { players, selfId, addSystemMessage } from '$lib/stores/game'
-	import { interactiveObjects } from '$lib/stores/objects'
-	import type { OutgoingMessage, InteractiveObject, PlayerInfo } from '$lib/types'
+	import { gameState } from '$lib/stores/game.svelte'
+	import { objectsState } from '$lib/stores/objects.svelte'
+	import type { OutgoingMessage, InteractiveObject } from '$lib/types'
 
 	let { snapshot }: { snapshot: OutgoingMessage | null } = $props()
 
@@ -16,21 +16,21 @@
 		// Initialize stores from snapshot data before creating game
 		if (snapshot) {
 			if (snapshot.self) {
-				selfId.set(snapshot.self.id)
-				const initial = new SvelteMap<string, PlayerInfo>()
+				gameState.selfId = snapshot.self.id
+				const initial = new SvelteMap<string, typeof snapshot.self>()
 				initial.set(snapshot.self.id, snapshot.self)
 				if (snapshot.players) {
 					snapshot.players.forEach((p) => initial.set(p.id, p))
 				}
-				players.set(initial)
-				addSystemMessage(snapshot.self.nickname + '님이 입장했습니다.')
+				gameState.players = initial
+				gameState.addSystemMessage(snapshot.self.nickname + '님이 입장했습니다.')
 			}
 
 			// Initialize interactive objects from snapshot
 			if (snapshot.objects) {
 				const objMap = new SvelteMap<string, InteractiveObject>()
 				snapshot.objects.forEach((obj) => objMap.set(obj.id, obj))
-				interactiveObjects.set(objMap)
+				objectsState.objects = objMap
 			}
 		}
 

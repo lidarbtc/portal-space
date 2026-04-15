@@ -1,11 +1,11 @@
 <script lang="ts">
 	import { ToggleGroup } from 'bits-ui'
-	import { currentStatus } from '$lib/stores/game'
+	import { gameState } from '$lib/stores/game.svelte'
 	import { network } from '$lib/network'
 	import type { PlayerStatus, Emoji } from '$lib/types'
 	import { CircleUserRound, SmilePlus, Settings } from '@lucide/svelte'
 	import CustomStatusModal from './CustomStatusModal.svelte'
-	import { customStatusModalOpen } from '$lib/stores/modal'
+	import { modalState } from '$lib/stores/modal.svelte'
 
 	let { onOpenSettings }: { onOpenSettings?: () => void } = $props()
 
@@ -34,7 +34,7 @@
 	function handleStatusChange(value: string | undefined) {
 		if (value) {
 			const status = value as PlayerStatus
-			currentStatus.set(status)
+			gameState.currentStatus = status
 			network.sendStatus(status)
 		}
 	}
@@ -64,7 +64,11 @@
 <div class="action-bar-wrapper" bind:this={containerEl}>
 	{#if openPanel === 'status'}
 		<div class="dropdown">
-			<ToggleGroup.Root type="single" value={$currentStatus} onValueChange={handleStatusChange}>
+			<ToggleGroup.Root
+				type="single"
+				value={gameState.currentStatus}
+				onValueChange={handleStatusChange}
+			>
 				{#each statuses as { key, label, color } (key)}
 					<ToggleGroup.Item value={key} class="dropdown-item status-item">
 						<span style="color: {color}">●</span>
@@ -76,7 +80,7 @@
 				class="dropdown-item custom-status-btn"
 				onclick={() => {
 					openPanel = null
-					$customStatusModalOpen = true
+					modalState.customStatusOpen = true
 				}}
 			>
 				✏️ 상태 설정
@@ -122,7 +126,7 @@
 	</div>
 </div>
 
-<CustomStatusModal bind:open={$customStatusModalOpen} />
+<CustomStatusModal bind:open={modalState.customStatusOpen} />
 
 <style>
 	.action-bar-wrapper {
