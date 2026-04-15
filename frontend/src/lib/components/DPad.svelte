@@ -1,16 +1,16 @@
 <script lang="ts">
-	import { dpadDirection } from '$lib/stores/dpad';
+	import { dpadDirection } from '$lib/stores/dpad'
 
 	function handleTouchStart(direction: 'up' | 'down' | 'left' | 'right') {
 		return (e: TouchEvent) => {
-			e.preventDefault();
-			dpadDirection.set(direction);
-		};
+			e.preventDefault()
+			dpadDirection.set(direction)
+		}
 	}
 
 	function handleTouchEnd(e: TouchEvent) {
-		e.preventDefault();
-		dpadDirection.set(null);
+		e.preventDefault()
+		dpadDirection.set(null)
 	}
 </script>
 
@@ -22,8 +22,8 @@
 			aria-label="Up"
 			ontouchstart={handleTouchStart('up')}
 			ontouchend={handleTouchEnd}
-			ontouchcancel={handleTouchEnd}
-		>▲</button>
+			ontouchcancel={handleTouchEnd}>▲</button
+		>
 		<div class="dpad-spacer"></div>
 	</div>
 	<div class="dpad-row">
@@ -32,16 +32,16 @@
 			aria-label="Left"
 			ontouchstart={handleTouchStart('left')}
 			ontouchend={handleTouchEnd}
-			ontouchcancel={handleTouchEnd}
-		>◄</button>
+			ontouchcancel={handleTouchEnd}>◄</button
+		>
 		<div class="dpad-spacer"></div>
 		<button
 			class="dpad-btn"
 			aria-label="Right"
 			ontouchstart={handleTouchStart('right')}
 			ontouchend={handleTouchEnd}
-			ontouchcancel={handleTouchEnd}
-		>►</button>
+			ontouchcancel={handleTouchEnd}>►</button
+		>
 	</div>
 	<div class="dpad-row">
 		<div class="dpad-spacer"></div>
@@ -50,8 +50,8 @@
 			aria-label="Down"
 			ontouchstart={handleTouchStart('down')}
 			ontouchend={handleTouchEnd}
-			ontouchcancel={handleTouchEnd}
-		>▼</button>
+			ontouchcancel={handleTouchEnd}>▼</button
+		>
 		<div class="dpad-spacer"></div>
 	</div>
 </div>

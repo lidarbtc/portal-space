@@ -1,61 +1,61 @@
-import { writable, derived } from 'svelte/store';
-import type { PlayerInfo, PlayerStatus, ChatImage, ChatMessage } from '$lib/types';
+import { writable, derived } from 'svelte/store'
+import type { PlayerInfo, PlayerStatus, ChatImage, ChatMessage } from '$lib/types'
 
 // Players map: id -> PlayerInfo
-export const players = writable<Map<string, PlayerInfo>>(new Map());
+export const players = writable<Map<string, PlayerInfo>>(new Map())
 
 // Local player ID
-export const selfId = writable<string | null>(null);
+export const selfId = writable<string | null>(null)
 
 // Derived player count
-export const playerCount = derived(players, ($players) => $players.size);
+export const playerCount = derived(players, ($players) => $players.size)
 
 // Chat messages (FIFO, max 50)
-const MAX_CHAT_MESSAGES = 50;
-export const chatMessages = writable<ChatMessage[]>([]);
+const MAX_CHAT_MESSAGES = 50
+export const chatMessages = writable<ChatMessage[]>([])
 
 export function addChatMessage({
-  senderId,
-  nickname,
-  nicknameColor,
-  text,
-  image,
+	senderId,
+	nickname,
+	nicknameColor,
+	text,
+	image,
 }: {
-  senderId?: string;
-  nickname: string;
-  nicknameColor?: string;
-  text?: string;
-  image?: ChatImage;
+	senderId?: string
+	nickname: string
+	nicknameColor?: string
+	text?: string
+	image?: ChatImage
 }): void {
-  if (!text && !image) return;
+	if (!text && !image) return
 
-  chatMessages.update((msgs) => {
-    const updated = [
-      ...msgs,
-      { senderId, nickname, nicknameColor, text, image, isSystem: false, timestamp: Date.now() }
-    ];
-    if (updated.length > MAX_CHAT_MESSAGES) {
-      return updated.slice(updated.length - MAX_CHAT_MESSAGES);
-    }
-    return updated;
-  });
+	chatMessages.update((msgs) => {
+		const updated = [
+			...msgs,
+			{ senderId, nickname, nicknameColor, text, image, isSystem: false, timestamp: Date.now() },
+		]
+		if (updated.length > MAX_CHAT_MESSAGES) {
+			return updated.slice(updated.length - MAX_CHAT_MESSAGES)
+		}
+		return updated
+	})
 }
 
 export function addSystemMessage(text: string): void {
-  chatMessages.update((msgs) => {
-    const updated = [...msgs, { text, isSystem: true, timestamp: Date.now() }];
-    if (updated.length > MAX_CHAT_MESSAGES) {
-      return updated.slice(updated.length - MAX_CHAT_MESSAGES);
-    }
-    return updated;
-  });
+	chatMessages.update((msgs) => {
+		const updated = [...msgs, { text, isSystem: true, timestamp: Date.now() }]
+		if (updated.length > MAX_CHAT_MESSAGES) {
+			return updated.slice(updated.length - MAX_CHAT_MESSAGES)
+		}
+		return updated
+	})
 }
 
 // Current status
-export const currentStatus = writable<PlayerStatus>('online');
+export const currentStatus = writable<PlayerStatus>('online')
 
 // Custom status text (session-only)
-export const currentCustomStatus = writable<string>('');
+export const currentCustomStatus = writable<string>('')
 
 // Chat input active state
-export const chatInputActive = writable(false);
+export const chatInputActive = writable(false)
