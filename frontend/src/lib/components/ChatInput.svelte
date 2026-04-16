@@ -50,7 +50,7 @@
 		'keydown',
 		(e: KeyboardEvent) => {
 			if (!alwaysActive) return
-			if (e.key !== 'j' && e.key !== 'J') return
+			if (e.key !== 'j' && e.key !== 'J' && e.key !== 'Enter') return
 			if (e.ctrlKey || e.metaKey || e.altKey) return
 			const el = document.activeElement
 			if (
@@ -61,6 +61,18 @@
 				return
 			e.preventDefault()
 			inputEl?.focus()
+		},
+	)
+
+	useEventListener(
+		() => document,
+		'pointerdown',
+		(e: PointerEvent) => {
+			if (!gameState.chatInputActive) return
+			const target = e.target as HTMLElement | null
+			if (!target?.closest('#game-container')) return
+
+			hideInput()
 		},
 	)
 
