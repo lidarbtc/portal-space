@@ -1,4 +1,4 @@
-.PHONY: dev build clean
+.PHONY: dev build clean test
 
 # Build SvelteKit, then Go binary
 build:
@@ -11,6 +11,10 @@ dev-go:
 
 dev-frontend:
 	cd frontend && bun run dev
+
+test:
+	go test ./...
+	cd frontend && bun run test
 
 clean:
 	rm -rf static/_app static/index.html static/favicon.ico static/env.js
