@@ -11,19 +11,34 @@ if (!portalCheck) {
 console.log("[deploy] Building frontend...");
 await $`cd frontend && bun run build`;
 
-// 2. 서버 시작
+// 2. 기존 3000 포트 프로세스 정리
+const existing = Bun.spawnSync(["lsof", "-ti:3000"]);
+const pids = existing.stdout.toString().trim();
+if (pids) {
+	console.log(`[deploy] Killing existing processes on port 3000 (PIDs: ${pids.replace(/\n/g, ", ")})...`);
+	for (const pid of pids.split("\n")) {
+		try { process.kill(Number(pid), 9); } catch {}
+	}
+	await Bun.sleep(500);
+}
+
+// 3. 서버 시작
 console.log("[deploy] Starting server...");
 const server = Bun.spawn(["bun", "run", "server/main.ts"], {
 	stdout: "inherit",
 	stderr: "inherit",
 });
 
-// 3. 포트 대기
+// 4. 포트 대기 (서버 프로세스 생존 확인 포함)
 console.log("[deploy] Waiting for port 3000...");
 const maxRetries = 50;
 for (let i = 0; i < maxRetries; i++) {
+	if (server.exitCode !== null) {
+		console.error(`Error: Server exited with code ${server.exitCode}`);
+		process.exit(1);
+	}
 	try {
-		const socket = await Bun.connect({
+		await Bun.connect({
 			hostname: "localhost",
 			port: 3000,
 			socket: {
@@ -45,9 +60,19 @@ for (let i = 0; i < maxRetries; i++) {
 	}
 }
 
-// 4. 터널 노출
+// 5. 터널 노출
 console.log("[deploy] Exposing via portal tunnel...");
-const portal = Bun.spawn(["portal", "expose", "3000", "--name", "space", "--discovery=true"], {
+const portal = Bun.spawn([
+	"portal", "expose", "3000",
+	"--name", "space",
+	"--discovery=true",
+	"--relays", "https://portal.1ncursio.dev",
+	"--description", "Portal Space — 2D pixel co-coding space",
+	"--tags", "collab,portal-space",
+	"--owner", "Portal Space",
+	"--thumbnail", "https://space.portal.1ncursio.dev/assets/og-image.jpg",
+	"--identity-path", "identity.json",
+], {
 	stdout: "inherit",
 	stderr: "inherit",
 });
