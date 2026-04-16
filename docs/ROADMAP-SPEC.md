@@ -1,5 +1,7 @@
 # Deep Interview Spec: Portal Space 로드맵
 
+> **Note (2026-04-16):** Go 백엔드는 Bun/TypeScript로 마이그레이션 완료됨. Go 참조는 역사적 맥락임.
+
 ## Metadata
 - Interview ID: di-roadmap-20260407
 - Rounds: 9

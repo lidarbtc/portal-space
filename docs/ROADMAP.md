@@ -1,5 +1,9 @@
 # Portal Space 로드맵 구현 계획 (v2 — Architect/Critic 피드백 반영)
 
+> **Note (2026-04-16):** Go 백엔드는 Bun/TypeScript로 마이그레이션 완료됨.
+> 이 문서의 Go 참조(`*.go`, Go 구조체 등)는 현재 `frontend/src/server/` 아래의 TypeScript 모듈에 대응합니다.
+> 새 구조: `protocol.ts`, `storage.ts`, `hub.ts`, `room.ts`, `client.ts`, `yjs-relay.ts`
+
 ## RALPLAN-DR Summary
 
 ### Principles

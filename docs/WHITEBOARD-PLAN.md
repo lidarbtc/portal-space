@@ -1,5 +1,8 @@
 # 화이트보드 Y.js + Konva.js 리팩터링 계획 (v2 — Architect/Critic 반영)
 
+> **Note (2026-04-16):** Go 백엔드는 Bun/TypeScript로 마이그레이션 완료됨.
+> Y.js 릴레이는 `frontend/src/server/yjs-relay.ts`에 구현되어 있음. Go 코드 참조는 역사적 맥락임.
+
 ## RALPLAN-DR Summary
 
 ### Principles

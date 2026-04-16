@@ -3,8 +3,8 @@ import adapter from '@sveltejs/adapter-static'
 export default {
 	kit: {
 		adapter: adapter({
-			pages: '../static',
-			assets: '../static',
+			pages: 'build',
+			assets: 'build',
 			fallback: 'index.html',
 		}),
 		paths: {
