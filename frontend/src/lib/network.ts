@@ -1,7 +1,7 @@
 import { SvelteMap } from 'svelte/reactivity'
+import { Effect, Schedule, Fiber, Duration } from 'effect'
 import { connectionState } from './stores/connection.svelte'
 import { gameState } from './stores/game.svelte'
-import { retryWithBackoff } from './utils/retry'
 import type {
 	MsgType,
 	IncomingMessage,
@@ -14,7 +14,9 @@ import type {
 	ActionMessage,
 	ChatImage,
 } from './types'
+import { parseOutgoingMessage } from './schemas/messages'
 import { DEFAULT_COLORS } from './game/palette-swap'
+import { WebSocketError, ConnectionTimeoutError } from './errors'
 
 type MessageHandler = (msg: OutgoingMessage) => void
 type DisconnectHandler = () => void
@@ -31,7 +33,7 @@ class NetworkClient {
 	private lastY = 0
 	private shouldReconnect = false
 	private reconnecting = false
-	private cancelRetry: (() => void) | null = null
+	private reconnectFiber: Fiber.RuntimeFiber<void, never> | null = null
 	private connectTimeoutId: ReturnType<typeof setTimeout> | undefined
 
 	connect(
@@ -78,7 +80,13 @@ class NetworkClient {
 
 			this.ws.onmessage = (event: MessageEvent) => {
 				try {
-					const msg: OutgoingMessage = JSON.parse(event.data)
+					const raw: unknown = JSON.parse(event.data)
+					const decoded = parseOutgoingMessage(raw)
+					if (decoded._tag === 'error') {
+						console.warn('[network] message decode error:', decoded.error.error)
+					}
+					// Use validated message if decode succeeded, fall back to raw for graceful degradation
+					const msg = (decoded._tag === 'ok' ? decoded.message : raw) as OutgoingMessage
 
 					if (msg.type === 'snapshot') {
 						if (!settled) {
@@ -99,7 +107,7 @@ class NetworkClient {
 					if (msg.type === 'error') {
 						if (!settled) {
 							settled = true
-							reject(new Error(msg.message))
+							reject(new WebSocketError(msg.message ?? 'Server error'))
 						}
 						return
 					}
@@ -131,7 +139,7 @@ class NetworkClient {
 			this.ws.onerror = () => {
 				if (!settled) {
 					settled = true
-					reject(new Error('WebSocket connection failed'))
+					reject(new WebSocketError('WebSocket connection failed'))
 				}
 			}
 
@@ -143,7 +151,7 @@ class NetworkClient {
 				this.connectTimeoutId = undefined
 				if (!settled) {
 					settled = true
-					reject(new Error('Connection timeout'))
+					reject(new ConnectionTimeoutError(5000))
 				}
 			}, 5000)
 		})
@@ -156,16 +164,17 @@ class NetworkClient {
 
 	private attemptReconnect(): void {
 		// Cancel any in-flight reconnect before starting new one
-		if (this.cancelRetry) {
-			this.cancelRetry()
-			this.cancelRetry = null
+		if (this.reconnectFiber) {
+			Effect.runSync(Fiber.interrupt(this.reconnectFiber))
+			this.reconnectFiber = null
 		}
 
 		this.reconnecting = true
 		connectionState.state = 'reconnecting'
 
+		// onReconnectSnapshot runs in browser event loop (WebSocket onmessage callback),
+		// NOT inside an Effect fiber — safe to mutate $state directly here.
 		const onReconnectSnapshot = (msg: OutgoingMessage) => {
-			// Build fresh players map — msg.players can be undefined when alone in room
 			const newMap = new SvelteMap<string, PlayerInfo>()
 			if (msg.players) {
 				for (const p of msg.players) {
@@ -184,41 +193,61 @@ class NetworkClient {
 			gameState.addSystemMessage('재접속되었습니다.')
 		}
 
-		const { promise, cancel } = retryWithBackoff(
-			() =>
+		// Effect.retry with exponential backoff + jitter, max 60s elapsed
+		const connectEffect = Effect.tryPromise({
+			try: () =>
 				this.connect(this.lastNickname, this.lastColors, onReconnectSnapshot, {
 					x: this.lastX,
 					y: this.lastY,
 					reconnect: true,
 				}),
-			{ baseDelay: 1000, maxDelay: 16000, maxElapsed: 60000 },
+			catch: (e) =>
+				e instanceof Error && e.message === 'Connection timeout'
+					? new ConnectionTimeoutError()
+					: new WebSocketError(e instanceof Error ? e.message : 'Unknown error'),
+		})
+
+		const retrySchedule = Schedule.intersect(
+			Schedule.exponential(Duration.seconds(1)).pipe(
+				Schedule.jittered,
+				Schedule.union(Schedule.spaced(Duration.seconds(16))),
+			),
+			Schedule.elapsed.pipe(Schedule.whileOutput(Duration.lessThan(Duration.seconds(60)))),
 		)
 
-		this.cancelRetry = cancel
+		const reconnectEffect = connectEffect.pipe(Effect.retry(retrySchedule))
 
-		promise
-			.then(() => {
-				this.reconnecting = false
-				this.cancelRetry = null
-				connectionState.state = 'connected'
-			})
-			.catch(() => {
-				this.reconnecting = false
-				this.shouldReconnect = false
-				this.cancelRetry = null
-				connectionState.state = 'disconnected'
-				const handler = this.handlers.get('disconnect')
-				if (handler) (handler as DisconnectHandler)()
-			})
+		// Store mutations at the Effect.runPromise boundary — not inside Effect pipeline
+		this.reconnectFiber = Effect.runFork(
+			reconnectEffect.pipe(
+				Effect.matchEffect({
+					onSuccess: (_msg) =>
+						Effect.sync(() => {
+							this.reconnecting = false
+							this.reconnectFiber = null
+							connectionState.state = 'connected'
+						}),
+					onFailure: () =>
+						Effect.sync(() => {
+							this.reconnecting = false
+							this.shouldReconnect = false
+							this.reconnectFiber = null
+							connectionState.state = 'disconnected'
+							const handler = this.handlers.get('disconnect')
+							if (handler) (handler as DisconnectHandler)()
+						}),
+				}),
+			),
+		)
 	}
 
 	/** Intentional disconnect — do not auto-reconnect */
 	disconnect(): void {
 		this.shouldReconnect = false
 		this.reconnecting = false
-		if (this.cancelRetry) {
-			this.cancelRetry()
-			this.cancelRetry = null
+		if (this.reconnectFiber) {
+			Effect.runSync(Fiber.interrupt(this.reconnectFiber))
+			this.reconnectFiber = null
 		}
 		if (this.ws) {
 			this.ws.onclose = () => {}

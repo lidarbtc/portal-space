@@ -4,7 +4,7 @@ import type { PlayerInfo, PlayerStatus, ChatImage, ChatMessage } from '$lib/type
 const MAX_CHAT_MESSAGES = 50
 
 export class GameStore {
-	players = new SvelteMap<string, PlayerInfo>()
+	players = $state(new SvelteMap<string, PlayerInfo>())
 	selfId = $state<string | null>(null)
 	chatMessages = $state<ChatMessage[]>([])
 	currentStatus = $state<PlayerStatus>('online')

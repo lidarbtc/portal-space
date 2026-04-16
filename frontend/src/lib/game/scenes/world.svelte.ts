@@ -402,136 +402,136 @@ export class WorldScene extends Phaser.Scene {
 					})
 				}
 			}
+		})
 
-			network.on('profile', (msg) => {
-				if (!msg.id || !msg.player) return
-				const p = this.playerObjects.get(msg.id)
-				if (!p) return
+		network.on('profile', (msg) => {
+			if (!msg.id || !msg.player) return
+			const p = this.playerObjects.get(msg.id)
+			if (!p) return
 
-				// Update nickname
-				if (msg.nickname) {
-					p.nickname = msg.nickname
-					p.nameText.setText(msg.nickname)
-					p.statusDot.setPosition(p.nameText.x - p.nameText.width / 2 + 8, p.nameText.y)
-				}
+			// Update nickname
+			if (msg.nickname) {
+				p.nickname = msg.nickname
+				p.nameText.setText(msg.nickname)
+				p.statusDot.setPosition(p.nameText.x - p.nameText.width / 2 + 8, p.nameText.y)
+			}
 
-				// Update colors — handle 'characters' -> 'player_' + id texture key transition
-				if (msg.player.colors) {
-					const newTextureKey = 'player_' + msg.id
-					createTintedSpritesheet(this, newTextureKey, msg.player.colors)
-					p.textureKey = newTextureKey
-					p.sprite.setTexture(newTextureKey)
-					const dirFrame: Record<Direction, number> = {
-						down: 0,
-						up: 1,
-						right: 2,
-						left: 3,
-					}
-					p.sprite.setFrame(dirFrame[p.dir] ?? 0)
-				}
-
-				// Update players store (for PlayerList)
-				const info = gameState.players.get(msg.id)
-				if (info) {
-					gameState.players.set(msg.id, {
-						...info,
-						nickname: msg.nickname ?? info.nickname,
-						colors: msg.player.colors ?? info.colors,
-					})
-				}
-			})
-
-			network.on('dash', (msg) => {
-				if (!msg.id || msg.id === this.localPlayerId) return
-				const p = this.playerObjects.get(msg.id)
-				if (!p) return
-				const dir = (msg.dir as Direction) ?? 'down'
+			// Update colors — handle 'characters' -> 'player_' + id texture key transition
+			if (msg.player.colors) {
+				const newTextureKey = 'player_' + msg.id
+				createTintedSpritesheet(this, newTextureKey, msg.player.colors)
+				p.textureKey = newTextureKey
+				p.sprite.setTexture(newTextureKey)
 				const dirFrame: Record<Direction, number> = {
 					down: 0,
 					up: 1,
 					right: 2,
 					left: 3,
 				}
-				this.spawnDashAfterimages(msg.x, msg.y, dir, p.textureKey, dirFrame[dir])
-			})
+				p.sprite.setFrame(dirFrame[p.dir] ?? 0)
+			}
 
-			network.on('snapshot', (msg) => {
-				this.lastNetworkSendTime = 0
-				this.wasMoving = false
+			// Update players store (for PlayerList)
+			const info = gameState.players.get(msg.id)
+			if (info) {
+				gameState.players.set(msg.id, {
+					...info,
+					nickname: msg.nickname ?? info.nickname,
+					colors: msg.player.colors ?? info.colors,
+				})
+			}
+		})
 
-				const newMap = new SvelteMap<string, PlayerInfo>()
-				if (msg.players) {
-					msg.players.forEach((p) => {
-						newMap.set(p.id, p)
-					})
+		network.on('dash', (msg) => {
+			if (!msg.id || msg.id === this.localPlayerId) return
+			const p = this.playerObjects.get(msg.id)
+			if (!p) return
+			const dir = (msg.dir as Direction) ?? 'down'
+			const dirFrame: Record<Direction, number> = {
+				down: 0,
+				up: 1,
+				right: 2,
+				left: 3,
+			}
+			this.spawnDashAfterimages(msg.x, msg.y, dir, p.textureKey, dirFrame[dir])
+		})
+
+		network.on('snapshot', (msg) => {
+			this.lastNetworkSendTime = 0
+			this.wasMoving = false
+
+			const newMap = new SvelteMap<string, PlayerInfo>()
+			if (msg.players) {
+				msg.players.forEach((p) => {
+					newMap.set(p.id, p)
+				})
+			}
+			if (msg.self) {
+				newMap.set(msg.self.id, msg.self)
+				gameState.selfId = msg.self.id
+				this.localPlayerId = msg.self.id
+
+				const localObj = this.playerObjects.get(msg.self.id)
+				if (localObj) {
+					this.cameras.main.startFollow(localObj.container, true, 0.1, 0.1)
 				}
-				if (msg.self) {
-					newMap.set(msg.self.id, msg.self)
-					gameState.selfId = msg.self.id
-					this.localPlayerId = msg.self.id
+			}
+			gameState.players = newMap
 
-					const localObj = this.playerObjects.get(msg.self.id)
-					if (localObj) {
-						this.cameras.main.startFollow(localObj.container, true, 0.1, 0.1)
+			// Load interactive objects from snapshot
+			if (msg.objects) {
+				const objMap = new SvelteMap<string, InteractiveObject>()
+				msg.objects.forEach((obj) => {
+					objMap.set(obj.id, obj)
+					if (!this.gameObjects.has(obj.id)) {
+						const gameObj = createInteractiveObject(this, obj)
+						this.gameObjects.set(obj.id, gameObj)
+						gameObj.container.on('pointerdown', () => {
+							this.onObjectInteract(obj)
+						})
 					}
-				}
-				gameState.players = newMap
+				})
+				objectsState.objects = objMap
+			}
+		})
 
-				// Load interactive objects from snapshot
-				if (msg.objects) {
-					const objMap = new SvelteMap<string, InteractiveObject>()
-					msg.objects.forEach((obj) => {
-						objMap.set(obj.id, obj)
-						if (!this.gameObjects.has(obj.id)) {
-							const gameObj = createInteractiveObject(this, obj)
-							this.gameObjects.set(obj.id, gameObj)
-							gameObj.container.on('pointerdown', () => {
-								this.onObjectInteract(obj)
-							})
-						}
-					})
-					objectsState.objects = objMap
-				}
-			})
+		network.on('action', (msg) => {
+			const ap = msg.actionPayload
+			if (!ap || ap.domain !== 'regional_chat' || ap.action !== 'state_updated') return
+			if (!ap.objectId) return
 
-			network.on('action', (msg) => {
-				const ap = msg.actionPayload
-				if (!ap || ap.domain !== 'regional_chat' || ap.action !== 'state_updated') return
-				if (!ap.objectId) return
+			const gObj = this.gameObjects.get(ap.objectId)
+			if (!gObj || gObj.data.type !== 'regional_chat') return
 
-				const gObj = this.gameObjects.get(ap.objectId)
-				if (!gObj || gObj.data.type !== 'regional_chat') return
+			const newState = ap.payload as RegionalChatState | undefined
+			if (!newState) return
 
-				const newState = ap.payload as RegionalChatState | undefined
-				if (!newState) return
+			// Update stored data
+			gObj.data = { ...gObj.data, state: newState }
 
-				// Update stored data
-				gObj.data = { ...gObj.data, state: newState }
+			// Redraw zone fill circle
+			if (gObj.zoneCircle) {
+				gObj.zoneCircle.clear()
+				gObj.zoneCircle.fillStyle(0x06b6d4, 0.08)
+				gObj.zoneCircle.fillCircle(0, 0, newState.radius)
+			}
 
-				// Redraw zone fill circle
-				if (gObj.zoneCircle) {
-					gObj.zoneCircle.clear()
-					gObj.zoneCircle.fillStyle(0x06b6d4, 0.08)
-					gObj.zoneCircle.fillCircle(0, 0, newState.radius)
-				}
+			// Redraw stroke circle (keep current alpha for tween)
+			if (gObj.zoneStroke) {
+				const currentAlpha = gObj.zoneStroke.alpha
+				gObj.zoneStroke.clear()
+				gObj.zoneStroke.lineStyle(2, 0x06b6d4, 0.3)
+				gObj.zoneStroke.strokeCircle(0, 0, newState.radius)
+				gObj.zoneStroke.setAlpha(currentAlpha)
+			}
 
-				// Redraw stroke circle (keep current alpha for tween)
-				if (gObj.zoneStroke) {
-					const currentAlpha = gObj.zoneStroke.alpha
-					gObj.zoneStroke.clear()
-					gObj.zoneStroke.lineStyle(2, 0x06b6d4, 0.3)
-					gObj.zoneStroke.strokeCircle(0, 0, newState.radius)
-					gObj.zoneStroke.setAlpha(currentAlpha)
-				}
+			// Update label text
+			if (gObj.zoneLabel) {
+				gObj.zoneLabel.setText(newState.name)
+			}
 
-				// Update label text
-				if (gObj.zoneLabel) {
-					gObj.zoneLabel.setText(newState.name)
-				}
-
-				// Update interactiveObjects store
-				objectsState.objects.set(ap.objectId, gObj.data)
-			})
+			// Update interactiveObjects store
+			objectsState.objects.set(ap.objectId, gObj.data)
 		})
 	}
 
