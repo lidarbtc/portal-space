@@ -13,7 +13,7 @@ import type {
 	ColorPalette,
 	ActionMessage,
 	ChatImage,
-} from './types'
+} from '@shared/types'
 import { parseOutgoingMessage } from './schemas/messages'
 import { DEFAULT_COLORS } from './game/palette-swap'
 import { WebSocketError, ConnectionTimeoutError } from './errors'
