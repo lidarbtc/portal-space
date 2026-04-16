@@ -161,8 +161,16 @@ const tiledMap = {
 			tiles: [
 				{ id: 0, type: 'floor' },
 				{ id: 1, type: 'plant' },
-				{ id: 2, type: 'table', properties: [{ name: 'collides', type: 'bool', value: true }] },
-				{ id: 3, type: 'wall', properties: [{ name: 'collides', type: 'bool', value: true }] },
+				{
+					id: 2,
+					type: 'table',
+					properties: [{ name: 'collides', type: 'bool', value: true }],
+				},
+				{
+					id: 3,
+					type: 'wall',
+					properties: [{ name: 'collides', type: 'bool', value: true }],
+				},
 			],
 		},
 	],

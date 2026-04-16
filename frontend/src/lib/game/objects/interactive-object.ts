@@ -39,7 +39,12 @@ export function createInteractiveObject(
 			sprite.strokeRect(-TILE_SIZE, -TILE_SIZE * 2, TILE_SIZE * 2, TILE_SIZE * 3)
 			// Inner white area
 			sprite.fillStyle(0xffffff, 0.9)
-			sprite.fillRect(-TILE_SIZE + 4, -TILE_SIZE * 2 + 4, TILE_SIZE * 2 - 8, TILE_SIZE * 3 - 8)
+			sprite.fillRect(
+				-TILE_SIZE + 4,
+				-TILE_SIZE * 2 + 4,
+				TILE_SIZE * 2 - 8,
+				TILE_SIZE * 3 - 8,
+			)
 		}
 		container.add(sprite)
 	}
@@ -95,7 +100,12 @@ export function createInteractiveObject(
 	const highlight = scene.add.graphics()
 	if (obj.type === 'whiteboard') {
 		highlight.lineStyle(2, 0xfbbf24, 0.8)
-		highlight.strokeRect(-TILE_SIZE - 2, -TILE_SIZE * 2 - 2, TILE_SIZE * 2 + 4, TILE_SIZE * 3 + 4)
+		highlight.strokeRect(
+			-TILE_SIZE - 2,
+			-TILE_SIZE * 2 - 2,
+			TILE_SIZE * 2 + 4,
+			TILE_SIZE * 3 + 4,
+		)
 	}
 	// regional_chat uses preFX glow on the sprite instead of Graphics highlight
 	highlight.setVisible(false)

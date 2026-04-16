@@ -47,7 +47,10 @@ class NetworkClient {
 			if (this.ws) {
 				this.ws.onclose = () => {}
 				this.ws.onerror = () => {}
-				if (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING) {
+				if (
+					this.ws.readyState === WebSocket.OPEN ||
+					this.ws.readyState === WebSocket.CONNECTING
+				) {
 					this.ws.close()
 				}
 				this.ws = null

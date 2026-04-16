@@ -32,7 +32,15 @@ export class GameStore {
 
 		const updated = [
 			...this.chatMessages,
-			{ senderId, nickname, nicknameColor, text, image, isSystem: false, timestamp: Date.now() },
+			{
+				senderId,
+				nickname,
+				nicknameColor,
+				text,
+				image,
+				isSystem: false,
+				timestamp: Date.now(),
+			},
 		]
 		if (updated.length > MAX_CHAT_MESSAGES) {
 			this.chatMessages = updated.slice(updated.length - MAX_CHAT_MESSAGES)

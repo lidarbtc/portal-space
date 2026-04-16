@@ -98,7 +98,12 @@ export class WorldScene extends Phaser.Scene {
 		createAvatarSpritesheet(this)
 		this.createMap()
 
-		this.cameras.main.setBounds(0, 0, this.mapWidth * this.tileSize, this.mapHeight * this.tileSize)
+		this.cameras.main.setBounds(
+			0,
+			0,
+			this.mapWidth * this.tileSize,
+			this.mapHeight * this.tileSize,
+		)
 
 		// Declarative y-sort layer: all y-sortable entities go here
 		this.entityContainer = this.add.container(0, 0)
@@ -287,7 +292,8 @@ export class WorldScene extends Phaser.Scene {
 				this.addPlayer(msg.player)
 				gameState.players.set(msg.player.id, msg.player)
 				gameState.addSystemMessage(
-					msg.player.nickname + (msg.reconnect ? '님이 재접속했습니다.' : '님이 입장했습니다.'),
+					msg.player.nickname +
+						(msg.reconnect ? '님이 재접속했습니다.' : '님이 입장했습니다.'),
 				)
 			}
 		})
@@ -372,7 +378,8 @@ export class WorldScene extends Phaser.Scene {
 					}
 					if (msg.id && msg.nickname && (msg.text || image)) {
 						const senderColors = gameState.players.get(msg.id)?.colors
-						const bubbleText = image && msg.text ? `[사진] ${msg.text}` : (msg.text ?? '[사진]')
+						const bubbleText =
+							image && msg.text ? `[사진] ${msg.text}` : (msg.text ?? '[사진]')
 						this.showChatBubble(msg.id, bubbleText, msg.nickname)
 						regionalChatState.addRegionalMessage({
 							senderId: msg.id,
@@ -391,7 +398,8 @@ export class WorldScene extends Phaser.Scene {
 				}
 				if (msg.id && msg.nickname && (msg.text || image)) {
 					const senderColors = gameState.players.get(msg.id)?.colors
-					const bubbleText = image && msg.text ? `[사진] ${msg.text}` : (msg.text ?? '[사진]')
+					const bubbleText =
+						image && msg.text ? `[사진] ${msg.text}` : (msg.text ?? '[사진]')
 					this.showChatBubble(msg.id, bubbleText, msg.nickname)
 					gameState.addChatMessage({
 						senderId: msg.id,
@@ -571,7 +579,9 @@ export class WorldScene extends Phaser.Scene {
 			.setResolution(1)
 
 		const statusDot = this.add.graphics()
-		const dotColor = Phaser.Display.Color.HexStringToColor(this.getStatusColor(info.status)).color
+		const dotColor = Phaser.Display.Color.HexStringToColor(
+			this.getStatusColor(info.status),
+		).color
 		statusDot.fillStyle(dotColor, 1)
 		statusDot.fillCircle(0, 0, 3)
 		statusDot.setPosition(-nameText.width / 2 + 8, -this.tileSize / 2 - 14)

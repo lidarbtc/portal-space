@@ -49,7 +49,11 @@ export function createTintedSpritesheet(
 			g = data[i + 1],
 			b = data[i + 2]
 
-		if (r === SOURCE_COLORS.body.r && g === SOURCE_COLORS.body.g && b === SOURCE_COLORS.body.b) {
+		if (
+			r === SOURCE_COLORS.body.r &&
+			g === SOURCE_COLORS.body.g &&
+			b === SOURCE_COLORS.body.b
+		) {
 			data[i] = targetBody.r
 			data[i + 1] = targetBody.g
 			data[i + 2] = targetBody.b
@@ -112,7 +116,11 @@ export function createPreviewCanvas(
 			g = data[i + 1],
 			b = data[i + 2]
 
-		if (r === SOURCE_COLORS.body.r && g === SOURCE_COLORS.body.g && b === SOURCE_COLORS.body.b) {
+		if (
+			r === SOURCE_COLORS.body.r &&
+			g === SOURCE_COLORS.body.g &&
+			b === SOURCE_COLORS.body.b
+		) {
 			data[i] = targetBody.r
 			data[i + 1] = targetBody.g
 			data[i + 2] = targetBody.b
