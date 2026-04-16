@@ -51,10 +51,10 @@ cd portal-space/frontend && bun install
 
 ```bash
 # 터미널 1: Bun WebSocket 서버 (포트 3001)
-make dev-server
+bun run dev:server
 
 # 터미널 2: Vite 프론트엔드 개발 서버
-make dev-frontend
+bun run dev:frontend
 ```
 
 Vite가 `/ws`, `/peer` 요청을 `localhost:3001`로 프록시합니다.
@@ -64,7 +64,7 @@ Vite가 `/ws`, `/peer` 요청을 `localhost:3001`로 프록시합니다.
 SvelteKit을 정적 빌드합니다.
 
 ```bash
-make build
+bun run build
 ```
 
 ### 프로덕션 실행
@@ -80,10 +80,10 @@ bun run server.ts
 Portal Tunnel로 공개 URL을 생성합니다.
 
 ```bash
-./deploy.sh
+bun run deploy
 ```
 
-내부적으로 `make build` 후 Bun 서버를 시작하고 `portal expose`로 공개합니다.
+내부적으로 프론트엔드 빌드 후 Bun 서버를 시작하고 `portal expose`로 공개합니다.
 
 ```bash
 # 또는 수동으로:
@@ -96,8 +96,8 @@ portal expose 3000 --name "my-space" --discovery=true
 
 ```
 portal-space/
-├── Makefile
-├── deploy.sh
+├── scripts/
+│   └── deploy.ts              # 배포 스크립트 (빌드 + 서버 + 터널)
 ├── frontend/
 │   ├── server.ts              # Bun HTTP/WebSocket 서버 진입점
 │   ├── src/
