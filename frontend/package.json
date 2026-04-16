@@ -1,30 +1,52 @@
 {
-  "name": "portal-space-frontend",
-  "version": "0.0.1",
-  "private": true,
-  "scripts": {
-    "dev": "vite dev --port 5173",
-    "build": "vite build",
-    "preview": "vite preview",
-    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json"
-  },
-  "devDependencies": {
-    "@sveltejs/adapter-static": "^3.0.0",
-    "@sveltejs/kit": "^2.0.0",
-    "svelte": "^5.0.0",
-    "svelte-check": "^4.0.0",
-    "typescript": "^6.0.0",
-    "vite": "^8.0.0"
-  },
-  "dependencies": {
-    "@lucide/svelte": "^1.7.0",
-    "bits-ui": "^2.16.5",
-    "konva": "^10.2.3",
-    "phaser": "^3.80.0",
-    "runed": "^0.37.1",
-    "svelte-sonner": "^1.1.0",
-    "y-websocket": "^3.0.0",
-    "yjs": "^13.6.30"
-  },
-  "type": "module"
+	"name": "portal-space-frontend",
+	"version": "0.0.1",
+	"private": true,
+	"scripts": {
+		"build:tileset": "bun run scripts/build-tileset.ts",
+		"dev": "bun run build:tileset && vite dev --port 5173",
+		"build": "bun run build:tileset && vite build",
+		"preview": "vite preview",
+		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"lint": "prettier --check . && eslint .",
+		"format": "prettier --write .",
+		"prepare": "cd .. && husky frontend/.husky"
+	},
+	"lint-staged": {
+		"*.{js,ts,svelte,html,css,json}": "prettier --write",
+		"*.{js,ts,svelte}": "eslint --fix"
+	},
+	"devDependencies": {
+		"@eslint/compat": "^2.0.4",
+		"@eslint/js": "^10.0.1",
+		"@sveltejs/adapter-static": "^3.0.0",
+		"@sveltejs/kit": "^2.0.0",
+		"@types/node": "^22",
+		"@types/pngjs": "^6.0.5",
+		"eslint": "^10.2.0",
+		"eslint-config-prettier": "^10.1.8",
+		"eslint-plugin-svelte": "^3.17.0",
+		"globals": "^17.4.0",
+		"husky": "^9.1.7",
+		"lint-staged": "^16.4.0",
+		"pngjs": "^7.0.0",
+		"prettier": "^3.8.1",
+		"prettier-plugin-svelte": "^3.5.1",
+		"svelte": "^5.0.0",
+		"svelte-check": "^4.0.0",
+		"typescript": "^6.0.0",
+		"typescript-eslint": "^8.58.1",
+		"vite": "^8.0.0"
+	},
+	"dependencies": {
+		"@lucide/svelte": "^1.7.0",
+		"bits-ui": "^2.16.5",
+		"konva": "^10.2.3",
+		"phaser": "^3.80.0",
+		"runed": "^0.37.1",
+		"svelte-sonner": "^1.1.0",
+		"y-websocket": "^3.0.0",
+		"yjs": "^13.6.30"
+	},
+	"type": "module"
 }

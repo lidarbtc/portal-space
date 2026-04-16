@@ -1,108 +1,107 @@
 <script lang="ts">
-	import { dpadDirection } from '$lib/stores/dpad';
-	import type { Direction } from '$lib/types';
+	import { dpadState } from '$lib/stores/dpad.svelte'
+	import type { Direction } from '$lib/types'
 
-	const BASE_SIZE = 120;
-	const THUMB_SIZE = 44;
-	const MAX_RADIUS = BASE_SIZE / 2;
-	const DEAD_ZONE = MAX_RADIUS * 0.15;
+	const BASE_SIZE = 120
+	const MAX_RADIUS = BASE_SIZE / 2
+	const DEAD_ZONE = MAX_RADIUS * 0.15
 
-	let thumbX = $state(0);
-	let thumbY = $state(0);
-	let visible = $state(false);
-	let baseX = $state(0);
-	let baseY = $state(0);
-	let activeTouchId: number | null = $state(null);
+	let thumbX = $state(0)
+	let thumbY = $state(0)
+	let visible = $state(false)
+	let baseX = $state(0)
+	let baseY = $state(0)
+	let activeTouchId: number | null = $state(null)
 
-	let centerX = 0;
-	let centerY = 0;
+	let centerX = 0
+	let centerY = 0
 
 	function getDirection(dx: number, dy: number): Direction | null {
-		const distance = Math.sqrt(dx * dx + dy * dy);
-		if (distance < DEAD_ZONE) return null;
+		const distance = Math.sqrt(dx * dx + dy * dy)
+		if (distance < DEAD_ZONE) return null
 
-		const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+		const angle = Math.atan2(dy, dx) * (180 / Math.PI)
 
-		if (angle > -45 && angle <= 45) return 'right';
-		if (angle > 45 && angle <= 135) return 'down';
-		if (angle > -135 && angle <= -45) return 'up';
-		return 'left';
+		if (angle > -45 && angle <= 45) return 'right'
+		if (angle > 45 && angle <= 135) return 'down'
+		if (angle > -135 && angle <= -45) return 'up'
+		return 'left'
 	}
 
 	function handleTouchStart(e: TouchEvent) {
-		e.preventDefault();
-		e.stopPropagation();
+		e.preventDefault()
+		e.stopPropagation()
 
-		if (activeTouchId !== null) return;
+		if (activeTouchId !== null) return
 
-		const touch = e.changedTouches[0];
-		activeTouchId = touch.identifier;
+		const touch = e.changedTouches[0]
+		activeTouchId = touch.identifier
 
-		const overlay = e.currentTarget as HTMLElement;
-		const rect = overlay.getBoundingClientRect();
-		baseX = touch.clientX - rect.left;
-		baseY = touch.clientY - rect.top;
+		const overlay = e.currentTarget as HTMLElement
+		const rect = overlay.getBoundingClientRect()
+		baseX = touch.clientX - rect.left
+		baseY = touch.clientY - rect.top
 
-		centerX = touch.clientX;
-		centerY = touch.clientY;
+		centerX = touch.clientX
+		centerY = touch.clientY
 
-		visible = true;
-		thumbX = 0;
-		thumbY = 0;
-		dpadDirection.set(null);
+		visible = true
+		thumbX = 0
+		thumbY = 0
+		dpadState.direction = null
 	}
 
 	function handleTouchMove(e: TouchEvent) {
-		e.preventDefault();
-		e.stopPropagation();
+		e.preventDefault()
+		e.stopPropagation()
 
-		if (activeTouchId === null) return;
+		if (activeTouchId === null) return
 
-		let touch: Touch | null = null;
+		let touch: Touch | null = null
 		for (let i = 0; i < e.changedTouches.length; i++) {
 			if (e.changedTouches[i].identifier === activeTouchId) {
-				touch = e.changedTouches[i];
-				break;
+				touch = e.changedTouches[i]
+				break
 			}
 		}
-		if (!touch) return;
+		if (!touch) return
 
-		const dx = touch.clientX - centerX;
-		const dy = touch.clientY - centerY;
-		const distance = Math.sqrt(dx * dx + dy * dy);
+		const dx = touch.clientX - centerX
+		const dy = touch.clientY - centerY
+		const distance = Math.sqrt(dx * dx + dy * dy)
 
 		if (distance > MAX_RADIUS) {
-			const scale = MAX_RADIUS / distance;
-			thumbX = dx * scale;
-			thumbY = dy * scale;
+			const scale = MAX_RADIUS / distance
+			thumbX = dx * scale
+			thumbY = dy * scale
 		} else {
-			thumbX = dx;
-			thumbY = dy;
+			thumbX = dx
+			thumbY = dy
 		}
 
-		dpadDirection.set(getDirection(dx, dy));
+		dpadState.direction = getDirection(dx, dy)
 	}
 
 	function handleTouchEnd(e: TouchEvent) {
-		e.preventDefault();
-		e.stopPropagation();
+		e.preventDefault()
+		e.stopPropagation()
 
-		if (activeTouchId === null) return;
+		if (activeTouchId === null) return
 
-		let found = false;
+		let found = false
 		for (let i = 0; i < e.changedTouches.length; i++) {
 			if (e.changedTouches[i].identifier === activeTouchId) {
-				found = true;
-				break;
+				found = true
+				break
 			}
 		}
-		if (!found) return;
+		if (!found) return
 
-		visible = false;
-		activeTouchId = null;
-		thumbX = 0;
-		thumbY = 0;
-		dpadDirection.set(null);
+		visible = false
+		activeTouchId = null
+		thumbX = 0
+		thumbY = 0
+		dpadState.direction = null
 	}
 </script>
 
@@ -115,14 +114,8 @@
 	role="none"
 >
 	{#if visible}
-		<div
-			class="joystick-base"
-			style="left: {baseX}px; top: {baseY}px;"
-		>
-			<div
-				class="joystick-thumb"
-				style="transform: translate({thumbX}px, {thumbY}px)"
-			></div>
+		<div class="joystick-base" style="left: {baseX}px; top: {baseY}px;">
+			<div class="joystick-thumb" style="transform: translate({thumbX}px, {thumbY}px)"></div>
 		</div>
 	{/if}
 </div>
@@ -168,8 +161,20 @@
 			transparent 310deg 320deg,
 			rgba(220, 220, 220, 0.8) 320deg 360deg
 		);
-		-webkit-mask: radial-gradient(circle, transparent calc(50% - 2px), black calc(50% - 2px), black 50%, transparent 50%);
-		mask: radial-gradient(circle, transparent calc(50% - 2px), black calc(50% - 2px), black 50%, transparent 50%);
+		-webkit-mask: radial-gradient(
+			circle,
+			transparent calc(50% - 2px),
+			black calc(50% - 2px),
+			black 50%,
+			transparent 50%
+		);
+		mask: radial-gradient(
+			circle,
+			transparent calc(50% - 2px),
+			black calc(50% - 2px),
+			black 50%,
+			transparent 50%
+		);
 	}
 
 	.joystick-thumb {

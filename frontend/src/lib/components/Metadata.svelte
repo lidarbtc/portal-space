@@ -1,11 +1,11 @@
 <script lang="ts">
-	const BASE_URL = 'https://space.portal.1ncursio.dev';
+	const BASE_URL = 'https://space.portal.1ncursio.dev'
 
 	interface Props {
-		title?: string;
-		description?: string;
-		image?: string;
-		url?: string;
+		title?: string
+		description?: string
+		image?: string
+		url?: string
 	}
 
 	let {
@@ -13,7 +13,7 @@
 		description = '함께 모여 소통하는 가상 공간',
 		image = '/assets/og-image.jpg',
 		url = '/',
-	}: Props = $props();
+	}: Props = $props()
 </script>
 
 <svelte:head>

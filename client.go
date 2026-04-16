@@ -117,8 +117,8 @@ func (c *Client) readPump() {
 			}
 			c.reconnect = msg.Reconnect
 			if (msg.X != 0 || msg.Y != 0) && c.room.validateMove(msg.X, msg.Y) {
-				tileX := int(msg.X) / 32
-				tileY := int(msg.Y) / 32
+				tileX := int(msg.X) / tileSize
+				tileY := int(msg.Y) / tileSize
 				if c.room.isWalkable(tileX, tileY) {
 					c.x = msg.X
 					c.y = msg.Y

@@ -51,9 +51,9 @@ const (
 	settingsCooldown     = 2
 
 	// Regional chat zone radius bounds (in pixels)
-	defaultZoneRadius = 160.0 // 5 tiles
-	maxZoneRadius     = 320.0 // 10 tiles
-	minZoneRadius     = 64.0  // 2 tiles
+	defaultZoneRadius = 5.0 * tileSize // 5 tiles
+	maxZoneRadius     = 8.0 * tileSize // 8 tiles
+	minZoneRadius     = 2.0 * tileSize // 2 tiles
 
 	// Action domains and actions
 	DomainRegionalChat   = "regional_chat"
@@ -233,9 +233,11 @@ func normalizeChatImage(img *ChatImage) *ChatImage {
 	}
 }
 
+const tileSize = 16
+
 const (
-	mapPixelWidth  = mapWidth * 32
-	mapPixelHeight = mapHeight * 32
+	mapPixelWidth  = mapWidth * tileSize
+	mapPixelHeight = mapHeight * tileSize
 )
 
 func validateMove(x, y float64) bool {
