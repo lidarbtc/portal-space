@@ -8,6 +8,7 @@ import { loadTileset } from '../tileset'
 import { createAvatarSpritesheet } from '../spritesheet'
 import { createTintedSpritesheet } from '../palette-swap'
 import { resolveNicknameColor } from '$lib/utils/nickname-colors'
+import { parseTextSegments } from '$lib/utils/linkify'
 import type { PlayerInfo, Direction, InteractiveObject, RegionalChatState } from '@shared/types'
 import { MAP_WIDTH, MAP_HEIGHT } from '@shared/types'
 import { zoomState, computeMinZoom, clampZoom } from '$lib/stores/zoom.svelte'
@@ -33,8 +34,8 @@ const ALLOWED_CHAT_IMAGE_MIMES = new Set(['image/png', 'image/jpeg', 'image/gif'
 interface PlayerObject {
 	container: Phaser.GameObjects.Container
 	sprite: Phaser.GameObjects.Sprite
-	nameText: Phaser.GameObjects.Text
-	statusDot: Phaser.GameObjects.Graphics
+	nameElement: Phaser.GameObjects.DOMElement
+	// statusDot 제거 — nameElement DOM 내부 <span>으로 편입됨
 	nickname: string
 	x: number // pixel coordinate
 	y: number // pixel coordinate
@@ -42,11 +43,11 @@ interface PlayerObject {
 	targetY: number // remote player interpolation target
 	dir: Direction
 	textureKey: string
-	bubbleText: Phaser.GameObjects.Text | null
+	bubbleElement: Phaser.GameObjects.DOMElement | null
 	bubbleTimer: ReturnType<typeof setTimeout> | null
-	emoteText: Phaser.GameObjects.Text | null
+	emoteElement: Phaser.GameObjects.DOMElement | null
 	emoteTimer: ReturnType<typeof setTimeout> | null
-	customStatusBubble: Phaser.GameObjects.Text | null
+	customStatusElement: Phaser.GameObjects.DOMElement | null
 }
 
 export class WorldScene extends Phaser.Scene {
@@ -110,6 +111,18 @@ export class WorldScene extends Phaser.Scene {
 		this.#entityContainer.setDepth(10)
 		this.events.on('postupdate', () => {
 			this.#entityContainer.sort('y')
+			// Canvas y-sort only affects Container draw order. DOMElements render in a
+			// separate DOM layer with CSS z-index (equal depth → DOM insertion order).
+			// Sync each DOMElement's depth to its container's post-sort index so DOM
+			// stacking matches y-sort (P0 fix: prevents nickname overlap order mismatch).
+			const list = this.#entityContainer.list as Phaser.GameObjects.Container[]
+			list.forEach((container, i) => {
+				container.list.forEach((child) => {
+					if (child instanceof Phaser.GameObjects.DOMElement) {
+						child.setDepth(i)
+					}
+				})
+			})
 		})
 
 		const currentPlayers = gameState.players
@@ -420,8 +433,13 @@ export class WorldScene extends Phaser.Scene {
 			// Update nickname
 			if (msg.nickname) {
 				p.nickname = msg.nickname
-				p.nameText.setText(msg.nickname)
-				p.statusDot.setPosition(p.nameText.x - p.nameText.width / 2 + 8, p.nameText.y)
+				// DOM structure: <div><span.dot></span>TEXT_NODE</div>
+				// childNodes[0] = dot span, childNodes[1] = text node
+				const textNode = p.nameElement.node.childNodes[1]
+				if (textNode && textNode.nodeType === Node.TEXT_NODE) {
+					textNode.textContent = msg.nickname
+				}
+				// statusDot position recalc removed — handled by CSS flex
 			}
 
 			// Update colors — handle 'characters' -> 'player_' + id texture key transition
@@ -567,34 +585,18 @@ export class WorldScene extends Phaser.Scene {
 		// All positions are relative to the character container
 		const sprite = this.add.sprite(0, 0, textureKey, frameIndex)
 
-		const nameText = this.add
-			.text(0, -this.#tileSize / 2 - 14, info.nickname, {
-				fontSize: '12px',
-				color: '#e0e0ff',
-				fontFamily: 'MulmaruMono',
-				backgroundColor: 'rgba(0, 0, 0, 0.5)',
-				padding: { left: 14, right: 4, top: 2, bottom: 2 },
-			})
-			.setOrigin(0.5)
-			.setResolution(1)
-
-		const statusDot = this.add.graphics()
-		const dotColor = Phaser.Display.Color.HexStringToColor(
-			this.#getStatusColor(info.status),
-		).color
-		statusDot.fillStyle(dotColor, 1)
-		statusDot.fillCircle(0, 0, 3)
-		statusDot.setPosition(-nameText.width / 2 + 8, -this.#tileSize / 2 - 14)
+		const nameEl = this.#buildPlayerNameElement(info.nickname, info.status)
+		const nameElement = this.add.dom(0, -this.#tileSize - 14, nameEl).setOrigin(0.5)
+		nameElement.pointerEvents = 'none'
 
 		// Container groups character elements; entityContainer auto-sorts by y
-		const container = this.add.container(px, py, [sprite, nameText, statusDot])
+		const container = this.add.container(px, py, [sprite, nameElement])
 		this.#entityContainer.add(container)
 
 		this.#playerObjects.set(info.id, {
 			container,
 			sprite,
-			nameText,
-			statusDot,
+			nameElement,
 			nickname: info.nickname,
 			x: px,
 			y: py,
@@ -602,11 +604,11 @@ export class WorldScene extends Phaser.Scene {
 			targetY: py,
 			dir: info.dir ?? 'down',
 			textureKey,
-			bubbleText: null,
+			bubbleElement: null,
 			bubbleTimer: null,
-			emoteText: null,
+			emoteElement: null,
 			emoteTimer: null,
-			customStatusBubble: null,
+			customStatusElement: null,
 		})
 
 		if (info.customStatus) {
@@ -621,18 +623,18 @@ export class WorldScene extends Phaser.Scene {
 	#removePlayer(id: string): void {
 		const p = this.#playerObjects.get(id)
 		if (!p) return
-		p.container.destroy() // destroys sprite, nameText, statusDot together
-		if (p.bubbleText) {
-			this.tweens.killTweensOf(p.bubbleText)
-			p.bubbleText.destroy()
+		p.container.destroy() // destroys sprite, nameElement together
+		if (p.bubbleElement) {
+			this.tweens.killTweensOf(p.bubbleElement)
+			p.bubbleElement.destroy()
 		}
 		if (p.bubbleTimer) clearTimeout(p.bubbleTimer)
-		if (p.emoteText) {
-			this.tweens.killTweensOf(p.emoteText)
-			p.emoteText.destroy()
+		if (p.emoteElement) {
+			this.tweens.killTweensOf(p.emoteElement)
+			p.emoteElement.destroy()
 		}
 		if (p.emoteTimer) clearTimeout(p.emoteTimer)
-		if (p.customStatusBubble) p.customStatusBubble.destroy()
+		if (p.customStatusElement) p.customStatusElement.destroy()
 
 		// Clean up per-player texture to prevent memory leak
 		const playerTexKey = 'player_' + id
@@ -693,18 +695,17 @@ export class WorldScene extends Phaser.Scene {
 
 	#updatePlayerVisuals(p: PlayerObject): void {
 		p.container.setPosition(p.x, p.y)
-		// Sub-elements use relative coords within the container — no individual updates needed
-		// StatusDot tracks nameText width (fixed after creation, but kept for safety)
-		p.statusDot.setPosition(-p.nameText.width / 2 + 8, -this.#tileSize / 2 - 14)
+		// nameElement is a Container child → auto-follows container transform.
+		// statusDot is now an inline span inside nameElement → no position tracking needed.
 		// UI elements remain on the main display list with absolute positions
-		if (p.customStatusBubble) {
-			p.customStatusBubble.setPosition(p.x, p.y - this.#tileSize / 2 - 34)
+		if (p.customStatusElement) {
+			p.customStatusElement.setPosition(p.x, p.y - this.#tileSize / 2 - 34)
 		}
-		if (p.bubbleText) {
-			p.bubbleText.setPosition(p.x, p.y - this.#tileSize - 10)
+		if (p.bubbleElement) {
+			p.bubbleElement.setPosition(p.x, p.y - this.#tileSize - 10)
 		}
-		if (p.emoteText) {
-			p.emoteText.setPosition(p.x, p.y - this.#tileSize - 34)
+		if (p.emoteElement) {
+			p.emoteElement.setPosition(p.x, p.y - this.#tileSize - 34)
 		}
 	}
 
@@ -731,54 +732,81 @@ export class WorldScene extends Phaser.Scene {
 	#updatePlayerStatus(id: string, status: string): void {
 		const p = this.#playerObjects.get(id)
 		if (!p) return
-		const dotColor = Phaser.Display.Color.HexStringToColor(this.#getStatusColor(status)).color
-		p.statusDot.clear()
-		p.statusDot.fillStyle(dotColor, 1)
-		p.statusDot.fillCircle(0, 0, 3)
-	}
-
-	#getStatusColor(status: string): string {
-		const colors: Record<string, string> = {
-			online: '#4ade80',
-			away: '#eab308',
-			dnd: '#ef4444',
+		const dot = p.nameElement.node.querySelector('.phaser-player-name-dot')
+		if (dot instanceof HTMLElement) {
+			dot.className = `phaser-player-name-dot ${status}`
 		}
-		return colors[status] ?? '#4ade80'
 	}
 
 	#updateCustomStatus(id: string, text: string): void {
 		const p = this.#playerObjects.get(id)
 		if (!p) return
 
-		if (p.customStatusBubble) {
-			p.customStatusBubble.destroy()
-			p.customStatusBubble = null
+		if (p.customStatusElement) {
+			p.customStatusElement.destroy()
+			p.customStatusElement = null
 		}
 
 		if (!text) return
 
-		p.customStatusBubble = this.add
-			.text(p.x, p.y - this.#tileSize / 2 - 34, text, {
-				fontSize: '12px',
-				color: '#ffffff',
-				fontFamily: 'MulmaruMono',
-				backgroundColor: '#445588cc',
-				padding: { x: 6, y: 3 },
-				stroke: '#000',
-				strokeThickness: 1,
-			})
+		const div = document.createElement('div')
+		div.className = 'phaser-custom-status'
+		div.textContent = text // XSS-safe
+
+		const dom = this.add
+			.dom(p.x, p.y - this.#tileSize / 2 - 34, div)
 			.setOrigin(0.5)
 			.setDepth(15)
-			.setResolution(2)
+		dom.pointerEvents = 'none'
+		p.customStatusElement = dom
+	}
+
+	#buildPlayerNameElement(nickname: string, status: string): HTMLDivElement {
+		const div = document.createElement('div')
+		div.className = 'phaser-player-name'
+
+		const dot = document.createElement('span')
+		dot.className = `phaser-player-name-dot ${status}`
+		div.appendChild(dot)
+
+		// textContent is XSS-safe; interprets input as literal text
+		div.appendChild(document.createTextNode(nickname))
+		return div
+	}
+
+	#buildBubbleElement(text: string): HTMLDivElement {
+		const div = document.createElement('div')
+		div.className = 'phaser-chat-bubble'
+
+		const knownNicknames = [...gameState.players.values()].map((p) => p.nickname)
+		const segments = parseTextSegments(text, knownNicknames)
+
+		for (const seg of segments) {
+			if (seg.type === 'mention') {
+				const span = document.createElement('span')
+				span.className = 'phaser-chat-bubble-mention'
+				span.textContent = seg.value
+				div.appendChild(span)
+			} else if (seg.type === 'url') {
+				const span = document.createElement('span')
+				span.className = 'phaser-chat-bubble-url'
+				span.textContent = seg.value
+				div.appendChild(span)
+			} else {
+				div.appendChild(document.createTextNode(seg.value))
+			}
+		}
+
+		return div
 	}
 
 	#showChatBubble(id: string, text: string, _nickname: string): void {
 		const p = this.#playerObjects.get(id)
 		if (!p) return
 
-		if (p.bubbleText) {
-			this.tweens.killTweensOf(p.bubbleText)
-			p.bubbleText.destroy()
+		if (p.bubbleElement) {
+			this.tweens.killTweensOf(p.bubbleElement)
+			p.bubbleElement.destroy()
 			if (p.bubbleTimer) clearTimeout(p.bubbleTimer)
 		}
 
@@ -786,32 +814,28 @@ export class WorldScene extends Phaser.Scene {
 		const py = p.y - this.#tileSize - 10
 
 		const displayText = text.length > 40 ? text.substring(0, 40) + '...' : text
+		const bubbleEl = this.#buildBubbleElement(displayText)
 
-		p.bubbleText = this.add
-			.text(px, py, displayText, {
-				fontSize: '12px',
-				color: '#ffffff',
-				fontFamily: 'MulmaruMono',
-				backgroundColor: '#333355dd',
-				padding: { x: 6, y: 4 },
-				stroke: '#000',
-				strokeThickness: 1,
-				wordWrap: { width: 200 },
-			})
-			.setOrigin(0.5)
-			.setDepth(100)
-			.setResolution(2)
+		// setOrigin centers horizontally and anchors bottom above the head.
+		// (Phaser overrides inline style.transform every frame, so CSS transform is not reliable.)
+		const dom = this.add.dom(px, py, bubbleEl).setOrigin(0.5, 1).setDepth(100)
+
+		// CRITICAL: pointerEvents must be set as Phaser property, not just CSS.
+		// DOMElementCSSRenderer overwrites style.pointerEvents every frame with src.pointerEvents.
+		dom.pointerEvents = 'none'
+
+		p.bubbleElement = dom
 
 		p.bubbleTimer = setTimeout(() => {
-			if (p.bubbleText) {
+			if (p.bubbleElement) {
 				this.tweens.add({
-					targets: p.bubbleText,
+					targets: p.bubbleElement,
 					alpha: 0,
 					duration: 500,
 					onComplete: () => {
-						if (p.bubbleText) {
-							p.bubbleText.destroy()
-							p.bubbleText = null
+						if (p.bubbleElement) {
+							p.bubbleElement.destroy()
+							p.bubbleElement = null
 						}
 					},
 				})
@@ -823,43 +847,40 @@ export class WorldScene extends Phaser.Scene {
 		const p = this.#playerObjects.get(id)
 		if (!p) return
 
-		if (p.emoteText) {
-			this.tweens.killTweensOf(p.emoteText)
-			p.emoteText.destroy()
+		if (p.emoteElement) {
+			this.tweens.killTweensOf(p.emoteElement)
+			p.emoteElement.destroy()
 			if (p.emoteTimer) clearTimeout(p.emoteTimer)
 		}
 
 		const px = p.x
 		const py = p.y - this.#tileSize - 34
 
-		p.emoteText = this.add
-			.text(px, py, emoji, {
-				fontSize: '20px',
-				fontFamily: 'MulmaruMono',
-				stroke: '#000',
-				strokeThickness: 2,
-			})
-			.setOrigin(0.5)
-			.setDepth(101)
-			.setResolution(2)
+		const div = document.createElement('div')
+		div.className = 'phaser-emote'
+		div.textContent = emoji
+
+		const dom = this.add.dom(px, py, div).setOrigin(0.5).setDepth(101)
+		dom.pointerEvents = 'none'
+		p.emoteElement = dom
 
 		this.tweens.add({
-			targets: p.emoteText,
+			targets: p.emoteElement,
 			y: '-=8',
 			duration: 600,
 			ease: 'Power1',
 		})
 
 		p.emoteTimer = setTimeout(() => {
-			if (p.emoteText) {
+			if (p.emoteElement) {
 				this.tweens.add({
-					targets: p.emoteText,
+					targets: p.emoteElement,
 					alpha: 0,
 					duration: 500,
 					onComplete: () => {
-						if (p.emoteText) {
-							p.emoteText.destroy()
-							p.emoteText = null
+						if (p.emoteElement) {
+							p.emoteElement.destroy()
+							p.emoteElement = null
 						}
 					},
 				})

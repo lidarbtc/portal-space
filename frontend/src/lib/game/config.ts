@@ -13,5 +13,8 @@ export function createGameConfig(parent: HTMLElement): Phaser.Types.Core.GameCon
 			mode: Phaser.Scale.RESIZE,
 			autoCenter: Phaser.Scale.CENTER_BOTH,
 		},
+		dom: {
+			createContainer: true,
+		},
 	}
 }

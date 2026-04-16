@@ -8,13 +8,13 @@ export interface GameInteractiveObject {
 	data: InteractiveObject
 	container: Phaser.GameObjects.Container
 	highlight: Phaser.GameObjects.Graphics
-	label: Phaser.GameObjects.Text
+	label: Phaser.GameObjects.DOMElement
 	isNearby: boolean
 	// regional_chat extras
 	wardStoneSprite?: Phaser.GameObjects.Image
 	zoneCircle?: Phaser.GameObjects.Graphics
 	zoneStroke?: Phaser.GameObjects.Graphics
-	zoneLabel?: Phaser.GameObjects.Text
+	zoneLabel?: Phaser.GameObjects.DOMElement
 }
 
 export function createInteractiveObject(
@@ -52,7 +52,7 @@ export function createInteractiveObject(
 	// regional_chat: translucent circle zone
 	let zoneCircle: Phaser.GameObjects.Graphics | undefined
 	let zoneStroke: Phaser.GameObjects.Graphics | undefined
-	let zoneLabel: Phaser.GameObjects.Text | undefined
+	let zoneLabel: Phaser.GameObjects.DOMElement | undefined
 
 	if (obj.type === 'regional_chat') {
 		const state = obj.state as RegionalChatState | undefined
@@ -82,17 +82,12 @@ export function createInteractiveObject(
 		})
 
 		// Zone name label at center
-		zoneLabel = scene.add
-			.text(0, -56, name, {
-				fontSize: '12px',
-				color: '#67e8f9',
-				fontFamily: 'MulmaruMono',
-				backgroundColor: 'rgba(0,0,0,0.45)',
-				padding: { x: 6, y: 3 },
-			})
-			.setOrigin(0.5)
-			.setDepth(6)
-			.setAlpha(0.85)
+		const zoneLabelEl = document.createElement('div')
+		zoneLabelEl.className = 'phaser-zone-label'
+		zoneLabelEl.textContent = name // XSS-safe
+
+		zoneLabel = scene.add.dom(0, -56, zoneLabelEl).setOrigin(0.5).setDepth(6).setAlpha(0.85)
+		zoneLabel.pointerEvents = 'none'
 		container.add(zoneLabel)
 	}
 
@@ -113,17 +108,12 @@ export function createInteractiveObject(
 
 	// Interaction label — always uses INTERACTION_RADIUS proximity, not zone radius
 	const labelY = obj.type === 'regional_chat' ? 24 : TILE_SIZE * 1.5 + 8
-	const label = scene.add
-		.text(0, labelY, '[E] 사용', {
-			fontSize: '12px',
-			color: '#ffffff',
-			fontFamily: 'MulmaruMono',
-			backgroundColor: 'rgba(0,0,0,0.7)',
-			padding: { x: 4, y: 2 },
-		})
-		.setOrigin(0.5)
-		.setDepth(6)
-		.setVisible(false)
+	const labelEl = document.createElement('div')
+	labelEl.className = 'phaser-object-label'
+	labelEl.textContent = '[E] 사용'
+
+	const label = scene.add.dom(0, labelY, labelEl).setOrigin(0.5).setDepth(6).setVisible(false)
+	label.pointerEvents = 'none'
 	container.add(label)
 
 	// Make interactive with pointer cursor

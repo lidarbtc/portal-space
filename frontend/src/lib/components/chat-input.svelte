@@ -3,7 +3,9 @@
 	import { useEventListener } from 'runed'
 	import { gameState } from '$lib/stores/game.svelte'
 	import { MAX_CHAT_IMAGE_BYTES } from '@shared/types'
+	import type { PlayerInfo } from '@shared/types'
 	import { regionalChatState } from '$lib/stores/regional-chat.svelte'
+	import MentionDropdown from './mention-dropdown.svelte'
 
 	let {
 		onSend,
@@ -22,6 +24,25 @@
 	let inputValue = $state('')
 	let imageError = $state('')
 	let isSendingImage = $state(false)
+
+	// Mention state
+	let mentionActive = $state(false)
+	let mentionFilter = $state('')
+	let mentionSelectedIndex = $state(0)
+	let mentionStartPos = $state(0)
+
+	let allPlayers = $derived(
+		[...gameState.players.values()].filter((p) => p.id !== gameState.selfId),
+	)
+	let filteredMentionPlayers = $derived.by(() => {
+		if (!mentionActive) return []
+		const f = mentionFilter.toLowerCase()
+		const filtered = f
+			? allPlayers.filter((p) => p.nickname.toLowerCase().startsWith(f))
+			: allPlayers
+		return filtered.slice(0, 20)
+	})
+	let isMentionDropdownVisible = $derived(mentionActive && filteredMentionPlayers.length > 0)
 
 	const MAX_CHAT_IMAGE_SOURCE_BYTES = 10 * 1024 * 1024
 
@@ -109,8 +130,105 @@
 		}
 	}
 
+	function detectMention() {
+		if (!inputEl) {
+			mentionActive = false
+			return
+		}
+		const cursorPos = inputEl.selectionStart ?? inputValue.length
+		const textBeforeCursor = inputValue.slice(0, cursorPos)
+
+		// Find the last @ that is preceded by space/start
+		let atPos = -1
+		for (let i = textBeforeCursor.length - 1; i >= 0; i--) {
+			if (textBeforeCursor[i] === '@') {
+				if (
+					i === 0 ||
+					textBeforeCursor[i - 1] === ' ' ||
+					textBeforeCursor[i - 1] === '\n'
+				) {
+					atPos = i
+				}
+				break
+			}
+		}
+
+		if (atPos === -1) {
+			mentionActive = false
+			return
+		}
+
+		const filterText = textBeforeCursor.slice(atPos + 1)
+		mentionStartPos = atPos
+		mentionFilter = filterText
+		mentionActive = true
+		mentionSelectedIndex = 0
+	}
+
+	function confirmMention(player: PlayerInfo) {
+		if (!inputEl) return
+		const cursorPos = inputEl.selectionStart ?? inputValue.length
+		const before = inputValue.slice(0, mentionStartPos)
+		const after = inputValue.slice(cursorPos)
+		const mention = `@${player.nickname} `
+		inputValue = before + mention + after
+		mentionActive = false
+		mentionFilter = ''
+		mentionSelectedIndex = 0
+
+		// Set cursor after mention
+		const newPos = mentionStartPos + mention.length
+		requestAnimationFrame(() => {
+			inputEl?.setSelectionRange(newPos, newPos)
+			inputEl?.focus()
+		})
+	}
+
+	function handleInput(e: Event) {
+		// Skip while IME composing (e.g. Korean); `isComposing` lives on InputEvent.
+		if (e instanceof InputEvent && e.isComposing) return
+		detectMention()
+	}
+
+	function handleMentionSelect(player: PlayerInfo) {
+		confirmMention(player)
+	}
+
 	function handleKeydown(e: KeyboardEvent) {
 		e.stopPropagation()
+
+		if (mentionActive && !e.isComposing) {
+			// Mention mode — intercept navigation keys
+			if (e.key === 'Escape') {
+				e.preventDefault()
+				mentionActive = false
+				return
+			}
+			if (isMentionDropdownVisible) {
+				if (e.key === 'Enter' || e.key === 'Tab') {
+					e.preventDefault()
+					const player = filteredMentionPlayers[mentionSelectedIndex]
+					if (player) confirmMention(player)
+					return
+				}
+				if (e.key === 'ArrowDown') {
+					e.preventDefault()
+					mentionSelectedIndex =
+						(mentionSelectedIndex + 1) % filteredMentionPlayers.length
+					return
+				}
+				if (e.key === 'ArrowUp') {
+					e.preventDefault()
+					mentionSelectedIndex =
+						(mentionSelectedIndex - 1 + filteredMentionPlayers.length) %
+						filteredMentionPlayers.length
+					return
+				}
+			}
+			// mentionActive but no dropdown results — let typing continue
+		}
+
+		// Default mode
 		if (e.key === 'Enter' && !e.isComposing) {
 			sendMessage()
 		} else if (e.key === 'Escape') {
@@ -226,19 +344,29 @@
 			{#if isReadOnly}
 				<div class="chat-readonly-indicator">(읽기 전용)</div>
 			{:else}
-				<input
-					id="chat-input"
-					type="text"
-					placeholder={alwaysActive ? '메시지를 입력해주세요 (J)' : '메시지 입력...'}
-					maxlength={500}
-					bind:this={inputEl}
-					bind:value={inputValue}
-					onkeydown={handleKeydown}
-					onfocus={handleFocus}
-					onblur={handleBlur}
-					onpaste={handlePaste}
-					disabled={isSendingImage}
-				/>
+				<div class="chat-input-wrapper">
+					<MentionDropdown
+						players={allPlayers}
+						filter={mentionFilter}
+						selectedIndex={mentionSelectedIndex}
+						visible={isMentionDropdownVisible}
+						onselect={handleMentionSelect}
+					/>
+					<input
+						id="chat-input"
+						type="text"
+						placeholder={alwaysActive ? '메시지를 입력해주세요 (J)' : '메시지 입력...'}
+						maxlength={500}
+						bind:this={inputEl}
+						bind:value={inputValue}
+						onkeydown={handleKeydown}
+						oninput={handleInput}
+						onfocus={handleFocus}
+						onblur={handleBlur}
+						onpaste={handlePaste}
+						disabled={isSendingImage}
+					/>
+				</div>
 			{/if}
 			{#if mobile}
 				<button
@@ -260,6 +388,11 @@
 </div>
 
 <style>
+	.chat-input-wrapper {
+		position: relative;
+		flex: 1;
+	}
+
 	.chat-input-row {
 		display: flex;
 		gap: 6px;

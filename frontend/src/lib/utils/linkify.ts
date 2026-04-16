@@ -1,5 +1,5 @@
 export interface TextSegment {
-	type: 'text' | 'url'
+	type: 'text' | 'url' | 'mention'
 	value: string
 }
 
@@ -88,4 +88,103 @@ export function parseTextWithUrls(text: string): TextSegment[] {
 	}
 
 	return segments
+}
+
+/**
+ * Resolve @mentions in plain text against a list of known nicknames.
+ * Uses greedy longest-match: nicknames sorted by length descending,
+ * so "Kim Yechan" (11 chars) matches before "Kim" (3 chars).
+ */
+export function resolveMentions(text: string, knownNicknames: string[]): TextSegment[] {
+	if (knownNicknames.length === 0 || !text.includes('@')) {
+		return [{ type: 'text', value: text }]
+	}
+
+	// Sort by length descending for greedy longest-match
+	const sorted = [...knownNicknames].sort((a, b) => b.length - a.length)
+	const segments: TextSegment[] = []
+	let i = 0
+	let textBuf = ''
+
+	function flushText() {
+		if (textBuf) {
+			segments.push({ type: 'text', value: textBuf })
+			textBuf = ''
+		}
+	}
+
+	while (i < text.length) {
+		if (text[i] !== '@') {
+			textBuf += text[i]
+			i++
+			continue
+		}
+
+		// @ found — check if preceded by start or whitespace
+		if (i > 0 && text[i - 1] !== ' ' && text[i - 1] !== '\n' && text[i - 1] !== '\t') {
+			textBuf += text[i]
+			i++
+			continue
+		}
+
+		// Try to match a known nickname after @
+		const afterAt = text.slice(i + 1)
+		let matched = false
+		for (const nick of sorted) {
+			if (afterAt.length < nick.length) continue
+			const candidate = afterAt.slice(0, nick.length)
+			if (candidate.toLowerCase() === nick.toLowerCase()) {
+				// Check that mention ends at word boundary (end of string, space, or punctuation)
+				const charAfter = afterAt[nick.length]
+				if (
+					charAfter !== undefined &&
+					charAfter !== ' ' &&
+					charAfter !== '\n' &&
+					charAfter !== '\t' &&
+					!/[.,;:!?)]/.test(charAfter)
+				) {
+					continue
+				}
+				flushText()
+				segments.push({ type: 'mention', value: '@' + candidate })
+				i += 1 + nick.length
+				matched = true
+				break
+			}
+		}
+
+		if (!matched) {
+			textBuf += text[i]
+			i++
+		}
+	}
+
+	flushText()
+
+	return segments
+}
+
+/**
+ * Parse text into segments of plain text, URLs, and @mentions.
+ * 2-phase: (1) URL parsing via parseTextWithUrls, (2) mention resolution on text segments.
+ * Pure function — knownNicknames must be passed in, no reactive store dependency.
+ */
+export function parseTextSegments(text: string, knownNicknames: string[]): TextSegment[] {
+	// Phase 1: URL parsing
+	const urlSegments = parseTextWithUrls(text)
+
+	if (knownNicknames.length === 0) return urlSegments
+
+	// Phase 2: Resolve mentions in text segments only (URL segments pass through)
+	const result: TextSegment[] = []
+	for (const seg of urlSegments) {
+		if (seg.type !== 'text') {
+			result.push(seg)
+			continue
+		}
+		const mentionSegments = resolveMentions(seg.value, knownNicknames)
+		result.push(...mentionSegments)
+	}
+
+	return result
 }

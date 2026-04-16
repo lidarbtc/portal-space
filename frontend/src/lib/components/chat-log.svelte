@@ -2,16 +2,43 @@
 	import { SvelteSet } from 'svelte/reactivity'
 	import { onDestroy } from 'svelte'
 	import { gameState } from '$lib/stores/game.svelte'
-	import type { ChatImage } from '@shared/types'
+	import type { ChatImage, PlayerInfo } from '@shared/types'
 	import type { ChatMessage, ChatChannel } from '$lib/types'
 	import { regionalChatState } from '$lib/stores/regional-chat.svelte'
-	import { parseTextWithUrls } from '$lib/utils/linkify'
+	import { parseTextWithUrls, parseTextSegments } from '$lib/utils/linkify'
 	import { AlertDialog } from 'bits-ui'
+	import PlayerProfilePopup from './player-profile-popup.svelte'
 
 	let chatLogEl: HTMLDivElement | undefined = $state()
 	let atBottom = $state(true)
 	let openLinkDialog = $state(false)
 	let pendingUrl = $state('')
+
+	// Mention state
+	let popupPlayer = $state<PlayerInfo | null>(null)
+	let popupNickname = $state('')
+	let popupOpen = $state(false)
+	let popupAnchor = $state({ x: 0, y: 0 })
+
+	let knownNicknames = $derived([...gameState.players.values()].map((p) => p.nickname))
+
+	function handleMentionClick(e: MouseEvent, mentionText: string) {
+		const nickname = mentionText.startsWith('@') ? mentionText.slice(1) : mentionText
+		const player =
+			[...gameState.players.values()].find(
+				(p) => p.nickname.toLowerCase() === nickname.toLowerCase(),
+			) ?? null
+
+		const rect = (e.target as HTMLElement).getBoundingClientRect()
+		popupAnchor = { x: rect.left, y: rect.top - 4 }
+		popupPlayer = player
+		popupNickname = nickname
+		popupOpen = true
+	}
+
+	function handlePopupClose() {
+		popupOpen = false
+	}
 	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- non-reactive cache for blob URLs
 	const chatImageUrls = new Map<ChatImage, string>()
 
@@ -148,12 +175,16 @@
 				>
 				{#if message.text}
 					<span class="chat-text">
-						{#each parseTextWithUrls(message.text) as segment, j (j)}{#if segment.type === 'url'}<a
+						{#each parseTextSegments(message.text, knownNicknames) as segment, j (j)}{#if segment.type === 'url'}<a
 									href={segment.value}
 									target="_blank"
 									rel="noopener noreferrer"
 									onclick={(e) => handleLinkClick(e, segment.value)}
 									>{segment.value}</a
+								>{:else if segment.type === 'mention'}<button
+									class="chat-mention"
+									onclick={(e) => handleMentionClick(e, segment.value)}
+									>{segment.value}</button
 								>{:else}{segment.value}{/if}{/each}</span
 					>
 				{/if}
@@ -202,7 +233,29 @@
 	</AlertDialog.Portal>
 </AlertDialog.Root>
 
+<PlayerProfilePopup
+	player={popupPlayer}
+	nickname={popupNickname}
+	open={popupOpen}
+	anchorPosition={popupAnchor}
+	onclose={handlePopupClose}
+/>
+
 <style>
+	:global(.chat-mention) {
+		color: var(--color-primary);
+		cursor: pointer;
+		background: none;
+		border: none;
+		font: inherit;
+		padding: 0;
+		display: inline;
+	}
+
+	:global(.chat-mention:hover) {
+		text-decoration: underline;
+	}
+
 	.chat-tab-bar {
 		display: flex;
 		gap: 0;
