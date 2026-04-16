@@ -21,8 +21,6 @@
 	<meta name="description" content={description} />
 	<meta name="author" content="Portal Space" />
 	<meta name="theme-color" content="#06b6d4" />
-	<meta http-equiv="content-language" content="ko" />
-
 	<!-- Open Graph -->
 	<meta property="og:title" content={title} />
 	<meta property="og:description" content={description} />

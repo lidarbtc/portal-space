@@ -241,22 +241,22 @@ export function bindYjsToKonva(
 				;(existing as Konva.Line).points((shapeMap.get('points') as number[]) ?? [])
 			} else if (type === 'rect') {
 				existing.setAttrs({
-					x: shapeMap.get('x'),
-					y: shapeMap.get('y'),
-					width: shapeMap.get('width'),
-					height: shapeMap.get('height'),
+					x: shapeMap.get('x') as number,
+					y: shapeMap.get('y') as number,
+					width: shapeMap.get('width') as number,
+					height: shapeMap.get('height') as number,
 				})
 			} else if (type === 'circle') {
 				existing.setAttrs({
-					x: shapeMap.get('x'),
-					y: shapeMap.get('y'),
-					radius: shapeMap.get('radius'),
+					x: shapeMap.get('x') as number,
+					y: shapeMap.get('y') as number,
+					radius: shapeMap.get('radius') as number,
 				})
 			} else if (type === 'text') {
 				existing.setAttrs({
-					x: shapeMap.get('x'),
-					y: shapeMap.get('y'),
-					text: shapeMap.get('text'),
+					x: shapeMap.get('x') as number,
+					y: shapeMap.get('y') as number,
+					text: shapeMap.get('text') as string,
 				})
 			}
 			layer.batchDraw()
@@ -296,7 +296,7 @@ export function bindYjsToKonva(
 }
 
 function attachNodeEvents(
-	node: Konva.Shape | Konva.Group,
+	node: Konva.Node,
 	shapeMap: Y.Map<unknown>,
 	onShapeSelect?: (id: string | null) => void,
 ) {

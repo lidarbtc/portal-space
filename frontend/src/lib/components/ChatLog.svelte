@@ -12,6 +12,7 @@
 	let atBottom = $state(true)
 	let openLinkDialog = $state(false)
 	let pendingUrl = $state('')
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- non-reactive cache for blob URLs
 	const chatImageUrls = new Map<ChatImage, string>()
 
 	function base64ToBlob(data: string, mime: string): Blob {

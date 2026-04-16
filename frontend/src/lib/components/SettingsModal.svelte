@@ -110,7 +110,7 @@
 							</div>
 
 							<div class="field-group">
-								<label class="field-label">캐릭터 색상</label>
+								<span class="field-label">캐릭터 색상</span>
 								<ColorCustomizer
 									bind:bodyColor={persistedBodyColor.current}
 									bind:eyeColor={persistedEyeColor.current}
@@ -125,7 +125,7 @@
 							<h3 class="section-heading">오디오</h3>
 
 							<div class="field-group">
-								<label class="field-label">볼륨</label>
+								<span class="field-label">볼륨</span>
 								<div class="audio-row">
 									<Slider.Root
 										type="single"
@@ -135,6 +135,7 @@
 										value={volumePercent}
 										onValueChange={(v) => (settingsState.volume = v / 100)}
 										class="volume-slider"
+										aria-label="볼륨"
 									>
 										<Slider.Range class="volume-range" />
 										<Slider.Thumb index={0} class="volume-thumb" />
@@ -145,11 +146,12 @@
 
 							<div class="field-group">
 								<div class="audio-toggle-row">
-									<label class="field-label">음소거</label>
+									<span class="field-label">음소거</span>
 									<Switch.Root
 										checked={settingsState.muted}
 										onCheckedChange={(checked) => (settingsState.muted = checked)}
 										class="mute-switch"
+										aria-label="음소거"
 									>
 										<Switch.Thumb class="mute-thumb" />
 									</Switch.Root>
