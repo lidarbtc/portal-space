@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { SvelteMap, SvelteSet } from 'svelte/reactivity'
+	import { SvelteSet } from 'svelte/reactivity'
 	import { onDestroy } from 'svelte'
 	import { gameState } from '$lib/stores/game.svelte'
 	import type { ChatImage, ChatMessage } from '$lib/types'
@@ -12,7 +12,7 @@
 	let atBottom = $state(true)
 	let openLinkDialog = $state(false)
 	let pendingUrl = $state('')
-	const chatImageUrls = new SvelteMap<ChatImage, string>()
+	const chatImageUrls = new Map<ChatImage, string>()
 
 	function base64ToBlob(data: string, mime: string): Blob {
 		const binary = atob(data)
