@@ -1,5 +1,5 @@
 import type Phaser from 'phaser'
-import type { ColorPalette } from '$lib/types'
+import type { ColorPalette } from '@shared/types'
 
 const SOURCE_COLORS = {
 	body: { r: 0x80, g: 0xd3, b: 0xe1 },

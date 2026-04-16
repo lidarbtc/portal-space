@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test'
-import { YjsRelay } from './yjs-relay'
-import { Storage } from './storage'
-import { encodeUpdates } from './protocol'
+import { YjsRelay } from '../yjs-relay'
+import { Storage } from '../storage'
+import { encodeUpdates } from '../protocol'
 import { unlinkSync, existsSync } from 'fs'
 
 const TEST_DB = '/tmp/portal-space-yjs-test.db'
@@ -75,11 +75,7 @@ describe('YjsRelay', () => {
 	it('sendFullState sends docState as SyncStep2 then SyncStep1', () => {
 		// Pre-seed a room with state via storage
 		const docState = new Uint8Array([10, 20, 30])
-		storage.write(
-			'INSERT INTO yjs_documents (board_id, doc_state) VALUES (?, ?)',
-			'wb-1',
-			Buffer.from(docState),
-		)
+		storage.upsertDocument('wb-1', Buffer.from(docState), null)
 
 		// Recreate relay to load from storage
 		const relay2 = new YjsRelay(storage, ['wb-1', 'wb-2'])
@@ -164,12 +160,9 @@ describe('YjsRelay', () => {
 		await new Promise((resolve) => setImmediate(resolve))
 
 		// Check SQLite
-		const rows = storage.query<{ board_id: string; doc_state: Buffer }>(
-			'SELECT board_id, doc_state FROM yjs_documents WHERE board_id = ?',
-			'wb-1',
-		)
-		expect(rows).toHaveLength(1)
-		expect(Buffer.from(rows[0].doc_state)).toEqual(Buffer.from([0xaa, 0xbb]))
+		const doc = storage.getDocument('wb-1')
+		expect(doc).toBeDefined()
+		expect(Buffer.from(doc!.docState)).toEqual(Buffer.from([0xaa, 0xbb]))
 	})
 
 	it('loads persisted state on restart', () => {
@@ -178,12 +171,7 @@ describe('YjsRelay', () => {
 		const updates = [new Uint8Array([0x44]), new Uint8Array([0x55, 0x66])]
 		const updatesBlob = encodeUpdates(updates)!
 
-		storage.write(
-			`INSERT INTO yjs_documents (board_id, doc_state, updates_blob) VALUES (?, ?, ?)`,
-			'wb-2',
-			Buffer.from(docState),
-			Buffer.from(updatesBlob),
-		)
+		storage.upsertDocument('wb-2', Buffer.from(docState), Buffer.from(updatesBlob))
 
 		// Create new relay (simulates restart)
 		const relay2 = new YjsRelay(storage, ['wb-1', 'wb-2'])

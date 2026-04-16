@@ -1,0 +1,13 @@
+{
+	"compilerOptions": {
+		"strict": true,
+		"target": "ESNext",
+		"module": "ESNext",
+		"moduleResolution": "bundler",
+		"skipLibCheck": true,
+		"paths": {
+			"@shared/*": ["../shared/*"]
+		}
+	},
+	"include": ["./**/*.ts", "../shared/**/*.ts"]
+}

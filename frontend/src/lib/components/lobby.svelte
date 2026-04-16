@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { network } from '$lib/network'
 	import { DEFAULT_COLORS } from '$lib/game/palette-swap'
-	import type { OutgoingMessage, ColorPalette } from '$lib/types'
+	import type { OutgoingMessage, ColorPalette } from '@shared/types'
 	import { PersistedState } from 'runed'
 	import ColorCustomizer from './color-customizer.svelte'
 

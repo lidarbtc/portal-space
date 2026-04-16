@@ -1,4 +1,4 @@
-import type { InteractiveObject, RegionalChatState } from '$lib/types'
+import type { InteractiveObject, RegionalChatState } from '@shared/types'
 import type { Storage } from './storage'
 import { Room } from './room'
 import { TILE_SIZE, MAP_WIDTH, MAP_HEIGHT } from './protocol'

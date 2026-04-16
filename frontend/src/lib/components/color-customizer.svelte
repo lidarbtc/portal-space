@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { createPreviewCanvas } from '$lib/game/palette-swap'
-	import type { ColorPalette } from '$lib/types'
+	import type { ColorPalette } from '@shared/types'
 
 	let {
 		bodyColor = $bindable(),

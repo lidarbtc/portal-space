@@ -1,5 +1,6 @@
 import { SvelteMap } from 'svelte/reactivity'
-import type { PlayerInfo, PlayerStatus, ChatImage, ChatMessage } from '$lib/types'
+import type { PlayerInfo, PlayerStatus, ChatImage } from '@shared/types'
+import type { ChatMessage } from '$lib/types'
 
 const MAX_CHAT_MESSAGES = 50
 

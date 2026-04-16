@@ -4,7 +4,7 @@
 	import { objectsState } from '$lib/stores/objects.svelte'
 	import { network } from '$lib/network'
 	import { toast } from 'svelte-sonner'
-	import type { RegionalChatState } from '$lib/types'
+	import type { RegionalChatState } from '@shared/types'
 
 	let name = $state('')
 	let radius = $state(128)

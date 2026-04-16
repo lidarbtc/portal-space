@@ -38,24 +38,21 @@ export class YjsRelay {
 
 	#loadFromStorage(): void {
 		try {
-			const rows = this.#storage.query<{
-				board_id: string
-				doc_state: Buffer | null
-				updates_blob: Buffer | null
-			}>('SELECT board_id, doc_state, updates_blob FROM yjs_documents')
-
-			for (const row of rows) {
-				const room: YjsRoom = {
-					clients: new Set(),
-					docState: row.doc_state ? new Uint8Array(row.doc_state) : null,
-					updates: row.updates_blob
-						? decodeUpdates(new Uint8Array(row.updates_blob))
-						: [],
+			let count = 0
+			for (const boardId of this.#validBoards) {
+				const doc = this.#storage.getDocument(boardId)
+				if (doc) {
+					const room: YjsRoom = {
+						clients: new Set(),
+						docState: new Uint8Array(doc.docState),
+						updates: doc.updatesBlob ? decodeUpdates(new Uint8Array(doc.updatesBlob)) : [],
+					}
+					this.#rooms.set(boardId, room)
+					count++
 				}
-				this.#rooms.set(row.board_id, room)
 			}
-			if (rows.length > 0) {
-				console.log(`[yjs] loaded ${rows.length} document states`)
+			if (count > 0) {
+				console.log(`[yjs] loaded ${count} document states`)
 			}
 		} catch (e) {
 			console.warn('[yjs] failed to load documents:', e)
@@ -207,13 +204,7 @@ export class YjsRelay {
 		const updatesBlob = encodeUpdates(room.updates)
 
 		if ((state && state.length > 0) || (updatesBlob && updatesBlob.length > 0)) {
-			this.#storage.writeAsync(
-				`INSERT INTO yjs_documents (board_id, doc_state, updates_blob, updated_at)
-				 VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-				 ON CONFLICT(board_id) DO UPDATE SET
-				   doc_state = excluded.doc_state,
-				   updates_blob = excluded.updates_blob,
-				   updated_at = CURRENT_TIMESTAMP`,
+			this.#storage.upsertDocumentAsync(
 				boardId,
 				state ? Buffer.from(state) : Buffer.alloc(0),
 				updatesBlob ? Buffer.from(updatesBlob) : null,

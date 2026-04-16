@@ -1,4 +1,5 @@
-import type { ChatMessage, ChatChannel, ChatImage } from '$lib/types'
+import type { ChatImage } from '@shared/types'
+import type { ChatMessage, ChatChannel } from '$lib/types'
 
 const MAX_REGIONAL_MESSAGES = 50
 

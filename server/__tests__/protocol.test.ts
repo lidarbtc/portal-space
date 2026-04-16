@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from 'bun:test'
 import {
 	sanitizeString,
 	sanitizeNickname,
@@ -19,7 +19,7 @@ import {
 	MAX_CHAT_IMAGE_BASE64_LEN,
 	MAX_CHAT_IMAGE_BYTES,
 	MAX_INCOMING_WS_MESSAGE_BYTES,
-} from './protocol'
+} from '../protocol'
 
 function toBase64(bytes: number[]): string {
 	return btoa(String.fromCharCode(...bytes))

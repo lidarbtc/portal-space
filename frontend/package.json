@@ -7,12 +7,9 @@
 		"dev": "bun run build:tileset && vite dev --port 5173",
 		"build": "bun run build:tileset && vite build",
 		"preview": "vite preview",
-		"server": "bun run server.ts",
-		"dev:server": "bun --watch run server.ts",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"lint": "prettier --check . && eslint .",
 		"test": "vitest run",
-		"test:server": "bun test src/server/storage.test.ts src/server/yjs-relay.test.ts",
 		"test:watch": "vitest",
 		"format": "prettier --write .",
 		"prepare": "cd .. && husky frontend/.husky"

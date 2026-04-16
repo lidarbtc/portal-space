@@ -2,7 +2,7 @@
 	import { ToggleGroup } from 'bits-ui'
 	import { gameState } from '$lib/stores/game.svelte'
 	import { network } from '$lib/network'
-	import type { PlayerStatus, Emoji } from '$lib/types'
+	import type { PlayerStatus, Emoji } from '@shared/types'
 	import { CircleUserRound, SmilePlus, Settings } from '@lucide/svelte'
 	import CustomStatusModal from './custom-status-modal.svelte'
 	import { modalState } from '$lib/stores/modal.svelte'

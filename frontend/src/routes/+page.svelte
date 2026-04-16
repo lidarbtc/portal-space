@@ -18,7 +18,7 @@
 
 	const isMobile = new IsMobile()
 	import { modalState } from '$lib/stores/modal.svelte'
-	import { MAX_CHAT_IMAGE_BYTES, type OutgoingMessage, type ColorPalette } from '$lib/types'
+	import { MAX_CHAT_IMAGE_BYTES, type OutgoingMessage, type ColorPalette } from '@shared/types'
 
 	let inGame = $state(false)
 	let gameData: OutgoingMessage | null = $state(null)

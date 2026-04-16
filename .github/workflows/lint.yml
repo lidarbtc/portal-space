@@ -18,3 +18,4 @@ jobs:
         working-directory: frontend
       - run: bun run check
         working-directory: frontend
+      - run: bunx tsc --noEmit -p server/tsconfig.json

@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import type { InteractiveObject, RegionalChatState } from '$lib/types'
+import type { InteractiveObject, RegionalChatState } from '@shared/types'
 
 const TILE_SIZE = 16
 const INTERACTION_RADIUS = 1.5 * TILE_SIZE

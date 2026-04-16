@@ -9,7 +9,7 @@ import type {
 	ChatImage,
 	ColorPalette,
 	RegionalChatState,
-} from '$lib/types'
+} from '@shared/types'
 import { ServerClient } from './client'
 import {
 	TILE_SIZE,

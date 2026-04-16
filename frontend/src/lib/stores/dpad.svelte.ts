@@ -1,4 +1,4 @@
-import type { Direction } from '$lib/types'
+import type { Direction } from '@shared/types'
 
 class DpadStore {
 	direction = $state<Direction | null>(null)

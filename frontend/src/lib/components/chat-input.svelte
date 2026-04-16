@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte'
 	import { useEventListener } from 'runed'
 	import { gameState } from '$lib/stores/game.svelte'
-	import { MAX_CHAT_IMAGE_BYTES } from '$lib/types'
+	import { MAX_CHAT_IMAGE_BYTES } from '@shared/types'
 	import { regionalChatState } from '$lib/stores/regional-chat.svelte'
 
 	let {

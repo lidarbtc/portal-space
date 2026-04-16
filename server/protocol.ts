@@ -1,9 +1,16 @@
-import type { ChatImage, ColorPalette } from '$lib/types'
+import type { ChatImage, ColorPalette } from '@shared/types'
+import {
+	MAP_WIDTH,
+	MAP_HEIGHT,
+	MAX_NICKNAME_LEN,
+	MAX_CHAT_LEN,
+	MAX_CUSTOM_STATUS_LEN,
+	MAX_CHAT_IMAGE_BYTES,
+} from '@shared/types'
 
 // Map constants
 export const TILE_SIZE = 16
-export const MAP_WIDTH = 60
-export const MAP_HEIGHT = 45
+export { MAP_WIDTH, MAP_HEIGHT, MAX_NICKNAME_LEN, MAX_CHAT_LEN, MAX_CUSTOM_STATUS_LEN, MAX_CHAT_IMAGE_BYTES }
 export const MAP_PIXEL_WIDTH = MAP_WIDTH * TILE_SIZE
 export const MAP_PIXEL_HEIGHT = MAP_HEIGHT * TILE_SIZE
 
@@ -26,13 +33,7 @@ export const DASH_SPEED = 1000
 export const DASH_DURATION_MS = 150
 export const DASH_COOLDOWN_MS = 1500
 
-// String length limits
-export const MAX_NICKNAME_LEN = 20
-export const MAX_CHAT_LEN = 500
-export const MAX_CUSTOM_STATUS_LEN = 20
-
 // Chat image limits
-export const MAX_CHAT_IMAGE_BYTES = 2 * 1024 * 1024
 export const MAX_CHAT_IMAGE_BASE64_LEN = Math.floor((MAX_CHAT_IMAGE_BYTES + 2) / 3) * 4
 export const MAX_INCOMING_WS_MESSAGE_BYTES = MAX_CHAT_IMAGE_BASE64_LEN + 8 * 1024
 export const MAX_YJS_MESSAGE_BYTES = 1 << 20 // 1MB

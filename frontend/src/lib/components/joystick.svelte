@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { dpadState } from '$lib/stores/dpad.svelte'
-	import type { Direction } from '$lib/types'
+	import type { Direction } from '@shared/types'
 
 	const BASE_SIZE = 120
 	const MAX_RADIUS = BASE_SIZE / 2

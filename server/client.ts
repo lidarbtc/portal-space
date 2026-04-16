@@ -1,5 +1,5 @@
 import type { ServerWebSocket } from 'bun'
-import type { ColorPalette, OutgoingMessage, PlayerInfo } from '$lib/types'
+import type { ColorPalette, OutgoingMessage, PlayerInfo } from '@shared/types'
 
 export class ServerClient {
 	id: string

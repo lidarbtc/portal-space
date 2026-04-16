@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { network } from '$lib/network'
-	import type { Emoji } from '$lib/types'
+	import type { Emoji } from '@shared/types'
 	import { Tooltip } from 'bits-ui'
 
 	const emotes: { emoji: Emoji; label: string }[] = [

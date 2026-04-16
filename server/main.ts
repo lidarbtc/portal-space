@@ -1,8 +1,8 @@
 import type { ServerWebSocket } from 'bun'
-import { Hub } from './src/server/hub'
-import { Storage } from './src/server/storage'
-import { YjsRelay } from './src/server/yjs-relay'
-import { MAX_INCOMING_WS_MESSAGE_BYTES } from './src/server/protocol'
+import { Hub } from './hub'
+import { Storage } from './storage'
+import { YjsRelay } from './yjs-relay'
+import { MAX_INCOMING_WS_MESSAGE_BYTES } from './protocol'
 import { join } from 'path'
 import { existsSync } from 'fs'
 
@@ -10,7 +10,7 @@ type WsData = { type: 'game' } | { type: 'yjs'; boardId: string }
 
 const PORT = parseInt(process.env.PORT ?? '3000', 10)
 const DB_PATH = process.env.DB_PATH ?? 'portal-space.db'
-const BUILD_DIR = join(import.meta.dir, 'build')
+const BUILD_DIR = join(import.meta.dir, '../frontend/build')
 
 const storage = new Storage(DB_PATH)
 const hub = new Hub(storage)

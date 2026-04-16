@@ -5,7 +5,7 @@
 	import { createGameConfig } from '$lib/game/config'
 	import { gameState } from '$lib/stores/game.svelte'
 	import { objectsState } from '$lib/stores/objects.svelte'
-	import type { OutgoingMessage, InteractiveObject } from '$lib/types'
+	import type { OutgoingMessage, InteractiveObject } from '@shared/types'
 
 	let { snapshot }: { snapshot: OutgoingMessage | null } = $props()
 

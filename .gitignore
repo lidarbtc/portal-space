@@ -21,7 +21,8 @@ identity.json
 .omx/
 static.bak/
 
-# Frontend
+# Dependencies
+node_modules/
 frontend/node_modules/
 frontend/.svelte-kit/
 

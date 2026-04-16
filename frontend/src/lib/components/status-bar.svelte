@@ -2,7 +2,7 @@
 	import { ToggleGroup } from 'bits-ui'
 	import { gameState } from '$lib/stores/game.svelte'
 	import { network } from '$lib/network'
-	import type { PlayerStatus } from '$lib/types'
+	import type { PlayerStatus } from '@shared/types'
 
 	const statuses: { key: PlayerStatus; label: string; color: string }[] = [
 		{ key: 'online', label: '온라인', color: '#4ade80' },

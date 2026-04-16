@@ -1,4 +1,4 @@
-import type { ColorPalette } from '$lib/types'
+import type { ColorPalette } from '@shared/types'
 
 type RgbColor = { r: number; g: number; b: number }
 type HslColor = { h: number; s: number; l: number }

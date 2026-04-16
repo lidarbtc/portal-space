@@ -1,0 +1,11 @@
+{
+	"name": "portal-space",
+	"private": true,
+	"dependencies": {
+		"drizzle-orm": "latest"
+	},
+	"devDependencies": {
+		"@types/bun": "^1.3.12",
+		"drizzle-kit": "latest"
+	}
+}

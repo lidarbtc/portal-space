@@ -5,7 +5,7 @@
 	import { network } from '$lib/network'
 	import { DEFAULT_COLORS } from '$lib/game/palette-swap'
 	import { settingsState } from '$lib/stores/settings.svelte'
-	import type { ColorPalette } from '$lib/types'
+	import type { ColorPalette } from '@shared/types'
 	import { PersistedState } from 'runed'
 	import ColorCustomizer from './color-customizer.svelte'
 

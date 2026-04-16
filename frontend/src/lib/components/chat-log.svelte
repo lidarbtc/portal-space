@@ -2,9 +2,9 @@
 	import { SvelteSet } from 'svelte/reactivity'
 	import { onDestroy } from 'svelte'
 	import { gameState } from '$lib/stores/game.svelte'
-	import type { ChatImage, ChatMessage } from '$lib/types'
+	import type { ChatImage } from '@shared/types'
+	import type { ChatMessage, ChatChannel } from '$lib/types'
 	import { regionalChatState } from '$lib/stores/regional-chat.svelte'
-	import type { ChatChannel } from '$lib/types'
 	import { parseTextWithUrls } from '$lib/utils/linkify'
 	import { AlertDialog } from 'bits-ui'
 

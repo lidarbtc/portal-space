@@ -2,7 +2,7 @@
 	import { Dialog } from 'bits-ui'
 	import { network } from '$lib/network'
 	import { gameState } from '$lib/stores/game.svelte'
-	import { MAX_CUSTOM_STATUS_LEN } from '$lib/types'
+	import { MAX_CUSTOM_STATUS_LEN } from '@shared/types'
 
 	let { open = $bindable(false) }: { open: boolean } = $props()
 

@@ -1,5 +1,5 @@
 import { SvelteMap } from 'svelte/reactivity'
-import type { InteractiveObject } from '$lib/types'
+import type { InteractiveObject } from '@shared/types'
 
 class ObjectsStore {
 	objects = new SvelteMap<string, InteractiveObject>()

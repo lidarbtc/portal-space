@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach } from 'vitest'
-import { Room } from './room'
-import { TILE_SIZE, MAP_WIDTH, MAP_HEIGHT } from './protocol'
-import type { OutgoingMessage } from '$lib/types'
+import { describe, it, expect, beforeEach } from 'bun:test'
+import { Room } from '../room'
+import { TILE_SIZE, MAP_WIDTH, MAP_HEIGHT } from '../protocol'
+import type { OutgoingMessage } from '@shared/types'
 import type { ServerWebSocket } from 'bun'
 
 // Mock WebSocket that collects sent messages
