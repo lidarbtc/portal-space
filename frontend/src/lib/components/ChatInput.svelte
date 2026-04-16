@@ -125,28 +125,19 @@
 		}
 	}
 
-	async function handleFileChange(e: Event) {
-		const target = e.currentTarget as HTMLInputElement | null
-		const file = target?.files?.[0]
-		if (!file) return
-
-		imageError = ''
-
+	async function processImageFile(file: File) {
 		if (!file.type.startsWith('image/')) {
 			imageError = '이미지 파일만 전송할 수 있습니다.'
-			target.value = ''
 			return
 		}
 
 		if (file.type === 'image/gif' && file.size > MAX_CHAT_IMAGE_BYTES) {
 			imageError = 'GIF 이미지는 2MB 이하만 전송할 수 있습니다.'
-			target.value = ''
 			return
 		}
 
 		if (file.type !== 'image/gif' && file.size > MAX_CHAT_IMAGE_SOURCE_BYTES) {
 			imageError = '이미지는 원본 10MB 이하 파일만 업로드할 수 있습니다.'
-			target.value = ''
 			return
 		}
 
@@ -162,6 +153,35 @@
 			imageError = error instanceof Error ? error.message : '이미지 전송에 실패했습니다.'
 		} finally {
 			isSendingImage = false
+		}
+	}
+
+	function handlePaste(e: ClipboardEvent) {
+		const items = e.clipboardData?.items
+		if (!items) return
+
+		for (const item of items) {
+			if (!item.type.startsWith('image/')) continue
+			const file = item.getAsFile()
+			if (!file) return
+
+			e.preventDefault()
+			imageError = ''
+			processImageFile(file)
+			return
+		}
+	}
+
+	async function handleFileChange(e: Event) {
+		const target = e.currentTarget as HTMLInputElement | null
+		const file = target?.files?.[0]
+		if (!file) return
+
+		imageError = ''
+
+		await processImageFile(file)
+
+		if (target) {
 			target.value = ''
 		}
 	}
@@ -204,6 +224,7 @@
 					onkeydown={handleKeydown}
 					onfocus={handleFocus}
 					onblur={handleBlur}
+					onpaste={handlePaste}
 					disabled={isSendingImage}
 				/>
 			{/if}
