@@ -1,28 +1,16 @@
+import { PersistedState } from 'runed'
+
 export const ZOOM_STEPS = [0.5, 1, 2] as const
 
-const STORAGE_KEY = 'camera-zoom'
-
 class ZoomStore {
-	level = $state(1)
+	#level = new PersistedState('camera-zoom', 1)
 
-	constructor() {
-		if (typeof localStorage !== 'undefined') {
-			const saved = localStorage.getItem(STORAGE_KEY)
-			if (saved !== null) {
-				const parsed = parseFloat(saved)
-				if ((ZOOM_STEPS as readonly number[]).includes(parsed)) {
-					this.level = parsed
-				}
-			}
-		}
-
-		// Cleanup intentionally not called — singleton lives for app lifetime
-		$effect.root(() => {
-			$effect(() => {
-				if (typeof localStorage !== 'undefined')
-					localStorage.setItem(STORAGE_KEY, String(this.level))
-			})
-		})
+	get level() {
+		return this.#level.current
+	}
+	set level(v: number) {
+		if (!(ZOOM_STEPS as readonly number[]).includes(v)) return
+		this.#level.current = v
 	}
 
 	zoomIn() {

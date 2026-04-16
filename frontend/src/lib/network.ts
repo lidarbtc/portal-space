@@ -22,19 +22,19 @@ type MessageHandler = (msg: OutgoingMessage) => void
 type DisconnectHandler = () => void
 
 class NetworkClient {
-	private ws: WebSocket | null = null
-	private handlers: Map<string, MessageHandler | DisconnectHandler> = new Map()
-	private _connected = false
+	#ws: WebSocket | null = null
+	#handlers: Map<string, MessageHandler | DisconnectHandler> = new Map()
+	#_connected = false
 
 	// Reconnection state
-	private lastNickname = ''
-	private lastColors: ColorPalette = { ...DEFAULT_COLORS }
-	private lastX = 0
-	private lastY = 0
-	private shouldReconnect = false
-	private reconnecting = false
-	private reconnectFiber: Fiber.RuntimeFiber<void, never> | null = null
-	private connectTimeoutId: ReturnType<typeof setTimeout> | undefined
+	#lastNickname = ''
+	#lastColors: ColorPalette = { ...DEFAULT_COLORS }
+	#lastX = 0
+	#lastY = 0
+	#shouldReconnect = false
+	#reconnecting = false
+	#reconnectFiber: Fiber.RuntimeFiber<void, never> | null = null
+	#connectTimeoutId: ReturnType<typeof setTimeout> | undefined
 
 	connect(
 		nickname: string,
@@ -44,22 +44,22 @@ class NetworkClient {
 	): Promise<OutgoingMessage> {
 		return new Promise((resolve, reject) => {
 			// Clean up old socket before creating new one
-			if (this.ws) {
-				this.ws.onclose = () => {}
-				this.ws.onerror = () => {}
+			if (this.#ws) {
+				this.#ws.onclose = () => {}
+				this.#ws.onerror = () => {}
 				if (
-					this.ws.readyState === WebSocket.OPEN ||
-					this.ws.readyState === WebSocket.CONNECTING
+					this.#ws.readyState === WebSocket.OPEN ||
+					this.#ws.readyState === WebSocket.CONNECTING
 				) {
-					this.ws.close()
+					this.#ws.close()
 				}
-				this.ws = null
+				this.#ws = null
 			}
 
 			// Clear any pending timeout from previous connect
-			if (this.connectTimeoutId !== undefined) {
-				clearTimeout(this.connectTimeoutId)
-				this.connectTimeoutId = undefined
+			if (this.#connectTimeoutId !== undefined) {
+				clearTimeout(this.#connectTimeoutId)
+				this.#connectTimeoutId = undefined
 			}
 
 			const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
@@ -72,16 +72,16 @@ class NetworkClient {
 			}
 
 			const url = `${proto}//${location.host}${wsPath}`
-			this.ws = new WebSocket(url)
+			this.#ws = new WebSocket(url)
 			let settled = false
 
-			this.ws.onopen = () => {
-				this._connected = true
+			this.#ws.onopen = () => {
+				this.#_connected = true
 				connectionState.state = 'connected'
 				this.send({ type: 'join', nickname, colors, ...position })
 			}
 
-			this.ws.onmessage = (event: MessageEvent) => {
+			this.#ws.onmessage = (event: MessageEvent) => {
 				try {
 					const raw: unknown = JSON.parse(event.data)
 					const decoded = parseOutgoingMessage(raw)
@@ -94,13 +94,13 @@ class NetworkClient {
 					if (msg.type === 'snapshot') {
 						if (!settled) {
 							settled = true
-							if (this.connectTimeoutId !== undefined) {
-								clearTimeout(this.connectTimeoutId)
-								this.connectTimeoutId = undefined
+							if (this.#connectTimeoutId !== undefined) {
+								clearTimeout(this.#connectTimeoutId)
+								this.#connectTimeoutId = undefined
 							}
 							if (msg.self) {
-								this.lastX = msg.self.x
-								this.lastY = msg.self.y
+								this.#lastX = msg.self.x
+								this.#lastY = msg.self.y
 							}
 							if (onSnapshot) onSnapshot(msg)
 							resolve(msg)
@@ -114,32 +114,32 @@ class NetworkClient {
 						}
 						return
 					}
-					const handler = this.handlers.get(msg.type)
+					const handler = this.#handlers.get(msg.type)
 					if (handler) (handler as MessageHandler)(msg)
 				} catch (e) {
 					console.error('[network] parse error:', e)
 				}
 			}
 
-			this.ws.onclose = () => {
-				this._connected = false
+			this.#ws.onclose = () => {
+				this.#_connected = false
 
 				// If reconnecting, this is from an old socket — ignore
-				if (this.reconnecting) return
+				if (this.#reconnecting) return
 
 				// Auto-reconnect: go directly to 'reconnecting', skip 'disconnected'
 				// to prevent the $effect in +page.svelte from destroying the game
-				if (this.shouldReconnect) {
-					this.attemptReconnect()
+				if (this.#shouldReconnect) {
+					this.#attemptReconnect()
 					return
 				}
 
 				connectionState.state = 'disconnected'
-				const handler = this.handlers.get('disconnect')
+				const handler = this.#handlers.get('disconnect')
 				if (handler) (handler as DisconnectHandler)()
 			}
 
-			this.ws.onerror = () => {
+			this.#ws.onerror = () => {
 				if (!settled) {
 					settled = true
 					reject(new WebSocketError('WebSocket connection failed'))
@@ -147,11 +147,11 @@ class NetworkClient {
 			}
 
 			// Store for reconnection
-			this.lastNickname = nickname
-			this.lastColors = { ...colors }
+			this.#lastNickname = nickname
+			this.#lastColors = { ...colors }
 
-			this.connectTimeoutId = setTimeout(() => {
-				this.connectTimeoutId = undefined
+			this.#connectTimeoutId = setTimeout(() => {
+				this.#connectTimeoutId = undefined
 				if (!settled) {
 					settled = true
 					reject(new ConnectionTimeoutError(5000))
@@ -162,17 +162,17 @@ class NetworkClient {
 
 	/** Mark as ready for auto-reconnect (call after first successful join) */
 	enableReconnect(): void {
-		this.shouldReconnect = true
+		this.#shouldReconnect = true
 	}
 
-	private attemptReconnect(): void {
+	#attemptReconnect(): void {
 		// Cancel any in-flight reconnect before starting new one
-		if (this.reconnectFiber) {
-			Effect.runSync(Fiber.interrupt(this.reconnectFiber))
-			this.reconnectFiber = null
+		if (this.#reconnectFiber) {
+			Effect.runSync(Fiber.interrupt(this.#reconnectFiber))
+			this.#reconnectFiber = null
 		}
 
-		this.reconnecting = true
+		this.#reconnecting = true
 		connectionState.state = 'reconnecting'
 
 		// onReconnectSnapshot runs in browser event loop (WebSocket onmessage callback),
@@ -190,8 +190,8 @@ class NetworkClient {
 			gameState.players = newMap
 			if (msg.self) {
 				gameState.selfId = msg.self.id
-				this.lastX = msg.self.x
-				this.lastY = msg.self.y
+				this.#lastX = msg.self.x
+				this.#lastY = msg.self.y
 			}
 			gameState.addSystemMessage('재접속되었습니다.')
 		}
@@ -199,9 +199,9 @@ class NetworkClient {
 		// Effect.retry with exponential backoff + jitter, max 60s elapsed
 		const connectEffect = Effect.tryPromise({
 			try: () =>
-				this.connect(this.lastNickname, this.lastColors, onReconnectSnapshot, {
-					x: this.lastX,
-					y: this.lastY,
+				this.connect(this.#lastNickname, this.#lastColors, onReconnectSnapshot, {
+					x: this.#lastX,
+					y: this.#lastY,
 					reconnect: true,
 				}),
 			catch: (e) =>
@@ -221,22 +221,22 @@ class NetworkClient {
 		const reconnectEffect = connectEffect.pipe(Effect.retry(retrySchedule))
 
 		// Store mutations at the Effect.runPromise boundary — not inside Effect pipeline
-		this.reconnectFiber = Effect.runFork(
+		this.#reconnectFiber = Effect.runFork(
 			reconnectEffect.pipe(
 				Effect.matchEffect({
 					onSuccess: (_msg) =>
 						Effect.sync(() => {
-							this.reconnecting = false
-							this.reconnectFiber = null
+							this.#reconnecting = false
+							this.#reconnectFiber = null
 							connectionState.state = 'connected'
 						}),
 					onFailure: () =>
 						Effect.sync(() => {
-							this.reconnecting = false
-							this.shouldReconnect = false
-							this.reconnectFiber = null
+							this.#reconnecting = false
+							this.#shouldReconnect = false
+							this.#reconnectFiber = null
 							connectionState.state = 'disconnected'
-							const handler = this.handlers.get('disconnect')
+							const handler = this.#handlers.get('disconnect')
 							if (handler) (handler as DisconnectHandler)()
 						}),
 				}),
@@ -246,37 +246,37 @@ class NetworkClient {
 
 	/** Intentional disconnect — do not auto-reconnect */
 	disconnect(): void {
-		this.shouldReconnect = false
-		this.reconnecting = false
-		if (this.reconnectFiber) {
-			Effect.runSync(Fiber.interrupt(this.reconnectFiber))
-			this.reconnectFiber = null
+		this.#shouldReconnect = false
+		this.#reconnecting = false
+		if (this.#reconnectFiber) {
+			Effect.runSync(Fiber.interrupt(this.#reconnectFiber))
+			this.#reconnectFiber = null
 		}
-		if (this.ws) {
-			this.ws.onclose = () => {}
-			this.ws.onerror = () => {}
-			this.ws.close()
-			this.ws = null
+		if (this.#ws) {
+			this.#ws.onclose = () => {}
+			this.#ws.onerror = () => {}
+			this.#ws.close()
+			this.#ws = null
 		}
-		this._connected = false
+		this.#_connected = false
 		connectionState.state = 'disconnected'
 	}
 
 	send(msg: IncomingMessage): boolean {
-		if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-			this.ws.send(JSON.stringify(msg))
+		if (this.#ws && this.#ws.readyState === WebSocket.OPEN) {
+			this.#ws.send(JSON.stringify(msg))
 			return true
 		}
 		return false
 	}
 
 	on(type: MsgType | 'disconnect', handler: MessageHandler | DisconnectHandler): void {
-		this.handlers.set(type, handler)
+		this.#handlers.set(type, handler)
 	}
 
 	sendMove(x: number, y: number, dir: Direction): void {
-		this.lastX = x
-		this.lastY = y
+		this.#lastX = x
+		this.#lastY = y
 		this.send({ type: 'move', x, y, dir })
 	}
 
@@ -312,8 +312,8 @@ class NetworkClient {
 	}
 
 	sendProfile(nickname: string, colors: ColorPalette): boolean {
-		this.lastNickname = nickname
-		this.lastColors = { ...colors }
+		this.#lastNickname = nickname
+		this.#lastColors = { ...colors }
 		return this.send({ type: 'profile', nickname, colors })
 	}
 
@@ -325,12 +325,12 @@ class NetworkClient {
 	}
 
 	sendAction(domain: string, action: string, objectId?: string, payload?: unknown): void {
-		if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+		if (this.#ws && this.#ws.readyState === WebSocket.OPEN) {
 			const envelope: Record<string, unknown> = { domain, action }
 			if (objectId) envelope.objectId = objectId
 			if (payload !== undefined) envelope.payload = payload
 			// Send as { type: "action", payload: {object} } — payload must be a JSON object, not a string
-			this.ws.send(JSON.stringify({ type: 'action', payload: envelope }))
+			this.#ws.send(JSON.stringify({ type: 'action', payload: envelope }))
 		}
 	}
 
@@ -343,7 +343,7 @@ class NetworkClient {
 	}
 
 	get isConnected(): boolean {
-		return this._connected
+		return this.#_connected
 	}
 }
 

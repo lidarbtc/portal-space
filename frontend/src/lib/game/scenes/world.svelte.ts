@@ -50,35 +50,35 @@ interface PlayerObject {
 }
 
 export class WorldScene extends Phaser.Scene {
-	private playerObjects: Map<string, PlayerObject> = new Map() // eslint-disable-line svelte/prefer-svelte-reactivity
-	private gameObjects: Map<string, GameInteractiveObject> = new Map() // eslint-disable-line svelte/prefer-svelte-reactivity
-	private entityContainer!: Phaser.GameObjects.Container
-	private localPlayerId: string | null = null
-	private tileSize = 16
-	private effectCleanups: Array<() => void> = []
+	#playerObjects: Map<string, PlayerObject> = new Map() // eslint-disable-line svelte/prefer-svelte-reactivity
+	#gameObjects: Map<string, GameInteractiveObject> = new Map() // eslint-disable-line svelte/prefer-svelte-reactivity
+	#entityContainer!: Phaser.GameObjects.Container
+	#localPlayerId: string | null = null
+	#tileSize = 16
+	#effectCleanups: Array<() => void> = []
 
-	private cursors!: Phaser.Types.Input.Keyboard.CursorKeys
-	private wasd!: {
+	#cursors!: Phaser.Types.Input.Keyboard.CursorKeys
+	#wasd!: {
 		up: Phaser.Input.Keyboard.Key
 		down: Phaser.Input.Keyboard.Key
 		left: Phaser.Input.Keyboard.Key
 		right: Phaser.Input.Keyboard.Key
 	}
-	private collisionLayers: Phaser.Tilemaps.TilemapLayer[] = []
-	private mapWidth = MAP_WIDTH
-	private mapHeight = MAP_HEIGHT
+	#collisionLayers: Phaser.Tilemaps.TilemapLayer[] = []
+	#mapWidth = MAP_WIDTH
+	#mapHeight = MAP_HEIGHT
 
 	// Network send throttle
-	private lastNetworkSendTime = 0
-	private wasMoving = false
+	#lastNetworkSendTime = 0
+	#wasMoving = false
 
 	// Dash state
-	private isDashing = false
-	private dashDir: Direction | null = null
-	private modalOpen = false
-	private dashStartTime = 0
-	private lastDashTime = 0
-	private spaceKey!: Phaser.Input.Keyboard.Key
+	#isDashing = false
+	#dashDir: Direction | null = null
+	#modalOpen = false
+	#dashStartTime = 0
+	#lastDashTime = 0
+	#spaceKey!: Phaser.Input.Keyboard.Key
 
 	constructor() {
 		super({ key: 'WorldScene' })
@@ -96,32 +96,32 @@ export class WorldScene extends Phaser.Scene {
 
 	create(): void {
 		createAvatarSpritesheet(this)
-		this.createMap()
+		this.#createMap()
 
 		this.cameras.main.setBounds(
 			0,
 			0,
-			this.mapWidth * this.tileSize,
-			this.mapHeight * this.tileSize,
+			this.#mapWidth * this.#tileSize,
+			this.#mapHeight * this.#tileSize,
 		)
 
 		// Declarative y-sort layer: all y-sortable entities go here
-		this.entityContainer = this.add.container(0, 0)
-		this.entityContainer.setDepth(10)
+		this.#entityContainer = this.add.container(0, 0)
+		this.#entityContainer.setDepth(10)
 		this.events.on('postupdate', () => {
-			this.entityContainer.sort('y')
+			this.#entityContainer.sort('y')
 		})
 
 		const currentPlayers = gameState.players
 		const currentSelfId = gameState.selfId
-		this.localPlayerId = currentSelfId
+		this.#localPlayerId = currentSelfId
 
 		currentPlayers.forEach((info) => {
-			this.addPlayer(info)
+			this.#addPlayer(info)
 		})
 
-		this.cursors = this.input.keyboard!.createCursorKeys()
-		this.wasd = this.input.keyboard!.addKeys(
+		this.#cursors = this.input.keyboard!.createCursorKeys()
+		this.#wasd = this.input.keyboard!.addKeys(
 			{
 				up: Phaser.Input.Keyboard.KeyCodes.W,
 				down: Phaser.Input.Keyboard.KeyCodes.S,
@@ -136,7 +136,7 @@ export class WorldScene extends Phaser.Scene {
 			right: Phaser.Input.Keyboard.Key
 		}
 
-		this.spaceKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE, false)
+		this.#spaceKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE, false)
 
 		const cursorCaptureCodes = [
 			Phaser.Input.Keyboard.KeyCodes.LEFT,
@@ -144,11 +144,11 @@ export class WorldScene extends Phaser.Scene {
 			Phaser.Input.Keyboard.KeyCodes.UP,
 			Phaser.Input.Keyboard.KeyCodes.DOWN,
 		]
-		this.effectCleanups.push(
+		this.#effectCleanups.push(
 			$effect.root(() => {
 				$effect(() => {
-					this.modalOpen = modalState.anyModalOpen
-					if (this.modalOpen) {
+					this.#modalOpen = modalState.anyModalOpen
+					if (this.#modalOpen) {
 						this.input.keyboard?.removeCapture(cursorCaptureCodes)
 					} else {
 						this.input.keyboard?.addCapture(cursorCaptureCodes)
@@ -157,42 +157,42 @@ export class WorldScene extends Phaser.Scene {
 			}),
 		)
 
-		this.setupNetwork()
-		this.setupZoom()
-		this.setupInteractiveObjects()
+		this.#setupNetwork()
+		this.#setupZoom()
+		this.#setupInteractiveObjects()
 
 		// Render objects already in store (from initial snapshot)
 		const currentObjects = objectsState.objects
 		currentObjects.forEach((obj, id) => {
-			if (!this.gameObjects.has(id)) {
+			if (!this.#gameObjects.has(id)) {
 				const gameObj = createInteractiveObject(this, obj)
-				this.gameObjects.set(id, gameObj)
+				this.#gameObjects.set(id, gameObj)
 				gameObj.container.on('pointerdown', () => {
-					this.onObjectInteract(obj)
+					this.#onObjectInteract(obj)
 				})
 			}
 		})
 
-		this.effectCleanups.push(
+		this.#effectCleanups.push(
 			$effect.root(() => {
 				$effect(() => {
-					this.localPlayerId = gameState.selfId
+					this.#localPlayerId = gameState.selfId
 				})
 			}),
 		)
 
-		this.effectCleanups.push(
+		this.#effectCleanups.push(
 			$effect.root(() => {
 				$effect(() => {
 					const currentMap = gameState.players
 					currentMap.forEach((info, id) => {
-						if (!this.playerObjects.has(id)) {
-							this.addPlayer(info)
+						if (!this.#playerObjects.has(id)) {
+							this.#addPlayer(info)
 						}
 					})
-					this.playerObjects.forEach((_, id) => {
+					this.#playerObjects.forEach((_, id) => {
 						if (!currentMap.has(id)) {
-							this.removePlayer(id)
+							this.#removePlayer(id)
 						}
 					})
 				})
@@ -200,18 +200,18 @@ export class WorldScene extends Phaser.Scene {
 		)
 
 		this.events.on('shutdown', () => {
-			this.effectCleanups.forEach((fn) => fn())
-			this.effectCleanups = []
+			this.#effectCleanups.forEach((fn) => fn())
+			this.#effectCleanups = []
 		})
 	}
 
-	private createMap(): void {
+	#createMap(): void {
 		const map = this.make.tilemap({ key: 'map' })
 		const tileset = map.addTilesetImage('tileset', 'tileset')!
 
 		// Read map dimensions from Tiled JSON
-		this.mapWidth = map.width
-		this.mapHeight = map.height
+		this.#mapWidth = map.width
+		this.#mapHeight = map.height
 
 		// Ground layer (floor tiles)
 		map.createLayer('ground', tileset, 0, 0)!
@@ -227,18 +227,18 @@ export class WorldScene extends Phaser.Scene {
 		// Decoration layer (plants, no collision)
 		map.createLayer('decoration', tileset, 0, 0)
 
-		this.collisionLayers = [wallsLayer, furnitureLayer]
+		this.#collisionLayers = [wallsLayer, furnitureLayer]
 	}
 
-	private setupZoom(): void {
+	#setupZoom(): void {
 		const cam = this.cameras.main
-		const mapPixelW = this.mapWidth * this.tileSize
-		const mapPixelH = this.mapHeight * this.tileSize
+		const mapPixelW = this.#mapWidth * this.#tileSize
+		const mapPixelH = this.#mapHeight * this.#tileSize
 
 		let lastAppliedZoom = 1
 
 		// React to zoom store changes — apply camera zoom
-		this.effectCleanups.push(
+		this.#effectCleanups.push(
 			$effect.root(() => {
 				$effect(() => {
 					const level = zoomState.level
@@ -283,13 +283,13 @@ export class WorldScene extends Phaser.Scene {
 			}
 		}
 		this.scale.on('resize', onResize)
-		this.effectCleanups.push(() => this.scale.off('resize', onResize))
+		this.#effectCleanups.push(() => this.scale.off('resize', onResize))
 	}
 
-	private setupNetwork(): void {
+	#setupNetwork(): void {
 		network.on('join', (msg) => {
 			if (msg.player) {
-				this.addPlayer(msg.player)
+				this.#addPlayer(msg.player)
 				gameState.players.set(msg.player.id, msg.player)
 				gameState.addSystemMessage(
 					msg.player.nickname +
@@ -300,21 +300,21 @@ export class WorldScene extends Phaser.Scene {
 
 		network.on('leave', (msg) => {
 			if (!msg.id) return
-			const obj = this.playerObjects.get(msg.id)
+			const obj = this.#playerObjects.get(msg.id)
 			const nickname = obj?.nickname ?? '알 수 없는 유저'
-			this.removePlayer(msg.id)
+			this.#removePlayer(msg.id)
 			gameState.players.delete(msg.id)
 			gameState.addSystemMessage(nickname + '님이 퇴장했습니다.')
 		})
 
 		network.on('move', (msg) => {
-			if (msg.id && msg.id !== this.localPlayerId) {
-				const p = this.playerObjects.get(msg.id)
+			if (msg.id && msg.id !== this.#localPlayerId) {
+				const p = this.#playerObjects.get(msg.id)
 				if (p) {
 					p.targetX = msg.x
 					p.targetY = msg.y
 					p.dir = msg.dir ?? 'down'
-					this.updateCharacterFrame(p, p.dir)
+					this.#updateCharacterFrame(p, p.dir)
 				}
 				const info = gameState.players.get(msg.id)
 				if (info) {
@@ -330,7 +330,7 @@ export class WorldScene extends Phaser.Scene {
 
 		network.on('status', (msg) => {
 			if (msg.id && msg.status) {
-				this.updatePlayerStatus(msg.id, msg.status)
+				this.#updatePlayerStatus(msg.id, msg.status)
 				const p = gameState.players.get(msg.id)
 				if (p) {
 					gameState.players.set(msg.id, { ...p, status: msg.status })
@@ -340,13 +340,13 @@ export class WorldScene extends Phaser.Scene {
 
 		network.on('customStatus', (msg) => {
 			if (msg.id) {
-				this.updateCustomStatus(msg.id, msg.customStatus ?? '')
+				this.#updateCustomStatus(msg.id, msg.customStatus ?? '')
 			}
 		})
 
 		network.on('emote', (msg) => {
 			if (msg.id && msg.emoji) {
-				this.showEmote(msg.id, msg.emoji)
+				this.#showEmote(msg.id, msg.emoji)
 			}
 		})
 
@@ -355,7 +355,7 @@ export class WorldScene extends Phaser.Scene {
 				msg.image && ALLOWED_CHAT_IMAGE_MIMES.has(msg.image.mime) ? msg.image : undefined
 
 			if (msg.id && msg.nickname && (msg.text || image)) {
-				if (msg.id !== this.localPlayerId && gameState.currentStatus !== 'dnd') {
+				if (msg.id !== this.#localPlayerId && gameState.currentStatus !== 'dnd') {
 					notifyAudio.playIfHidden()
 				}
 				// Zone enter/exit system messages
@@ -373,14 +373,14 @@ export class WorldScene extends Phaser.Scene {
 
 				// Regional chat message
 				if (msg.zoneId) {
-					if (msg.id !== this.localPlayerId && gameState.currentStatus !== 'dnd') {
+					if (msg.id !== this.#localPlayerId && gameState.currentStatus !== 'dnd') {
 						notifyAudio.playIfHidden()
 					}
 					if (msg.id && msg.nickname && (msg.text || image)) {
 						const senderColors = gameState.players.get(msg.id)?.colors
 						const bubbleText =
 							image && msg.text ? `[사진] ${msg.text}` : (msg.text ?? '[사진]')
-						this.showChatBubble(msg.id, bubbleText, msg.nickname)
+						this.#showChatBubble(msg.id, bubbleText, msg.nickname)
 						regionalChatState.addRegionalMessage({
 							senderId: msg.id,
 							nickname: msg.nickname,
@@ -393,14 +393,14 @@ export class WorldScene extends Phaser.Scene {
 				}
 
 				// Global chat message (existing behavior)
-				if (msg.id !== this.localPlayerId && gameState.currentStatus !== 'dnd') {
+				if (msg.id !== this.#localPlayerId && gameState.currentStatus !== 'dnd') {
 					notifyAudio.playIfHidden()
 				}
 				if (msg.id && msg.nickname && (msg.text || image)) {
 					const senderColors = gameState.players.get(msg.id)?.colors
 					const bubbleText =
 						image && msg.text ? `[사진] ${msg.text}` : (msg.text ?? '[사진]')
-					this.showChatBubble(msg.id, bubbleText, msg.nickname)
+					this.#showChatBubble(msg.id, bubbleText, msg.nickname)
 					gameState.addChatMessage({
 						senderId: msg.id,
 						nickname: msg.nickname,
@@ -414,7 +414,7 @@ export class WorldScene extends Phaser.Scene {
 
 		network.on('profile', (msg) => {
 			if (!msg.id || !msg.player) return
-			const p = this.playerObjects.get(msg.id)
+			const p = this.#playerObjects.get(msg.id)
 			if (!p) return
 
 			// Update nickname
@@ -451,8 +451,8 @@ export class WorldScene extends Phaser.Scene {
 		})
 
 		network.on('dash', (msg) => {
-			if (!msg.id || msg.id === this.localPlayerId) return
-			const p = this.playerObjects.get(msg.id)
+			if (!msg.id || msg.id === this.#localPlayerId) return
+			const p = this.#playerObjects.get(msg.id)
 			if (!p) return
 			const dir = (msg.dir as Direction) ?? 'down'
 			const dirFrame: Record<Direction, number> = {
@@ -461,12 +461,12 @@ export class WorldScene extends Phaser.Scene {
 				right: 2,
 				left: 3,
 			}
-			this.spawnDashAfterimages(msg.x, msg.y, dir, p.textureKey, dirFrame[dir])
+			this.#spawnDashAfterimages(msg.x, msg.y, dir, p.textureKey, dirFrame[dir])
 		})
 
 		network.on('snapshot', (msg) => {
-			this.lastNetworkSendTime = 0
-			this.wasMoving = false
+			this.#lastNetworkSendTime = 0
+			this.#wasMoving = false
 
 			const newMap = new SvelteMap<string, PlayerInfo>()
 			if (msg.players) {
@@ -477,9 +477,9 @@ export class WorldScene extends Phaser.Scene {
 			if (msg.self) {
 				newMap.set(msg.self.id, msg.self)
 				gameState.selfId = msg.self.id
-				this.localPlayerId = msg.self.id
+				this.#localPlayerId = msg.self.id
 
-				const localObj = this.playerObjects.get(msg.self.id)
+				const localObj = this.#playerObjects.get(msg.self.id)
 				if (localObj) {
 					this.cameras.main.startFollow(localObj.container, true, 0.1, 0.1)
 				}
@@ -491,11 +491,11 @@ export class WorldScene extends Phaser.Scene {
 				const objMap = new SvelteMap<string, InteractiveObject>()
 				msg.objects.forEach((obj) => {
 					objMap.set(obj.id, obj)
-					if (!this.gameObjects.has(obj.id)) {
+					if (!this.#gameObjects.has(obj.id)) {
 						const gameObj = createInteractiveObject(this, obj)
-						this.gameObjects.set(obj.id, gameObj)
+						this.#gameObjects.set(obj.id, gameObj)
 						gameObj.container.on('pointerdown', () => {
-							this.onObjectInteract(obj)
+							this.#onObjectInteract(obj)
 						})
 					}
 				})
@@ -508,7 +508,7 @@ export class WorldScene extends Phaser.Scene {
 			if (!ap || ap.domain !== 'regional_chat' || ap.action !== 'state_updated') return
 			if (!ap.objectId) return
 
-			const gObj = this.gameObjects.get(ap.objectId)
+			const gObj = this.#gameObjects.get(ap.objectId)
 			if (!gObj || gObj.data.type !== 'regional_chat') return
 
 			const newState = ap.payload as RegionalChatState | undefined
@@ -543,8 +543,8 @@ export class WorldScene extends Phaser.Scene {
 		})
 	}
 
-	private addPlayer(info: PlayerInfo): void {
-		if (this.playerObjects.has(info.id)) return
+	#addPlayer(info: PlayerInfo): void {
+		if (this.#playerObjects.has(info.id)) return
 
 		// Server now sends pixel coordinates directly
 		const px = info.x
@@ -568,7 +568,7 @@ export class WorldScene extends Phaser.Scene {
 		const sprite = this.add.sprite(0, 0, textureKey, frameIndex)
 
 		const nameText = this.add
-			.text(0, -this.tileSize / 2 - 14, info.nickname, {
+			.text(0, -this.#tileSize / 2 - 14, info.nickname, {
 				fontSize: '12px',
 				color: '#e0e0ff',
 				fontFamily: 'MulmaruMono',
@@ -580,17 +580,17 @@ export class WorldScene extends Phaser.Scene {
 
 		const statusDot = this.add.graphics()
 		const dotColor = Phaser.Display.Color.HexStringToColor(
-			this.getStatusColor(info.status),
+			this.#getStatusColor(info.status),
 		).color
 		statusDot.fillStyle(dotColor, 1)
 		statusDot.fillCircle(0, 0, 3)
-		statusDot.setPosition(-nameText.width / 2 + 8, -this.tileSize / 2 - 14)
+		statusDot.setPosition(-nameText.width / 2 + 8, -this.#tileSize / 2 - 14)
 
 		// Container groups character elements; entityContainer auto-sorts by y
 		const container = this.add.container(px, py, [sprite, nameText, statusDot])
-		this.entityContainer.add(container)
+		this.#entityContainer.add(container)
 
-		this.playerObjects.set(info.id, {
+		this.#playerObjects.set(info.id, {
 			container,
 			sprite,
 			nameText,
@@ -610,16 +610,16 @@ export class WorldScene extends Phaser.Scene {
 		})
 
 		if (info.customStatus) {
-			this.updateCustomStatus(info.id, info.customStatus)
+			this.#updateCustomStatus(info.id, info.customStatus)
 		}
 
-		if (info.id === this.localPlayerId) {
+		if (info.id === this.#localPlayerId) {
 			this.cameras.main.startFollow(container, true, 0.1, 0.1)
 		}
 	}
 
-	private removePlayer(id: string): void {
-		const p = this.playerObjects.get(id)
+	#removePlayer(id: string): void {
+		const p = this.#playerObjects.get(id)
 		if (!p) return
 		p.container.destroy() // destroys sprite, nameText, statusDot together
 		if (p.bubbleText) {
@@ -640,49 +640,50 @@ export class WorldScene extends Phaser.Scene {
 			this.textures.remove(playerTexKey)
 		}
 
-		this.playerObjects.delete(id)
+		this.#playerObjects.delete(id)
 	}
 
-	private isTileBlocked(tileX: number, tileY: number): boolean {
-		if (tileX < 0 || tileX >= this.mapWidth || tileY < 0 || tileY >= this.mapHeight) return true
-		return this.collisionLayers.some((layer) => {
+	#isTileBlocked(tileX: number, tileY: number): boolean {
+		if (tileX < 0 || tileX >= this.#mapWidth || tileY < 0 || tileY >= this.#mapHeight)
+			return true
+		return this.#collisionLayers.some((layer) => {
 			const tile = layer.getTileAt(tileX, tileY)
 			return tile !== null && tile.properties?.collides === true
 		})
 	}
 
-	private checkCollision(
+	#checkCollision(
 		p: PlayerObject,
 		newPx: number,
 		newPy: number,
 		dir: Direction,
 	): { x: number; y: number } {
-		const ts = this.tileSize
+		const ts = this.#tileSize
 		const curTileX = Math.floor(p.x / ts)
 		const curTileY = Math.floor(p.y / ts)
 
 		if (dir === 'right') {
 			const newTileX = Math.floor(newPx / ts)
 			const checkTileY = Math.round((p.y - ts / 2) / ts)
-			if (newTileX !== curTileX && this.isTileBlocked(newTileX, checkTileY)) {
+			if (newTileX !== curTileX && this.#isTileBlocked(newTileX, checkTileY)) {
 				newPx = newTileX * ts - 0.5
 			}
 		} else if (dir === 'left') {
 			const newTileX = Math.floor(newPx / ts)
 			const checkTileY = Math.round((p.y - ts / 2) / ts)
-			if (newTileX !== curTileX && this.isTileBlocked(newTileX, checkTileY)) {
+			if (newTileX !== curTileX && this.#isTileBlocked(newTileX, checkTileY)) {
 				newPx = (newTileX + 1) * ts + 0.5
 			}
 		} else if (dir === 'down') {
 			const newTileY = Math.floor(newPy / ts)
 			const checkTileX = Math.round((p.x - ts / 2) / ts)
-			if (newTileY !== curTileY && this.isTileBlocked(checkTileX, newTileY)) {
+			if (newTileY !== curTileY && this.#isTileBlocked(checkTileX, newTileY)) {
 				newPy = newTileY * ts - 0.5
 			}
 		} else if (dir === 'up') {
 			const newTileY = Math.floor(newPy / ts)
 			const checkTileX = Math.round((p.x - ts / 2) / ts)
-			if (newTileY !== curTileY && this.isTileBlocked(checkTileX, newTileY)) {
+			if (newTileY !== curTileY && this.#isTileBlocked(checkTileX, newTileY)) {
 				newPy = (newTileY + 1) * ts + 0.5
 			}
 		}
@@ -690,34 +691,34 @@ export class WorldScene extends Phaser.Scene {
 		return { x: newPx, y: newPy }
 	}
 
-	private updatePlayerVisuals(p: PlayerObject): void {
+	#updatePlayerVisuals(p: PlayerObject): void {
 		p.container.setPosition(p.x, p.y)
 		// Sub-elements use relative coords within the container — no individual updates needed
 		// StatusDot tracks nameText width (fixed after creation, but kept for safety)
-		p.statusDot.setPosition(-p.nameText.width / 2 + 8, -this.tileSize / 2 - 14)
+		p.statusDot.setPosition(-p.nameText.width / 2 + 8, -this.#tileSize / 2 - 14)
 		// UI elements remain on the main display list with absolute positions
 		if (p.customStatusBubble) {
-			p.customStatusBubble.setPosition(p.x, p.y - this.tileSize / 2 - 34)
+			p.customStatusBubble.setPosition(p.x, p.y - this.#tileSize / 2 - 34)
 		}
 		if (p.bubbleText) {
-			p.bubbleText.setPosition(p.x, p.y - this.tileSize - 10)
+			p.bubbleText.setPosition(p.x, p.y - this.#tileSize - 10)
 		}
 		if (p.emoteText) {
-			p.emoteText.setPosition(p.x, p.y - this.tileSize - 34)
+			p.emoteText.setPosition(p.x, p.y - this.#tileSize - 34)
 		}
 	}
 
 	/** Add a game object to the y-sorted entity layer. */
 	addToSortLayer(obj: Phaser.GameObjects.GameObject): void {
-		this.entityContainer.add(obj)
+		this.#entityContainer.add(obj)
 	}
 
 	/** Remove a game object from the y-sorted entity layer. */
 	removeFromSortLayer(obj: Phaser.GameObjects.GameObject): void {
-		this.entityContainer.remove(obj)
+		this.#entityContainer.remove(obj)
 	}
 
-	private updateCharacterFrame(p: PlayerObject, dir: Direction): void {
+	#updateCharacterFrame(p: PlayerObject, dir: Direction): void {
 		const dirFrame: Record<Direction, number> = {
 			down: 0,
 			up: 1,
@@ -727,16 +728,16 @@ export class WorldScene extends Phaser.Scene {
 		p.sprite.setFrame(dirFrame[dir] ?? 0)
 	}
 
-	private updatePlayerStatus(id: string, status: string): void {
-		const p = this.playerObjects.get(id)
+	#updatePlayerStatus(id: string, status: string): void {
+		const p = this.#playerObjects.get(id)
 		if (!p) return
-		const dotColor = Phaser.Display.Color.HexStringToColor(this.getStatusColor(status)).color
+		const dotColor = Phaser.Display.Color.HexStringToColor(this.#getStatusColor(status)).color
 		p.statusDot.clear()
 		p.statusDot.fillStyle(dotColor, 1)
 		p.statusDot.fillCircle(0, 0, 3)
 	}
 
-	private getStatusColor(status: string): string {
+	#getStatusColor(status: string): string {
 		const colors: Record<string, string> = {
 			online: '#4ade80',
 			away: '#eab308',
@@ -745,8 +746,8 @@ export class WorldScene extends Phaser.Scene {
 		return colors[status] ?? '#4ade80'
 	}
 
-	private updateCustomStatus(id: string, text: string): void {
-		const p = this.playerObjects.get(id)
+	#updateCustomStatus(id: string, text: string): void {
+		const p = this.#playerObjects.get(id)
 		if (!p) return
 
 		if (p.customStatusBubble) {
@@ -757,7 +758,7 @@ export class WorldScene extends Phaser.Scene {
 		if (!text) return
 
 		p.customStatusBubble = this.add
-			.text(p.x, p.y - this.tileSize / 2 - 34, text, {
+			.text(p.x, p.y - this.#tileSize / 2 - 34, text, {
 				fontSize: '12px',
 				color: '#ffffff',
 				fontFamily: 'MulmaruMono',
@@ -771,8 +772,8 @@ export class WorldScene extends Phaser.Scene {
 			.setResolution(2)
 	}
 
-	private showChatBubble(id: string, text: string, _nickname: string): void {
-		const p = this.playerObjects.get(id)
+	#showChatBubble(id: string, text: string, _nickname: string): void {
+		const p = this.#playerObjects.get(id)
 		if (!p) return
 
 		if (p.bubbleText) {
@@ -782,7 +783,7 @@ export class WorldScene extends Phaser.Scene {
 		}
 
 		const px = p.x
-		const py = p.y - this.tileSize - 10
+		const py = p.y - this.#tileSize - 10
 
 		const displayText = text.length > 40 ? text.substring(0, 40) + '...' : text
 
@@ -818,8 +819,8 @@ export class WorldScene extends Phaser.Scene {
 		}, 3000)
 	}
 
-	private showEmote(id: string, emoji: string): void {
-		const p = this.playerObjects.get(id)
+	#showEmote(id: string, emoji: string): void {
+		const p = this.#playerObjects.get(id)
 		if (!p) return
 
 		if (p.emoteText) {
@@ -829,7 +830,7 @@ export class WorldScene extends Phaser.Scene {
 		}
 
 		const px = p.x
-		const py = p.y - this.tileSize - 34
+		const py = p.y - this.#tileSize - 34
 
 		p.emoteText = this.add
 			.text(px, py, emoji, {
@@ -866,7 +867,7 @@ export class WorldScene extends Phaser.Scene {
 		}, 3000)
 	}
 
-	private spawnDashAfterimages(
+	#spawnDashAfterimages(
 		_x: number,
 		_y: number,
 		dir: Direction,
@@ -878,8 +879,8 @@ export class WorldScene extends Phaser.Scene {
 
 		for (let i = 0; i < count; i++) {
 			this.time.delayedCall(delayPerGhost * (i + 1), () => {
-				if (!this.localPlayerId) return
-				const localPlayer = this.playerObjects.get(this.localPlayerId)
+				if (!this.#localPlayerId) return
+				const localPlayer = this.#playerObjects.get(this.#localPlayerId)
 				if (!localPlayer) return
 
 				const ghost = this.add.sprite(localPlayer.x, localPlayer.y, textureKey, frame)
@@ -899,11 +900,11 @@ export class WorldScene extends Phaser.Scene {
 	}
 
 	update(_time: number, delta: number): void {
-		if (!this.localPlayerId) return
+		if (!this.#localPlayerId) return
 
 		// Interpolate remote players
-		this.playerObjects.forEach((p, id) => {
-			if (id === this.localPlayerId) return
+		this.#playerObjects.forEach((p, id) => {
+			if (id === this.#localPlayerId) return
 			const dx = p.targetX - p.x
 			const dy = p.targetY - p.y
 			if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) {
@@ -911,23 +912,23 @@ export class WorldScene extends Phaser.Scene {
 				const t = Math.min(1, 1 - Math.pow(1 - REMOTE_LERP_FACTOR, clampedDelta / 16.67))
 				p.x += dx * t
 				p.y += dy * t
-				this.updatePlayerVisuals(p)
+				this.#updatePlayerVisuals(p)
 			} else if (dx !== 0 || dy !== 0) {
 				p.x = p.targetX
 				p.y = p.targetY
-				this.updatePlayerVisuals(p)
+				this.#updatePlayerVisuals(p)
 			}
 		})
 
 		// Local player movement
-		const localPlayer = this.playerObjects.get(this.localPlayerId)
+		const localPlayer = this.#playerObjects.get(this.#localPlayerId)
 		if (!localPlayer) return
 
 		// Block all input (including mobile dpad) when any modal is open
-		if (this.modalOpen) {
-			if (this.isDashing) {
-				this.isDashing = false
-				this.dashDir = null
+		if (this.#modalOpen) {
+			if (this.#isDashing) {
+				this.#isDashing = false
+				this.#dashDir = null
 			}
 			return
 		}
@@ -945,10 +946,10 @@ export class WorldScene extends Phaser.Scene {
 		let dir: Direction | null = null
 
 		// 축별 독립 합산 — 반대 방향 상쇄
-		if (this.cursors.left.isDown || this.wasd.left.isDown) dx -= 1
-		if (this.cursors.right.isDown || this.wasd.right.isDown) dx += 1
-		if (this.cursors.up.isDown || this.wasd.up.isDown) dy -= 1
-		if (this.cursors.down.isDown || this.wasd.down.isDown) dy += 1
+		if (this.#cursors.left.isDown || this.#wasd.left.isDown) dx -= 1
+		if (this.#cursors.right.isDown || this.#wasd.right.isDown) dx += 1
+		if (this.#cursors.up.isDown || this.#wasd.up.isDown) dy -= 1
+		if (this.#cursors.down.isDown || this.#wasd.down.isDown) dy += 1
 
 		// 방향 결정 (4방향만, X축 우선)
 		if (dx !== 0) {
@@ -967,14 +968,14 @@ export class WorldScene extends Phaser.Scene {
 		// Dash trigger: spacebar while moving, respecting cooldown
 		if (
 			dir &&
-			!this.isDashing &&
-			Phaser.Input.Keyboard.JustDown(this.spaceKey) &&
-			now - this.lastDashTime >= DASH_COOLDOWN
+			!this.#isDashing &&
+			Phaser.Input.Keyboard.JustDown(this.#spaceKey) &&
+			now - this.#lastDashTime >= DASH_COOLDOWN
 		) {
-			this.isDashing = true
-			this.dashDir = dir
-			this.dashStartTime = now
-			this.lastDashTime = now
+			this.#isDashing = true
+			this.#dashDir = dir
+			this.#dashStartTime = now
+			this.#lastDashTime = now
 			network.sendDash(dir)
 
 			const dirFrame: Record<Direction, number> = {
@@ -983,7 +984,7 @@ export class WorldScene extends Phaser.Scene {
 				right: 2,
 				left: 3,
 			}
-			this.spawnDashAfterimages(
+			this.#spawnDashAfterimages(
 				localPlayer.x,
 				localPlayer.y,
 				dir,
@@ -993,14 +994,14 @@ export class WorldScene extends Phaser.Scene {
 		}
 
 		// End dash if duration expired
-		if (this.isDashing && now - this.dashStartTime >= DASH_DURATION) {
-			this.isDashing = false
-			this.dashDir = null
+		if (this.#isDashing && now - this.#dashStartTime >= DASH_DURATION) {
+			this.#isDashing = false
+			this.#dashDir = null
 		}
 
 		// Determine effective direction and speed
-		const effectiveDir = this.isDashing ? this.dashDir! : dir
-		const effectiveSpeed = this.isDashing ? DASH_SPEED : MOVE_SPEED
+		const effectiveDir = this.#isDashing ? this.#dashDir! : dir
+		const effectiveSpeed = this.#isDashing ? DASH_SPEED : MOVE_SPEED
 
 		if (effectiveDir) {
 			const eDx = effectiveDir === 'right' ? 1 : effectiveDir === 'left' ? -1 : 0
@@ -1009,17 +1010,17 @@ export class WorldScene extends Phaser.Scene {
 			let newX = localPlayer.x + eDx * moveAmount
 			let newY = localPlayer.y + eDy * moveAmount
 
-			const result = this.checkCollision(localPlayer, newX, newY, effectiveDir)
+			const result = this.#checkCollision(localPlayer, newX, newY, effectiveDir)
 			newX = result.x
 			newY = result.y
 
 			// If collision stopped movement during dash, end dash early
-			if (this.isDashing) {
+			if (this.#isDashing) {
 				const movedX = Math.abs(newX - localPlayer.x)
 				const movedY = Math.abs(newY - localPlayer.y)
 				if (movedX < 0.1 && movedY < 0.1) {
-					this.isDashing = false
-					this.dashDir = null
+					this.#isDashing = false
+					this.#dashDir = null
 				}
 			}
 
@@ -1027,17 +1028,17 @@ export class WorldScene extends Phaser.Scene {
 			localPlayer.y = newY
 			localPlayer.dir = effectiveDir
 
-			this.updateCharacterFrame(localPlayer, effectiveDir)
-			this.updatePlayerVisuals(localPlayer)
+			this.#updateCharacterFrame(localPlayer, effectiveDir)
+			this.#updatePlayerVisuals(localPlayer)
 
 			// Throttled network send
-			if (now - this.lastNetworkSendTime >= NETWORK_SEND_INTERVAL) {
-				this.lastNetworkSendTime = now
+			if (now - this.#lastNetworkSendTime >= NETWORK_SEND_INTERVAL) {
+				this.#lastNetworkSendTime = now
 				network.sendMove(newX, newY, effectiveDir)
 
-				const info = gameState.players.get(this.localPlayerId!)
+				const info = gameState.players.get(this.#localPlayerId!)
 				if (info) {
-					gameState.players.set(this.localPlayerId!, {
+					gameState.players.set(this.#localPlayerId!, {
 						...info,
 						x: newX,
 						y: newY,
@@ -1045,13 +1046,13 @@ export class WorldScene extends Phaser.Scene {
 					})
 				}
 			}
-		} else if (!isMovingNow && !this.isDashing && this.wasMoving) {
+		} else if (!isMovingNow && !this.#isDashing && this.#wasMoving) {
 			// Movement ended — send final position immediately
 			network.sendMove(localPlayer.x, localPlayer.y, localPlayer.dir)
 
-			const info = gameState.players.get(this.localPlayerId!)
+			const info = gameState.players.get(this.#localPlayerId!)
 			if (info) {
-				gameState.players.set(this.localPlayerId!, {
+				gameState.players.set(this.#localPlayerId!, {
 					...info,
 					x: localPlayer.x,
 					y: localPlayer.y,
@@ -1060,13 +1061,13 @@ export class WorldScene extends Phaser.Scene {
 			}
 		}
 
-		this.wasMoving = isMovingNow || this.isDashing
+		this.#wasMoving = isMovingNow || this.#isDashing
 
 		// Update nearby interactive objects
-		this.updateNearbyObjects()
+		this.#updateNearbyObjects()
 	}
 
-	private setupInteractiveObjects(): void {
+	#setupInteractiveObjects(): void {
 		const eKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.E, false)
 		eKey.on('down', () => {
 			const activeEl = document.activeElement
@@ -1074,23 +1075,23 @@ export class WorldScene extends Phaser.Scene {
 				activeEl?.tagName === 'INPUT' ||
 				activeEl?.tagName === 'TEXTAREA' ||
 				(activeEl as HTMLElement)?.isContentEditable
-			if (this.modalOpen || gameState.chatInputActive || isTyping) return
+			if (this.#modalOpen || gameState.chatInputActive || isTyping) return
 
 			const nearId = objectsState.nearbyObjectId
 			if (nearId) {
-				const gObj = this.gameObjects.get(nearId)
-				if (gObj) this.onObjectInteract(gObj.data)
+				const gObj = this.#gameObjects.get(nearId)
+				if (gObj) this.#onObjectInteract(gObj.data)
 			}
 		})
 
-		this.effectCleanups.push(
+		this.#effectCleanups.push(
 			$effect.root(() => {
 				$effect(() => {
 					const objMap = objectsState.objects
-					this.gameObjects.forEach((gObj, id) => {
+					this.#gameObjects.forEach((gObj, id) => {
 						if (!objMap.has(id)) {
 							destroyInteractiveObject(gObj)
-							this.gameObjects.delete(id)
+							this.#gameObjects.delete(id)
 						}
 					})
 				})
@@ -1098,7 +1099,7 @@ export class WorldScene extends Phaser.Scene {
 		)
 	}
 
-	private onObjectInteract(obj: InteractiveObject): void {
+	#onObjectInteract(obj: InteractiveObject): void {
 		if (obj.type === 'whiteboard') {
 			whiteboardState.currentBoardId = obj.id
 			whiteboardState.open = true
@@ -1108,15 +1109,15 @@ export class WorldScene extends Phaser.Scene {
 		}
 	}
 
-	private updateNearbyObjects(): void {
-		if (!this.localPlayerId) return
-		const localPlayer = this.playerObjects.get(this.localPlayerId)
+	#updateNearbyObjects(): void {
+		if (!this.#localPlayerId) return
+		const localPlayer = this.#playerObjects.get(this.#localPlayerId)
 		if (!localPlayer) return
 
 		let closestId: string | null = null
 		let closestDist = Infinity
 
-		this.gameObjects.forEach((gObj, id) => {
+		this.#gameObjects.forEach((gObj, id) => {
 			const isNear = updateNearbyState(gObj, localPlayer.x, localPlayer.y)
 			if (isNear) {
 				const dx = gObj.data.x - localPlayer.x
