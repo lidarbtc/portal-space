@@ -134,6 +134,7 @@ export const ProfileMessageSchema = Schema.Struct({
 	id: Schema.optional(Schema.String),
 	nickname: Schema.optional(Schema.String),
 	colors: Schema.optional(ColorPaletteSchema),
+	player: Schema.optional(PlayerInfoSchema),
 })
 
 export const CustomStatusMessageSchema = Schema.Struct({
