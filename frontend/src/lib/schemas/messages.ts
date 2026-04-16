@@ -118,6 +118,7 @@ export const ChatMessageSchema = Schema.Struct({
 	isSystem: Schema.optional(Schema.Boolean),
 	zoneId: Schema.optional(Schema.String),
 	zoneName: Schema.optional(Schema.String),
+	zoneEvent: Schema.optional(ZoneEventSchema),
 })
 
 export const EmoteMessageSchema = Schema.Struct({

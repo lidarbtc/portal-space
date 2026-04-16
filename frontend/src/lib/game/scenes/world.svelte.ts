@@ -354,21 +354,21 @@ export class WorldScene extends Phaser.Scene {
 			const image =
 				msg.image && ALLOWED_CHAT_IMAGE_MIMES.has(msg.image.mime) ? msg.image : undefined
 
+			// Zone enter/exit system messages (no id/nickname from server)
+			if (msg.isSystem && msg.zoneId) {
+				const text = msg.text || ''
+				if (msg.zoneEvent === 'enter') {
+					regionalChatState.enterZone(msg.zoneId, msg.zoneName || '')
+				} else if (msg.zoneEvent === 'exit') {
+					regionalChatState.exitZone()
+				}
+				regionalChatState.addRegionalMessage({ text, isSystem: true })
+				return
+			}
+
 			if (msg.id && msg.nickname && (msg.text || image)) {
 				if (msg.id !== this.#localPlayerId && gameState.currentStatus !== 'dnd') {
 					notifyAudio.playIfHidden()
-				}
-				// Zone enter/exit system messages
-				if (msg.isSystem && msg.zoneId) {
-					const text = msg.text || ''
-					if (msg.zoneEvent === 'enter') {
-						regionalChatState.enterZone(msg.zoneId, msg.zoneName || '')
-					} else if (msg.zoneEvent === 'exit') {
-						regionalChatState.exitZone()
-					}
-					// Add to regional messages
-					regionalChatState.addRegionalMessage({ text, isSystem: true })
-					return
 				}
 
 				// Regional chat message
