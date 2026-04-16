@@ -10,7 +10,6 @@
 		addShape,
 		removeShape,
 		generateShapeId,
-		type ShapeType,
 		type BindingHandle,
 	} from '$lib/whiteboard/konva-yjs-binding'
 	import {

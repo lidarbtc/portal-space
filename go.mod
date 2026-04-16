@@ -1,13 +1,14 @@
 module github.com/1ncursio/portal-space
 
-go 1.26.1
+go 1.26.2
 
 require (
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
-	github.com/gosuda/portal-tunnel/v2 v2.1.3
+	github.com/gosuda/portal-tunnel/v2 v2.1.4
 	github.com/rs/zerolog v1.34.0
 	github.com/spf13/cobra v1.10.1
+	modernc.org/sqlite v1.48.1
 )
 
 require (
@@ -29,5 +30,4 @@ require (
 	modernc.org/libc v1.70.0 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
-	modernc.org/sqlite v1.48.1 // indirect
 )

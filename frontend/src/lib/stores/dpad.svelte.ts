@@ -1,7 +1,7 @@
-import type { Direction } from '$lib/types';
+import type { Direction } from '$lib/types'
 
 class DpadStore {
-  direction = $state<Direction | null>(null);
+	direction = $state<Direction | null>(null)
 }
 
-export const dpadState = new DpadStore();
+export const dpadState = new DpadStore()

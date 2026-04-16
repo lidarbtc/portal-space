@@ -50,8 +50,8 @@ interface PlayerObject {
 }
 
 export class WorldScene extends Phaser.Scene {
-	private playerObjects: Map<string, PlayerObject> = new Map()
-	private gameObjects: Map<string, GameInteractiveObject> = new Map()
+	private playerObjects: Map<string, PlayerObject> = new Map() // eslint-disable-line svelte/prefer-svelte-reactivity
+	private gameObjects: Map<string, GameInteractiveObject> = new Map() // eslint-disable-line svelte/prefer-svelte-reactivity
 	private entityContainer!: Phaser.GameObjects.Container
 	private localPlayerId: string | null = null
 	private tileSize = 16
@@ -942,7 +942,6 @@ export class WorldScene extends Phaser.Scene {
 
 		// 방향 결정 (4방향만, X축 우선)
 		if (dx !== 0) {
-			dy = 0
 			dir = dx > 0 ? 'right' : 'left'
 		} else if (dy !== 0) {
 			dir = dy > 0 ? 'down' : 'up'
@@ -950,8 +949,6 @@ export class WorldScene extends Phaser.Scene {
 
 		if (!dir && dpad) {
 			dir = dpad
-			dx = dpad === 'left' ? -1 : dpad === 'right' ? 1 : 0
-			dy = dpad === 'up' ? -1 : dpad === 'down' ? 1 : 0
 		}
 
 		const isMovingNow = dir !== null

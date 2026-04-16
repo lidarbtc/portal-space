@@ -1,7 +1,7 @@
-export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'reconnecting';
+export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'reconnecting'
 
 class ConnectionStore {
-  state = $state<ConnectionState>('disconnected');
+	state = $state<ConnectionState>('disconnected')
 }
 
-export const connectionState = new ConnectionStore();
+export const connectionState = new ConnectionStore()
