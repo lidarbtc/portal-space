@@ -1,5 +1,5 @@
 <script lang="ts">
-	import ZoomControls from './ZoomControls.svelte'
+	import ZoomControls from './zoom-controls.svelte'
 	import { IsMobile } from '$lib/hooks/is-mobile.svelte'
 
 	const isMobile = new IsMobile()

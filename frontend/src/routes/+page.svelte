@@ -1,16 +1,16 @@
 <script lang="ts">
-	import Lobby from '$lib/components/Lobby.svelte'
-	import GameCanvas from '$lib/components/GameCanvas.svelte'
-	import ActionBar from '$lib/components/ActionBar.svelte'
-	import SettingsModal from '$lib/components/SettingsModal.svelte'
-	import Whiteboard from '$lib/components/Whiteboard.svelte'
-	import RegionalChatSettings from '$lib/components/RegionalChatSettings.svelte'
-	import ChatLog from '$lib/components/ChatLog.svelte'
-	import ChatInput from '$lib/components/ChatInput.svelte'
+	import Lobby from '$lib/components/lobby.svelte'
+	import GameCanvas from '$lib/components/game-canvas.svelte'
+	import ActionBar from '$lib/components/action-bar.svelte'
+	import SettingsModal from '$lib/components/settings-modal.svelte'
+	import Whiteboard from '$lib/components/whiteboard.svelte'
+	import RegionalChatSettings from '$lib/components/regional-chat-settings.svelte'
+	import ChatLog from '$lib/components/chat-log.svelte'
+	import ChatInput from '$lib/components/chat-input.svelte'
 
-	import PlayerList from '$lib/components/PlayerList.svelte'
+	import PlayerList from '$lib/components/player-list.svelte'
 
-	import Joystick from '$lib/components/Joystick.svelte'
+	import Joystick from '$lib/components/joystick.svelte'
 	import { network } from '$lib/network'
 	import { gameState } from '$lib/stores/game.svelte'
 	import { connectionState } from '$lib/stores/connection.svelte'
@@ -52,7 +52,11 @@
 		}
 	})
 
-	function handleJoin(data: { nickname: string; colors: ColorPalette; snapshot: OutgoingMessage }) {
+	function handleJoin(data: {
+		nickname: string
+		colors: ColorPalette
+		snapshot: OutgoingMessage
+	}) {
 		gameData = data.snapshot
 		inGame = true
 		network.enableReconnect()
@@ -109,7 +113,11 @@
 		})
 	}
 
-	function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality?: number): Promise<Blob> {
+	function canvasToBlob(
+		canvas: HTMLCanvasElement,
+		type: string,
+		quality?: number,
+	): Promise<Blob> {
 		return new Promise((resolve, reject) => {
 			canvas.toBlob(
 				(blob) => {
@@ -287,7 +295,11 @@
 		<div class="chat-panel">
 			<PlayerList />
 			<ChatLog />
-			<ChatInput onSend={handleChatSend} onSendImage={handleChatImageSend} alwaysActive={true} />
+			<ChatInput
+				onSend={handleChatSend}
+				onSendImage={handleChatImageSend}
+				alwaysActive={true}
+			/>
 		</div>
 	</div>
 {:else}

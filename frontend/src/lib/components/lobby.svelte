@@ -3,12 +3,16 @@
 	import { DEFAULT_COLORS } from '$lib/game/palette-swap'
 	import type { OutgoingMessage, ColorPalette } from '$lib/types'
 	import { PersistedState } from 'runed'
-	import ColorCustomizer from './ColorCustomizer.svelte'
+	import ColorCustomizer from './color-customizer.svelte'
 
 	let {
 		onJoin,
 	}: {
-		onJoin: (data: { nickname: string; colors: ColorPalette; snapshot: OutgoingMessage }) => void
+		onJoin: (data: {
+			nickname: string
+			colors: ColorPalette
+			snapshot: OutgoingMessage
+		}) => void
 	} = $props()
 
 	const persistedNickname = new PersistedState('portal-nickname', '')

@@ -67,7 +67,14 @@
 
 				<label class="rcs-field">
 					<span class="rcs-label">반경 ({tileDisplay} 타일)</span>
-					<input type="range" bind:value={radius} min={32} max={128} step={16} class="rcs-range" />
+					<input
+						type="range"
+						bind:value={radius}
+						min={32}
+						max={128}
+						step={16}
+						class="rcs-range"
+					/>
 					<span class="rcs-range-labels">
 						<span>2 타일</span>
 						<span>8 타일</span>

@@ -4,7 +4,9 @@
 
 	let openDropdown: 'online' | 'away' | 'dnd' | null = $state(null)
 
-	let onlinePlayers = $derived([...gameState.players.values()].filter((p) => p.status === 'online'))
+	let onlinePlayers = $derived(
+		[...gameState.players.values()].filter((p) => p.status === 'online'),
+	)
 	let awayPlayers = $derived([...gameState.players.values()].filter((p) => p.status === 'away'))
 	let dndPlayers = $derived([...gameState.players.values()].filter((p) => p.status === 'dnd'))
 

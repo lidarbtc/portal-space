@@ -7,7 +7,7 @@
 	import { settingsState } from '$lib/stores/settings.svelte'
 	import type { ColorPalette } from '$lib/types'
 	import { PersistedState } from 'runed'
-	import ColorCustomizer from './ColorCustomizer.svelte'
+	import ColorCustomizer from './color-customizer.svelte'
 
 	let { open = $bindable(false) }: { open: boolean } = $props()
 
@@ -149,7 +149,8 @@
 									<span class="field-label">음소거</span>
 									<Switch.Root
 										checked={settingsState.muted}
-										onCheckedChange={(checked) => (settingsState.muted = checked)}
+										onCheckedChange={(checked) =>
+											(settingsState.muted = checked)}
 										class="mute-switch"
 										aria-label="음소거"
 									>

@@ -158,7 +158,11 @@
 		}
 
 		if (awarenessLayer) {
-			cleanupAwareness = createAwarenessRenderer(doc.awareness, awarenessLayer, doc.ydoc.clientID)
+			cleanupAwareness = createAwarenessRenderer(
+				doc.awareness,
+				awarenessLayer,
+				doc.ydoc.clientID,
+			)
 		}
 	}
 

@@ -129,12 +129,14 @@
 	{#each displayMessages as message, i (i)}
 		{#if message.isSystem}
 			<div class="chat-entry chat-system">
-				<span class="chat-time">{formatTime(message.timestamp)}</span><span class="chat-system-text"
+				<span class="chat-time">{formatTime(message.timestamp)}</span><span
+					class="chat-system-text"
 					>{#each parseTextWithUrls(message.text ?? '') as segment, j (j)}{#if segment.type === 'url'}<a
 								href={segment.value}
 								target="_blank"
 								rel="noopener noreferrer"
-								onclick={(e) => handleLinkClick(e, segment.value)}>{segment.value}</a
+								onclick={(e) => handleLinkClick(e, segment.value)}
+								>{segment.value}</a
 							>{:else}{segment.value}{/if}{/each}</span
 				>
 			</div>
@@ -150,7 +152,8 @@
 									href={segment.value}
 									target="_blank"
 									rel="noopener noreferrer"
-									onclick={(e) => handleLinkClick(e, segment.value)}>{segment.value}</a
+									onclick={(e) => handleLinkClick(e, segment.value)}
+									>{segment.value}</a
 								>{:else}{segment.value}{/if}{/each}</span
 					>
 				{/if}
@@ -187,9 +190,12 @@
 			</AlertDialog.Description>
 			<p class="link-dialog-url">{pendingUrl}</p>
 			<div class="link-dialog-actions">
-				<AlertDialog.Cancel class="link-dialog-btn link-dialog-cancel">취소</AlertDialog.Cancel>
-				<AlertDialog.Action class="link-dialog-btn link-dialog-confirm" onclick={handleConfirm}
-					>열기</AlertDialog.Action
+				<AlertDialog.Cancel class="link-dialog-btn link-dialog-cancel"
+					>취소</AlertDialog.Cancel
+				>
+				<AlertDialog.Action
+					class="link-dialog-btn link-dialog-confirm"
+					onclick={handleConfirm}>열기</AlertDialog.Action
 				>
 			</div>
 		</AlertDialog.Content>

@@ -89,7 +89,12 @@
 				<span class="color-label-text">배/발</span>
 				<input type="color" bind:value={footColor} />
 			</label>
-			<button class="reset-btn" onclick={resetColors} type="button" title="기본 색상으로 복원">
+			<button
+				class="reset-btn"
+				onclick={resetColors}
+				type="button"
+				title="기본 색상으로 복원"
+			>
 				초기화
 			</button>
 		</div>

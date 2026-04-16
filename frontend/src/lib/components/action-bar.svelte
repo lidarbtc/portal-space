@@ -4,7 +4,7 @@
 	import { network } from '$lib/network'
 	import type { PlayerStatus, Emoji } from '$lib/types'
 	import { CircleUserRound, SmilePlus, Settings } from '@lucide/svelte'
-	import CustomStatusModal from './CustomStatusModal.svelte'
+	import CustomStatusModal from './custom-status-modal.svelte'
 	import { modalState } from '$lib/stores/modal.svelte'
 
 	let { onOpenSettings }: { onOpenSettings?: () => void } = $props()
