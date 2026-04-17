@@ -1,5 +1,5 @@
 {
-	"name": "portal-space-server",
+	"name": "@portal-space/server",
 	"version": "0.0.1",
 	"private": true,
 	"type": "module",

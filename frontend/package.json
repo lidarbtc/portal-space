@@ -1,5 +1,5 @@
 {
-	"name": "portal-space-frontend",
+	"name": "@portal-space/frontend",
 	"version": "0.0.1",
 	"private": true,
 	"scripts": {
