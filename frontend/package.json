@@ -13,10 +13,6 @@
 		"test:watch": "vitest",
 		"format": "prettier --write ."
 	},
-	"lint-staged": {
-		"*.{js,ts,svelte,html,css,json}": "prettier --write",
-		"*.{js,ts,svelte}": "eslint --fix"
-	},
 	"devDependencies": {
 		"@eslint/compat": "^2.0.4",
 		"@eslint/js": "^10.0.1",
@@ -29,10 +25,7 @@
 		"eslint-config-prettier": "^10.1.8",
 		"eslint-plugin-svelte": "^3.17.0",
 		"globals": "^17.4.0",
-		"lint-staged": "^16.4.0",
 		"pngjs": "^7.0.0",
-		"prettier": "^3.8.1",
-		"prettier-plugin-svelte": "^3.5.1",
 		"svelte": "5.55.1",
 		"svelte-check": "^4.0.0",
 		"typescript": "^6.0.0",
