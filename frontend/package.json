@@ -8,10 +8,9 @@
 		"build": "bun run build:tileset && vite build",
 		"preview": "vite preview",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-		"lint": "prettier --check . && eslint .",
+		"lint": "eslint .",
 		"test": "vitest run",
-		"test:watch": "vitest",
-		"format": "prettier --write ."
+		"test:watch": "vitest"
 	},
 	"devDependencies": {
 		"@eslint/compat": "^2.0.4",
