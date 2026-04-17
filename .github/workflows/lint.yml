@@ -13,9 +13,6 @@ jobs:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
       - run: bun install
-        working-directory: frontend
-      - run: bun run lint
-        working-directory: frontend
-      - run: bun run check
-        working-directory: frontend
+      - run: bun run --filter portal-space-frontend lint
+      - run: bun run --filter portal-space-frontend check
       - run: bunx tsc --noEmit -p server/tsconfig.json

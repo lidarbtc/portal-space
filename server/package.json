@@ -1,0 +1,13 @@
+{
+	"name": "portal-space-server",
+	"version": "0.0.1",
+	"private": true,
+	"type": "module",
+	"dependencies": {
+		"drizzle-orm": "^0.45.2"
+	},
+	"devDependencies": {
+		"@types/bun": "^1.3.12",
+		"drizzle-kit": "^0.31.10"
+	}
+}

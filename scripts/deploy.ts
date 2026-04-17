@@ -9,7 +9,7 @@ if (!portalCheck) {
 
 // 1. 빌드
 console.log("[deploy] Building frontend...");
-await $`cd frontend && bun run build`;
+await $`bun run --filter portal-space-frontend build`;
 
 // 2. 기존 3000 포트 프로세스 정리
 const existing = Bun.spawnSync(["lsof", "-ti:3000"]);
