@@ -16,4 +16,5 @@ jobs:
             - run: bunx prettier --check .
             - run: bun run --filter @portal-space/frontend lint
             - run: bun run --filter @portal-space/frontend check
+            - run: bun run --filter @portal-space/server lint
             - run: bunx tsc --noEmit -p server/tsconfig.json
