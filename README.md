@@ -20,16 +20,16 @@
 
 ## 기술 스택
 
-| 계층 | 기술 |
-|------|------|
-| Frontend | SvelteKit 2, Svelte 5, TypeScript, Vite |
-| Game Engine | Phaser 3 |
-| Backend | Bun (WebSocket + 정적 파일 서빙) |
-| 실시간 통신 | Bun 네이티브 WebSocket |
-| 화이트보드 동기화 | Y.js (CRDT) |
-| 데이터베이스 | bun:sqlite (WAL 모드) |
-| 네트워크 노출 | Portal Tunnel CLI (`portal expose`) |
-| 패키지 매니저 | Bun |
+| 계층              | 기술                                    |
+| ----------------- | --------------------------------------- |
+| Frontend          | SvelteKit 2, Svelte 5, TypeScript, Vite |
+| Game Engine       | Phaser 3                                |
+| Backend           | Bun (WebSocket + 정적 파일 서빙)        |
+| 실시간 통신       | Bun 네이티브 WebSocket                  |
+| 화이트보드 동기화 | Y.js (CRDT)                             |
+| 데이터베이스      | bun:sqlite (WAL 모드)                   |
+| 네트워크 노출     | Portal Tunnel CLI (`portal expose`)     |
+| 패키지 매니저     | Bun                                     |
 
 ## 시작하기
 
@@ -127,9 +127,9 @@ portal-space/
 
 서버는 환경변수로 설정합니다.
 
-| 환경변수 | 기본값 | 설명 |
-|----------|--------|------|
-| `PORT` | `3000` | HTTP/WebSocket 포트 |
+| 환경변수  | 기본값            | 설명                     |
+| --------- | ----------------- | ------------------------ |
+| `PORT`    | `3000`            | HTTP/WebSocket 포트      |
 | `DB_PATH` | `portal-space.db` | SQLite 데이터베이스 경로 |
 
 Portal Tunnel 설정은 `portal expose --help`를 참조하세요.

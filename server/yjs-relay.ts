@@ -45,7 +45,9 @@ export class YjsRelay {
 					const room: YjsRoom = {
 						clients: new Set(),
 						docState: new Uint8Array(doc.docState),
-						updates: doc.updatesBlob ? decodeUpdates(new Uint8Array(doc.updatesBlob)) : [],
+						updates: doc.updatesBlob
+							? decodeUpdates(new Uint8Array(doc.updatesBlob))
+							: [],
 					}
 					this.#rooms.set(boardId, room)
 					count++

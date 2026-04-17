@@ -1,18 +1,18 @@
 name: Lint
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+    push:
+        branches: [main]
+    pull_request:
+        branches: [main]
 
 jobs:
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
-      - run: bun install
-      - run: bun run --filter @portal-space/frontend lint
-      - run: bun run --filter @portal-space/frontend check
-      - run: bunx tsc --noEmit -p server/tsconfig.json
+    lint:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: oven-sh/setup-bun@v2
+            - run: bun install
+            - run: bun run --filter @portal-space/frontend lint
+            - run: bun run --filter @portal-space/frontend check
+            - run: bunx tsc --noEmit -p server/tsconfig.json

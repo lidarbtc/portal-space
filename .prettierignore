@@ -11,4 +11,5 @@ frontend/.svelte-kit/
 
 # Assets / generated
 frontend/static/
+server/drizzle/
 .omc/
