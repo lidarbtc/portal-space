@@ -5,7 +5,7 @@ import { gameState } from '$lib/stores/game.svelte'
 import { dpadState } from '$lib/stores/dpad.svelte'
 import { notifyAudio } from '$lib/audio'
 import { loadTileset } from '../tileset'
-import { createAvatarSpritesheet } from '../spritesheet'
+import { createAvatarSpritesheet, getCharacterFrameCount } from '../spritesheet'
 import { createTintedSpritesheet } from '../palette-swap'
 import { resolveNicknameColor } from '$lib/utils/nickname-colors'
 import { parseTextSegments } from '$lib/utils/linkify'
@@ -13,6 +13,7 @@ import type {
 	PlayerInfo,
 	Direction,
 	Facing8,
+	IntentVector,
 	InteractiveObject,
 	RegionalChatState,
 } from '@shared/types'
@@ -20,6 +21,7 @@ import { MAP_WIDTH, MAP_HEIGHT } from '@shared/types'
 import {
 	directionToFrame,
 	directionToVector,
+	facing8ToFrame,
 	intentToDirection4,
 	intentToFacing8,
 	derivedFacing8FromDir,
@@ -98,6 +100,9 @@ export class WorldScene extends Phaser.Scene {
 	// Network send throttle
 	#lastNetworkSendTime = 0
 	#wasMoving = false
+	// 'characters' 스프라이트시트 실제 프레임 수 (4: 기존 카디널 전용, 8: 대각 포함).
+	// createAvatarSpritesheet() 호출 직후 설정. 8프레임 모드에서만 facing8 기반 렌더 사용.
+	#characterFrameCount = 4
 
 	// Dash state
 	#isDashing = false
@@ -124,6 +129,7 @@ export class WorldScene extends Phaser.Scene {
 
 	create(): void {
 		createAvatarSpritesheet(this)
+		this.#characterFrameCount = getCharacterFrameCount(this)
 		this.#createMap()
 
 		this.cameras.main.setBounds(
@@ -495,7 +501,7 @@ export class WorldScene extends Phaser.Scene {
 				createTintedSpritesheet(this, newTextureKey, msg.player.colors)
 				p.textureKey = newTextureKey
 				p.sprite.setTexture(newTextureKey)
-				p.sprite.setFrame(directionToFrame(p.dir))
+				p.sprite.setFrame(this.#frameFor(p.dir, p.facing8))
 			}
 
 			// Update players store (for PlayerList)
@@ -515,7 +521,13 @@ export class WorldScene extends Phaser.Scene {
 			if (!p) return
 			const dir = (msg.dir as Direction) ?? 'down'
 			if (msg.facing8) p.facing8 = msg.facing8 as Facing8
-			this.#spawnDashAfterimages(msg.x, msg.y, dir, p.textureKey, directionToFrame(dir))
+			this.#spawnDashAfterimages(
+				msg.x,
+				msg.y,
+				dir,
+				p.textureKey,
+				this.#frameFor(dir, p.facing8),
+			)
 		})
 
 		network.on('snapshot', (msg) => {
@@ -643,7 +655,8 @@ export class WorldScene extends Phaser.Scene {
 			createTintedSpritesheet(this, textureKey, info.colors)
 		}
 
-		const frameIndex = directionToFrame(info.dir)
+		// 초기 spawn 시점엔 facing8 미상 → 카디널 폴백. 이후 move/dash 메시지가 facing8을 채움.
+		const frameIndex = this.#frameFor(info.dir, null)
 
 		// All positions are relative to the character container
 		const sprite = this.add.sprite(0, 0, textureKey, frameIndex)
@@ -819,8 +832,19 @@ export class WorldScene extends Phaser.Scene {
 		this.#entityContainer.remove(obj)
 	}
 
+	// 렌더 프레임 인덱스 결정.
+	//   - 8프레임 모드 + facing8 존재 시 → facing8ToFrame (대각 포함 정확한 방향)
+	//   - 그 외 (자산 4프레임 또는 facing8 미상) → directionToFrame 폴백
+	// 자산 교체만으로 시각 업그레이드가 가능하도록 런타임 감지된 프레임 수에 분기.
+	#frameFor(dir: Direction, facing8: Facing8 | null | undefined): number {
+		if (this.#characterFrameCount >= 8 && facing8) {
+			return facing8ToFrame(facing8)
+		}
+		return directionToFrame(dir)
+	}
+
 	#updateCharacterFrame(p: PlayerObject, dir: Direction): void {
-		p.sprite.setFrame(directionToFrame(dir))
+		p.sprite.setFrame(this.#frameFor(dir, p.facing8))
 	}
 
 	#updatePlayerStatus(id: string, status: string): void {
@@ -1014,10 +1038,7 @@ export class WorldScene extends Phaser.Scene {
 		}
 	}
 
-	update(_time: number, delta: number): void {
-		if (!this.#localPlayerId) return
-
-		// Interpolate remote players
+	#updateRemoteInterpolation(delta: number): void {
 		this.#playerObjects.forEach((p, id) => {
 			if (id === this.#localPlayerId) return
 			const dx = p.targetX - p.x
@@ -1034,18 +1055,15 @@ export class WorldScene extends Phaser.Scene {
 				this.#updatePlayerVisuals(p)
 			}
 		})
+	}
 
-		// Local player movement
-		const localPlayer = this.#playerObjects.get(this.#localPlayerId)
-		if (!localPlayer) return
-
-		// Block all input (including mobile dpad) when any modal is open
+	#collectInput(): IntentVector | null {
 		if (this.#modalOpen) {
 			if (this.#isDashing) {
 				this.#isDashing = false
 				this.#dashDir = null
 			}
-			return
+			return null
 		}
 
 		const dpadIntent = dpadState.intent
@@ -1055,31 +1073,37 @@ export class WorldScene extends Phaser.Scene {
 			activeEl?.tagName === 'TEXTAREA' ||
 			(activeEl as HTMLElement)?.isContentEditable
 		if ((gameState.chatInputActive || isTyping) && dpadIntent.x === 0 && dpadIntent.y === 0)
-			return
-
-		let dx = 0,
-			dy = 0
-		let dir: Direction | null
+			return null
 
 		// 축별 독립 합산 — 반대 방향 상쇄
+		let dx = 0,
+			dy = 0
 		if (this.#cursors.left.isDown || this.#wasd.left.isDown) dx -= 1
 		if (this.#cursors.right.isDown || this.#wasd.right.isDown) dx += 1
 		if (this.#cursors.up.isDown || this.#wasd.up.isDown) dy -= 1
 		if (this.#cursors.down.isDown || this.#wasd.down.isDown) dy += 1
 		dx += dpadIntent.x
 		dy += dpadIntent.y
-		dx = Math.sign(dx)
-		dy = Math.sign(dy)
+		return { x: Math.sign(dx) as -1 | 0 | 1, y: Math.sign(dy) as -1 | 0 | 1 }
+	}
 
+	#resolveDirection(
+		intent: IntentVector,
+		currentDir: Direction | null,
+	): { dir: Direction | null; facing8: Facing8 | null } {
 		// (c) 마지막 카디널 유지 알고리즘
-		const intent = { x: dx as -1 | 0 | 1, y: dy as -1 | 0 | 1 }
-		dir = intentToDirection4(intent, localPlayer.dir ?? null)
+		let dir: Direction | null = intentToDirection4(intent, currentDir)
 		if (intent.x === 0 && intent.y === 0) dir = null
-		const currentFacing8 = intentToFacing8(intent)
+		return { dir, facing8: intentToFacing8(intent) }
+	}
 
-		const isMovingNow = dir !== null
-		const now = performance.now()
-
+	#updateDashState(
+		dir: Direction | null,
+		facing8: Facing8 | null,
+		intent: IntentVector,
+		now: number,
+		localPlayer: PlayerObject,
+	): void {
 		// Dash trigger: spacebar while moving, respecting cooldown
 		if (
 			dir &&
@@ -1089,7 +1113,7 @@ export class WorldScene extends Phaser.Scene {
 		) {
 			this.#isDashing = true
 			this.#dashDir = dir
-			this.#dashFacing8 = currentFacing8 ?? derivedFacing8FromDir(dir)
+			this.#dashFacing8 = facing8 ?? derivedFacing8FromDir(dir)
 			this.#dashStartTime = now
 			this.#lastDashTime = now
 			// (d) facing8 송신: 대각선만
@@ -1102,7 +1126,7 @@ export class WorldScene extends Phaser.Scene {
 				localPlayer.y,
 				dir,
 				localPlayer.textureKey,
-				directionToFrame(dir),
+				this.#frameFor(dir, this.#dashFacing8),
 			)
 		}
 
@@ -1112,70 +1136,86 @@ export class WorldScene extends Phaser.Scene {
 			this.#dashDir = null
 			this.#dashFacing8 = null
 		}
+	}
 
-		// Determine effective facing8 and speed
-		const effectiveDir = this.#isDashing ? this.#dashDir! : dir
-		const effectiveFacing8 = this.#isDashing ? this.#dashFacing8! : currentFacing8
-		const effectiveSpeed = this.#isDashing ? DASH_SPEED_PX_PER_SEC : MOVE_SPEED_PX_PER_SEC
+	#applyMovement(
+		localPlayer: PlayerObject,
+		effectiveDir: Direction,
+		effectiveFacing8: Facing8 | null,
+		effectiveSpeed: number,
+		delta: number,
+	): void {
+		// (b) dash 룩업: directionToVector (대각선 1/√2 정규화)
+		const v = directionToVector(effectiveFacing8 ?? derivedFacing8FromDir(effectiveDir))
+		const moveAmount = effectiveSpeed * (delta / 1000)
+
+		// (f) 분리축 슬라이드 충돌 + sub-step swept
+		// NOTE: #checkCollision 4번째 인자는 facing이 아니라 "검사 축+부호 신호".
+		//   dir 'right'/'left' = x축, 'down'/'up' = y축. 한 호출에 facing dir을 그대로 넘기면
+		//   다른 축은 분기 미스로 무검사 통과 → 대각선 벽 관통 버그 발생.
+		// NOTE(dash-swept): #sweptCollisionAxis가 한 프레임 이동량을 tile 단위로 sub-step 분할하여
+		//   30fps drop(dash 1000 × 33ms ≈ 33px) 환경에서도 벽 한 칸 건너뛰기를 방지한다.
+		// NOTE(corner-cut): 두 축 슬라이드 통과 후 대각 칸 자체가 collidable이어도 통과 허용.
+		//   게임 디자인 결정(2026-04-19): 캐릭터가 모서리를 비스듬히 지나는 자연스러움 우선
+		//   (Zelda/Pokemon 스타일). 엄밀한 차단이 필요한 위치는 collidable 영역을 넓혀 회피.
+		const xAxisDir: Direction | null = v.x > 0 ? 'right' : v.x < 0 ? 'left' : null
+		const yAxisDir: Direction | null = v.y > 0 ? 'down' : v.y < 0 ? 'up' : null
+
+		const xResult = xAxisDir
+			? this.#sweptCollisionAxis(localPlayer, v.x * moveAmount, 'x', xAxisDir)
+			: { x: localPlayer.x, y: localPlayer.y }
+		const yResult = yAxisDir
+			? this.#sweptCollisionAxis(localPlayer, v.y * moveAmount, 'y', yAxisDir)
+			: { x: localPlayer.x, y: localPlayer.y }
+		const newX = xResult.x
+		const newY = yResult.y
+
+		// If collision stopped movement during dash, end dash early
+		if (this.#isDashing) {
+			const movedX = Math.abs(newX - localPlayer.x)
+			const movedY = Math.abs(newY - localPlayer.y)
+			if (movedX < 0.1 && movedY < 0.1) {
+				this.#isDashing = false
+				this.#dashDir = null
+				this.#dashFacing8 = null
+			}
+		}
+
+		localPlayer.x = newX
+		localPlayer.y = newY
+		localPlayer.dir = effectiveDir
+		// 8프레임 자산 적용 시 facing8 기반 렌더를 위해 동기화. 4프레임 모드에선 영향 없음.
+		localPlayer.facing8 = effectiveFacing8 ?? derivedFacing8FromDir(effectiveDir)
+
+		this.#updateCharacterFrame(localPlayer, effectiveDir)
+		this.#updatePlayerVisuals(localPlayer)
+	}
+
+	#syncToNetwork(
+		localPlayer: PlayerObject,
+		dir: Direction | null,
+		effectiveDir: Direction | null,
+		intent: IntentVector,
+		facing8: Facing8 | null,
+		now: number,
+	): void {
+		const isMovingNow = dir !== null
 
 		if (effectiveDir) {
-			// (b) dash 룩업: directionToVector (대각선 1/√2 정규화)
-			const v = directionToVector(effectiveFacing8 ?? derivedFacing8FromDir(effectiveDir))
-			const moveAmount = effectiveSpeed * (delta / 1000)
-
-			// (f) 분리축 슬라이드 충돌 + sub-step swept
-			// NOTE: #checkCollision 4번째 인자는 facing이 아니라 "검사 축+부호 신호".
-			//   dir 'right'/'left' = x축, 'down'/'up' = y축. 한 호출에 facing dir을 그대로 넘기면
-			//   다른 축은 분기 미스로 무검사 통과 → 대각선 벽 관통 버그 발생.
-			// NOTE(dash-swept): #sweptCollisionAxis가 한 프레임 이동량을 tile 단위로 sub-step 분할하여
-			//   30fps drop(dash 1000 × 33ms ≈ 33px) 환경에서도 벽 한 칸 건너뛰기를 방지한다.
-			// NOTE(corner-cut): 두 축 슬라이드 통과 후 대각 칸 자체가 collidable이어도 통과 허용.
-			//   게임 디자인 결정(2026-04-19): 캐릭터가 모서리를 비스듬히 지나는 자연스러움 우선
-			//   (Zelda/Pokemon 스타일). 엄밀한 차단이 필요한 위치는 collidable 영역을 넓혀 회피.
-			const xAxisDir: Direction | null = v.x > 0 ? 'right' : v.x < 0 ? 'left' : null
-			const yAxisDir: Direction | null = v.y > 0 ? 'down' : v.y < 0 ? 'up' : null
-
-			const xResult = xAxisDir
-				? this.#sweptCollisionAxis(localPlayer, v.x * moveAmount, 'x', xAxisDir)
-				: { x: localPlayer.x, y: localPlayer.y }
-			const yResult = yAxisDir
-				? this.#sweptCollisionAxis(localPlayer, v.y * moveAmount, 'y', yAxisDir)
-				: { x: localPlayer.x, y: localPlayer.y }
-			const newX = xResult.x
-			const newY = yResult.y
-
-			// If collision stopped movement during dash, end dash early
-			if (this.#isDashing) {
-				const movedX = Math.abs(newX - localPlayer.x)
-				const movedY = Math.abs(newY - localPlayer.y)
-				if (movedX < 0.1 && movedY < 0.1) {
-					this.#isDashing = false
-					this.#dashDir = null
-					this.#dashFacing8 = null
-				}
-			}
-
-			localPlayer.x = newX
-			localPlayer.y = newY
-			localPlayer.dir = effectiveDir
-
-			this.#updateCharacterFrame(localPlayer, effectiveDir)
-			this.#updatePlayerVisuals(localPlayer)
-
-			// Throttled network send
+			// Throttled network send while moving or dashing
 			if (now - this.#lastNetworkSendTime >= NETWORK_SEND_INTERVAL_MS) {
 				this.#lastNetworkSendTime = now
 				// (d) facing8 송신: 대각선만
 				const facing8ToSend =
-					intent.x !== 0 && intent.y !== 0 ? (currentFacing8 ?? undefined) : undefined
-				network.sendMove(newX, newY, effectiveDir, facing8ToSend)
+					intent.x !== 0 && intent.y !== 0 ? (facing8 ?? undefined) : undefined
+				network.sendMove(localPlayer.x, localPlayer.y, effectiveDir, facing8ToSend)
 
 				const info = gameState.players.get(this.#localPlayerId!)
 				if (info) {
 					gameState.players.set(this.#localPlayerId!, {
 						...info,
-						x: newX,
-						y: newY,
+						x: localPlayer.x,
+						y: localPlayer.y,
 						dir: effectiveDir,
 					})
 				}
@@ -1194,10 +1234,36 @@ export class WorldScene extends Phaser.Scene {
 				})
 			}
 		}
+	}
 
-		this.#wasMoving = isMovingNow || this.#isDashing
+	update(_time: number, delta: number): void {
+		if (!this.#localPlayerId) return
 
-		// Update nearby interactive objects
+		this.#updateRemoteInterpolation(delta)
+
+		const localPlayer = this.#playerObjects.get(this.#localPlayerId)
+		if (!localPlayer) return
+
+		const intent = this.#collectInput()
+		if (intent === null) return
+
+		const { dir, facing8 } = this.#resolveDirection(intent, localPlayer.dir ?? null)
+		const now = performance.now()
+
+		this.#updateDashState(dir, facing8, intent, now, localPlayer)
+
+		// Capture effective snapshot BEFORE #applyMovement may end dash on collision stall
+		const effectiveDir = this.#isDashing ? this.#dashDir! : dir
+		const effectiveFacing8 = this.#isDashing ? this.#dashFacing8! : facing8
+		const effectiveSpeed = this.#isDashing ? DASH_SPEED_PX_PER_SEC : MOVE_SPEED_PX_PER_SEC
+
+		if (effectiveDir) {
+			this.#applyMovement(localPlayer, effectiveDir, effectiveFacing8, effectiveSpeed, delta)
+		}
+
+		this.#syncToNetwork(localPlayer, dir, effectiveDir, intent, facing8, now)
+
+		this.#wasMoving = dir !== null || this.#isDashing
 		this.#updateNearbyObjects()
 	}
 

@@ -66,6 +66,22 @@ export function directionToFrame(dir: Direction): number {
 	return dirFrame[dir] ?? 0
 }
 
+// 8프레임 스프라이트시트용 — Phaser 좌표계 (0°=right, 90°=down) 기준 시계방향.
+// 프레임 레이아웃: [right, down-right, down, down-left, left, up-left, up, up-right]
+export function facing8ToFrame(f8: Facing8): number {
+	const f8Frame: Record<Facing8, number> = {
+		right: 0,
+		'down-right': 1,
+		down: 2,
+		'down-left': 3,
+		left: 4,
+		'up-left': 5,
+		up: 6,
+		'up-right': 7,
+	}
+	return f8Frame[f8]
+}
+
 export function facing8ToDirection4(f8: Facing8): Direction {
 	switch (f8) {
 		case 'up':

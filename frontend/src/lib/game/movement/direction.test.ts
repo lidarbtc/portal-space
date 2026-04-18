@@ -4,6 +4,7 @@ import {
 	isFacing8ConsistentWithDir,
 	intentToDirection4,
 	directionToVector,
+	facing8ToFrame,
 } from './direction'
 import type { Facing8 } from '@shared/types'
 
@@ -114,5 +115,52 @@ describe('directionToVector', () => {
 		expect(v.x).toBeGreaterThan(0)
 		expect(v.y).toBeGreaterThan(0)
 		expect(Math.abs(Math.sqrt(v.x * v.x + v.y * v.y) - 1)).toBeLessThan(1e-9)
+	})
+})
+
+describe('facing8ToFrame', () => {
+	// 각도 시계방향 (0°=right, 90°=down) 기준 B안 레이아웃
+	it('right → 0', () => {
+		expect(facing8ToFrame('right')).toBe(0)
+	})
+	it('down-right → 1', () => {
+		expect(facing8ToFrame('down-right')).toBe(1)
+	})
+	it('down → 2', () => {
+		expect(facing8ToFrame('down')).toBe(2)
+	})
+	it('down-left → 3', () => {
+		expect(facing8ToFrame('down-left')).toBe(3)
+	})
+	it('left → 4', () => {
+		expect(facing8ToFrame('left')).toBe(4)
+	})
+	it('up-left → 5', () => {
+		expect(facing8ToFrame('up-left')).toBe(5)
+	})
+	it('up → 6', () => {
+		expect(facing8ToFrame('up')).toBe(6)
+	})
+	it('up-right → 7', () => {
+		expect(facing8ToFrame('up-right')).toBe(7)
+	})
+
+	it('8방향 모두 0~7 범위 내 unique 프레임', () => {
+		const all: Facing8[] = [
+			'right',
+			'down-right',
+			'down',
+			'down-left',
+			'left',
+			'up-left',
+			'up',
+			'up-right',
+		]
+		const frames = all.map(facing8ToFrame)
+		expect(new Set(frames).size).toBe(8)
+		frames.forEach((f) => {
+			expect(f).toBeGreaterThanOrEqual(0)
+			expect(f).toBeLessThanOrEqual(7)
+		})
 	})
 })
