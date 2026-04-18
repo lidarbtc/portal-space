@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test'
-import { YjsRelay } from '../yjs-relay'
-import { Storage } from '../storage'
-import { encodeUpdates } from '../protocol'
+import { YjsRelay } from './yjs-relay'
+import { Storage } from './storage'
+import { encodeUpdates } from './protocol'
 import { unlinkSync, existsSync } from 'fs'
 
 const TEST_DB = '/tmp/portal-space-yjs-test.db'

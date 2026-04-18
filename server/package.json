@@ -7,7 +7,9 @@
 		"lint": "biome lint ."
 	},
 	"dependencies": {
-		"drizzle-orm": "^0.45.2"
+		"drizzle-orm": "^0.45.2",
+		"nanoid": "^3.3.11",
+		"yaml": "^2.8.3"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^2.2.4",

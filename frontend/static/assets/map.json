@@ -10854,10 +10854,72 @@
       "width": 60,
       "x": 0,
       "y": 0
+    },
+    {
+      "draworder": "topdown",
+      "id": 5,
+      "name": "objects",
+      "objects": [
+        {
+          "id": 1,
+          "name": "wb-1",
+          "type": "whiteboard",
+          "x": 448,
+          "y": 384,
+          "width": 0,
+          "height": 0,
+          "visible": true,
+          "rotation": 0
+        },
+        {
+          "id": 2,
+          "name": "wb-2",
+          "type": "whiteboard",
+          "x": 544,
+          "y": 384,
+          "width": 0,
+          "height": 0,
+          "visible": true,
+          "rotation": 0
+        },
+        {
+          "id": 3,
+          "name": "rc-1",
+          "type": "regional_chat",
+          "x": 336,
+          "y": 256,
+          "width": 0,
+          "height": 0,
+          "visible": true,
+          "rotation": 0,
+          "properties": [
+            {
+              "name": "stateName",
+              "type": "string",
+              "value": "결계석"
+            },
+            {
+              "name": "stateRadius",
+              "type": "int",
+              "value": 80
+            },
+            {
+              "name": "stateRetain",
+              "type": "bool",
+              "value": false
+            }
+          ]
+        }
+      ],
+      "opacity": 1,
+      "type": "objectgroup",
+      "visible": true,
+      "x": 0,
+      "y": 0
     }
   ],
-  "nextlayerid": 5,
-  "nextobjectid": 1,
+  "nextlayerid": 6,
+  "nextobjectid": 4,
   "orientation": "orthogonal",
   "renderorder": "right-down",
   "tiledversion": "1.12.1",

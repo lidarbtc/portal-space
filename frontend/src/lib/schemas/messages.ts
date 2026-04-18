@@ -51,6 +51,8 @@ export const InteractiveObjectSchema = Schema.Struct({
 	x: Schema.Number,
 	y: Schema.Number,
 	state: Schema.optional(Schema.Unknown),
+	ownerId: Schema.optional(Schema.String),
+	placedAt: Schema.optional(Schema.Number),
 })
 
 export const ActionMessageSchema = Schema.Struct({
@@ -168,6 +170,18 @@ export const ActionPayloadMessageSchema = Schema.Struct({
 	zoneEvent: Schema.optional(ZoneEventSchema),
 })
 
+export const ObjectAddMessageSchema = Schema.Struct({
+	type: Schema.Literal('object_add'),
+	...BaseFields,
+	object: InteractiveObjectSchema,
+})
+
+export const ObjectRemoveMessageSchema = Schema.Struct({
+	type: Schema.Literal('object_remove'),
+	...BaseFields,
+	objectId: Schema.String,
+})
+
 // --- Discriminated union ---
 
 export const OutgoingMessageSchema = Schema.Union(
@@ -183,6 +197,8 @@ export const OutgoingMessageSchema = Schema.Union(
 	SnapshotMessageSchema,
 	ErrorMessageSchema,
 	ActionPayloadMessageSchema,
+	ObjectAddMessageSchema,
+	ObjectRemoveMessageSchema,
 )
 
 export type OutgoingMessageDecoded = typeof OutgoingMessageSchema.Type

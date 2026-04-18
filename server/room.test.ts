@@ -1,8 +1,37 @@
 import { describe, it, expect, beforeEach } from 'bun:test'
-import { Room } from '../room'
-import { TILE_SIZE, MAP_WIDTH, MAP_HEIGHT } from '../protocol'
+import { Room } from './room'
+import { Storage } from './storage'
+import { TILE_SIZE, MAP_WIDTH, MAP_HEIGHT } from './protocol'
+import { loadObjectConfig, type ObjectsConfig } from '@shared/config'
 import type { OutgoingMessage } from '@shared/types'
 import type { ServerWebSocket } from 'bun'
+
+const FIXTURE_YAML = `
+quotaPerUser: 3
+types:
+  whiteboard:
+    sprite: graphics/whiteboard
+    interactionRadius: 24
+    hitShape: rect
+    hitRect: { x: -16, y: -32, w: 32, h: 48 }
+    defaultState: null
+  regional_chat:
+    sprite: image/ward-stone
+    interactionRadius: 24
+    hitShape: circle
+    hitCircle: { radius: 24 }
+    defaultState: { name: 'fixture-zone', radius: 80, retainHistory: false }
+`
+
+function newTestRoom(storage?: Storage, config?: ObjectsConfig): Room {
+	return new Room({
+		id: 'test',
+		width: MAP_WIDTH,
+		height: MAP_HEIGHT,
+		storage: storage ?? new Storage(':memory:'),
+		config: config ?? loadObjectConfig(FIXTURE_YAML),
+	})
+}
 
 // Mock WebSocket that collects sent messages
 function createMockWs(): ServerWebSocket<unknown> & { messages: OutgoingMessage[] } {
@@ -44,11 +73,18 @@ function joinClient(room: Room, ws: ReturnType<typeof createMockWs>, nickname = 
 	)
 }
 
+function idOf(ws: ReturnType<typeof createMockWs>): string {
+	const snap = ws.messages.find((m) => m.type === 'snapshot')
+	if (!snap?.self?.id)
+		throw new Error('snapshot missing self.id — idOf must run before ws.messages is cleared')
+	return snap.self.id
+}
+
 describe('Room', () => {
 	let room: Room
 
 	beforeEach(() => {
-		room = new Room('test', MAP_WIDTH, MAP_HEIGHT)
+		room = newTestRoom()
 	})
 
 	describe('collision map', () => {
@@ -387,6 +423,183 @@ describe('Room', () => {
 
 			expect(ws1.messages.some((m) => m.type === 'chat' && m.text === 'hello all')).toBe(true)
 			expect(ws2.messages.some((m) => m.type === 'chat' && m.text === 'hello all')).toBe(true)
+		})
+	})
+
+	describe('handleChat /place', () => {
+		function sendPlace(ws: ReturnType<typeof createMockWs>, type: string, room: Room): void {
+			room.handleMessage(ws, JSON.stringify({ type: 'chat', text: `/place ${type}` }))
+		}
+
+		it('valid /place whiteboard broadcasts object_add with snapped tile-center coords (AC-4)', () => {
+			const ws1 = createMockWs()
+			const ws2 = createMockWs()
+			joinClient(room, ws1, 'placer')
+			joinClient(room, ws2, 'observer')
+			const placerId = idOf(ws1)
+
+			// Move the placer so we control the snap target.
+			room.handleMessage(
+				ws1,
+				JSON.stringify({
+					type: 'move',
+					x: 10 * TILE_SIZE + 5,
+					y: 7 * TILE_SIZE + 9,
+					dir: 'down',
+				}),
+			)
+
+			ws1.messages.length = 0
+			ws2.messages.length = 0
+
+			sendPlace(ws1, 'whiteboard', room)
+
+			const add1 = ws1.messages.find((m) => m.type === 'object_add')
+			const add2 = ws2.messages.find((m) => m.type === 'object_add')
+			expect(add1).toBeDefined()
+			expect(add2).toBeDefined()
+			expect(add1?.object?.type).toBe('whiteboard')
+			// Snap to tile top-left (matches Tiled convention for wb-1/wb-2/rc-1).
+			expect(add1?.object?.x).toBe(10 * TILE_SIZE)
+			expect(add1?.object?.y).toBe(7 * TILE_SIZE)
+			expect(add1?.object?.id).toBeDefined()
+			expect(add1?.object?.ownerId).toBe(placerId)
+
+			// /place text must NOT leak as a chat message anywhere
+			expect(
+				ws1.messages.some((m) => m.type === 'chat' && m.text === '/place whiteboard'),
+			).toBe(false)
+			expect(
+				ws2.messages.some((m) => m.type === 'chat' && m.text === '/place whiteboard'),
+			).toBe(false)
+		})
+
+		it('unknown type is rejected with sender-only error and no state mutation (AC-7)', () => {
+			const ws1 = createMockWs()
+			const ws2 = createMockWs()
+			joinClient(room, ws1, 'placer')
+			joinClient(room, ws2, 'observer')
+
+			const sizeBefore = room.objects.size
+			ws1.messages.length = 0
+			ws2.messages.length = 0
+
+			sendPlace(ws1, 'unknown_type', room)
+
+			expect(ws1.messages.some((m) => m.type === 'error')).toBe(true)
+			expect(ws2.messages.some((m) => m.type === 'error')).toBe(false)
+			expect(ws1.messages.some((m) => m.type === 'object_add')).toBe(false)
+			expect(ws2.messages.some((m) => m.type === 'object_add')).toBe(false)
+			expect(room.objects.size).toBe(sizeBefore)
+		})
+	})
+
+	describe('FIFO eviction', () => {
+		it('N+1-th /place evicts the oldest with object_remove before object_add (AC-6)', () => {
+			const ws1 = createMockWs()
+			joinClient(room, ws1, 'spammer')
+
+			room.handleMessage(
+				ws1,
+				JSON.stringify({
+					type: 'move',
+					x: 10 * TILE_SIZE + 5,
+					y: 7 * TILE_SIZE + 5,
+					dir: 'down',
+				}),
+			)
+			ws1.messages.length = 0
+
+			// quotaPerUser = 3
+			for (let i = 0; i < 3; i++) {
+				room.handleMessage(ws1, JSON.stringify({ type: 'chat', text: '/place whiteboard' }))
+			}
+			const adds = ws1.messages.filter((m) => m.type === 'object_add')
+			expect(adds).toHaveLength(3)
+			const firstId = adds[0].object!.id
+			const removesBefore = ws1.messages.filter((m) => m.type === 'object_remove')
+			expect(removesBefore).toHaveLength(0)
+
+			ws1.messages.length = 0
+
+			// 4th /place — must evict first, in the order: object_remove THEN object_add
+			room.handleMessage(ws1, JSON.stringify({ type: 'chat', text: '/place whiteboard' }))
+
+			const ordered = ws1.messages.filter(
+				(m) => m.type === 'object_remove' || m.type === 'object_add',
+			)
+			expect(ordered).toHaveLength(2)
+			expect(ordered[0].type).toBe('object_remove')
+			expect(ordered[0].objectId).toBe(firstId)
+			expect(ordered[1].type).toBe('object_add')
+
+			// Room state: exactly 3 user-placed remain (no Tiled seed in this test room).
+			expect(room.objects.size).toBe(3)
+		})
+
+		it('lazy seed from Storage so pre-existing rows count toward quota', () => {
+			const storage = new Storage(':memory:')
+			const fixtureRoom = newTestRoom(storage)
+			const ws1 = createMockWs()
+			joinClient(fixtureRoom, ws1, 'returning')
+			const clientId = idOf(ws1)
+
+			// Pre-seed Storage as if a prior session had already placed 3 objects.
+			for (let i = 0; i < 3; i++) {
+				storage.insertObject({
+					id: `pre-${i}`,
+					roomId: 'test',
+					type: 'whiteboard',
+					x: 0,
+					y: 0,
+					state: null,
+					ownerId: clientId,
+					placedAt: 1000 + i,
+				})
+			}
+
+			fixtureRoom.handleMessage(
+				ws1,
+				JSON.stringify({ type: 'move', x: 10 * TILE_SIZE, y: 7 * TILE_SIZE, dir: 'down' }),
+			)
+			ws1.messages.length = 0
+
+			// FIFO must trip on the very first /place of this session because Storage already holds 3.
+			fixtureRoom.handleMessage(
+				ws1,
+				JSON.stringify({ type: 'chat', text: '/place whiteboard' }),
+			)
+
+			const remove = ws1.messages.find((m) => m.type === 'object_remove')
+			expect(remove?.objectId).toBe('pre-0')
+			expect(fixtureRoom._debugIsSeeded(clientId)).toBe(true)
+			expect(fixtureRoom._debugOwnedIds(clientId)).toHaveLength(3)
+		})
+
+		it('disconnect clears in-memory FIFO maps but Storage rows persist', () => {
+			const storage = new Storage(':memory:')
+			const fixtureRoom = newTestRoom(storage)
+			const ws1 = createMockWs()
+			joinClient(fixtureRoom, ws1, 'leaver')
+			const clientId = idOf(ws1)
+
+			fixtureRoom.handleMessage(
+				ws1,
+				JSON.stringify({ type: 'move', x: 10 * TILE_SIZE, y: 7 * TILE_SIZE, dir: 'down' }),
+			)
+			fixtureRoom.handleMessage(
+				ws1,
+				JSON.stringify({ type: 'chat', text: '/place whiteboard' }),
+			)
+			expect(fixtureRoom._debugOwnedIds(clientId)).toHaveLength(1)
+			expect(fixtureRoom._debugIsSeeded(clientId)).toBe(true)
+
+			fixtureRoom.handleClose(ws1)
+
+			expect(fixtureRoom._debugOwnedIds(clientId)).toBeUndefined()
+			expect(fixtureRoom._debugIsSeeded(clientId)).toBe(false)
+			// Storage contract: owner rows remain for next-session seed.
+			expect(storage.listObjectsByOwner('test', clientId)).toHaveLength(1)
 		})
 	})
 })

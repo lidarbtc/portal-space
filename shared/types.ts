@@ -12,6 +12,8 @@ export type MsgType =
 	| 'snapshot'
 	| 'error'
 	| 'action'
+	| 'object_add'
+	| 'object_remove'
 
 export type Direction = 'up' | 'down' | 'left' | 'right'
 export type PlayerStatus = 'online' | 'away' | 'dnd'
@@ -67,6 +69,8 @@ export interface InteractiveObject {
 	x: number
 	y: number
 	state?: unknown
+	ownerId?: string
+	placedAt?: number
 }
 
 // Server -> Client
@@ -89,6 +93,8 @@ export interface OutgoingMessage {
 	self?: PlayerInfo
 	reconnect?: boolean
 	objects?: InteractiveObject[]
+	object?: InteractiveObject
+	objectId?: string
 	actionPayload?: ActionMessage
 	zoneId?: string
 	zoneName?: string

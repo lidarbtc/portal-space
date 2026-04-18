@@ -1,0 +1,14 @@
+quotaPerUser: 3
+types:
+    whiteboard:
+        sprite: graphics/whiteboard
+        interactionRadius: 24
+        hitShape: rect
+        hitRect: { x: -16, y: -32, w: 32, h: 48 }
+        defaultState: null
+    regional_chat:
+        sprite: image/ward-stone
+        interactionRadius: 24
+        hitShape: circle
+        hitCircle: { radius: 24 }
+        defaultState: { name: '결계석', radius: 80, retainHistory: false }

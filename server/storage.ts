@@ -1,7 +1,16 @@
-import { eq } from 'drizzle-orm'
+import { and, asc, eq } from 'drizzle-orm'
+import type { InteractiveObject } from '@shared/types'
 import { createDb, type DbInstance } from './db'
 import { runMigrations } from './db/migrate'
-import { yjsDocuments } from './db/schema'
+import { interactiveObjects, yjsDocuments } from './db/schema'
+
+// A persisted InteractiveObject row, with room / owner / placement metadata.
+// `ownerId` is null for Tiled-seeded overrides (unused in v1 but reserved).
+export interface StoredObject extends InteractiveObject {
+	roomId: string
+	ownerId: string
+	placedAt: number
+}
 
 export class Storage {
 	#dbInstance: DbInstance
@@ -69,7 +78,84 @@ export class Storage {
 		})
 	}
 
+	// --- Interactive objects (v1 runtime-placed) ---
+
+	insertObject(obj: StoredObject): void {
+		this.#dbInstance.db
+			.insert(interactiveObjects)
+			.values({
+				id: obj.id,
+				roomId: obj.roomId,
+				type: obj.type,
+				x: Math.trunc(obj.x),
+				y: Math.trunc(obj.y),
+				ownerId: obj.ownerId,
+				placedAt: obj.placedAt,
+				state:
+					obj.state === undefined || obj.state === null
+						? null
+						: JSON.stringify(obj.state),
+			})
+			.run()
+	}
+
+	deleteObject(id: string): void {
+		this.#dbInstance.db.delete(interactiveObjects).where(eq(interactiveObjects.id, id)).run()
+	}
+
+	listObjectsByRoom(roomId: string): StoredObject[] {
+		const rows = this.#dbInstance.db
+			.select()
+			.from(interactiveObjects)
+			.where(eq(interactiveObjects.roomId, roomId))
+			.orderBy(asc(interactiveObjects.placedAt))
+			.all()
+		return rows.map(rowToStoredObject)
+	}
+
+	listObjectsByOwner(roomId: string, ownerId: string): StoredObject[] {
+		const rows = this.#dbInstance.db
+			.select()
+			.from(interactiveObjects)
+			.where(
+				and(eq(interactiveObjects.roomId, roomId), eq(interactiveObjects.ownerId, ownerId)),
+			)
+			.orderBy(asc(interactiveObjects.placedAt))
+			.all()
+		return rows.map(rowToStoredObject)
+	}
+
 	close(): void {
 		this.#dbInstance.client.close()
+	}
+}
+
+function rowToStoredObject(row: {
+	id: string
+	roomId: string
+	type: string
+	x: number
+	y: number
+	ownerId: string | null
+	placedAt: number
+	state: string | null
+}): StoredObject {
+	let state: unknown = null
+	if (row.state !== null) {
+		try {
+			state = JSON.parse(row.state)
+		} catch {
+			state = null
+		}
+	}
+	return {
+		id: row.id,
+		roomId: row.roomId,
+		type: row.type,
+		x: row.x,
+		y: row.y,
+		ownerId: row.ownerId ?? '',
+		placedAt: row.placedAt,
+		state,
 	}
 }

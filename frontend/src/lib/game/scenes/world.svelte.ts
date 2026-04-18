@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { SvelteMap } from 'svelte/reactivity'
+import { SvelteMap, SvelteSet } from 'svelte/reactivity'
 import { network } from '$lib/network'
 import { gameState } from '$lib/stores/game.svelte'
 import { dpadState } from '$lib/stores/dpad.svelte'
@@ -22,6 +22,7 @@ import {
 	destroyInteractiveObject,
 	type GameInteractiveObject,
 } from '../objects/interactive-object'
+import { getTypeDef } from '../objects/config'
 
 const MOVE_SPEED = 200 // px/sec
 const NETWORK_SEND_INTERVAL = 100 // ms (10Hz)
@@ -57,6 +58,14 @@ export class WorldScene extends Phaser.Scene {
 	#localPlayerId: string | null = null
 	#tileSize = 16
 	#effectCleanups: Array<() => void> = []
+
+	// Scene-lifecycle buffer: WebSocket object_add / object_remove deltas may
+	// arrive after network.on() registers but before snapshot hydrates (or in
+	// a burst during hydration). We queue them here and flush after snapshot.
+	#objectDeltaBuffer: Array<
+		{ kind: 'add'; object: InteractiveObject } | { kind: 'remove'; objectId: string }
+	> = []
+	#snapshotHydrated = false
 
 	#cursors!: Phaser.Types.Input.Keyboard.CursorKeys
 	#wasd!: {
@@ -174,17 +183,36 @@ export class WorldScene extends Phaser.Scene {
 		this.#setupZoom()
 		this.#setupInteractiveObjects()
 
-		// Render objects already in store (from initial snapshot)
+		// Render objects already in store (from initial snapshot received via
+		// the connect() onSnapshot callback — not via network.on('snapshot')).
 		const currentObjects = objectsState.objects
 		currentObjects.forEach((obj, id) => {
 			if (!this.#gameObjects.has(id)) {
-				const gameObj = createInteractiveObject(this, obj)
+				const typeDef = getTypeDef(obj.type)
+				if (!typeDef) {
+					console.warn('[world] unknown object type:', obj.type)
+					return
+				}
+				const gameObj = createInteractiveObject(this, obj, typeDef)
 				this.#gameObjects.set(id, gameObj)
 				gameObj.container.on('pointerdown', () => {
 					this.#onObjectInteract(obj)
 				})
 			}
 		})
+
+		// The scene is now synced with the initial snapshot; any realtime
+		// object_add / object_remove deltas should be applied directly. The
+		// buffer only matters on reconnect when a fresh snapshot arrives via
+		// network.on('snapshot') and may collide with in-flight deltas.
+		this.#snapshotHydrated = true
+		if (this.#objectDeltaBuffer.length > 0) {
+			for (const d of this.#objectDeltaBuffer) {
+				if (d.kind === 'add') this.#applyObjectAdd(d.object)
+				else this.#applyObjectRemove(d.objectId)
+			}
+			this.#objectDeltaBuffer.length = 0
+		}
 
 		this.#effectCleanups.push(
 			$effect.root(() => {
@@ -504,21 +532,54 @@ export class WorldScene extends Phaser.Scene {
 			}
 			gameState.players = newMap
 
-			// Load interactive objects from snapshot
+			// Load interactive objects from snapshot. Mutate the existing
+			// SvelteMap in place (do NOT reassign objectsState.objects) so that
+			// downstream subscribers remain live across reconnects.
 			if (msg.objects) {
-				const objMap = new SvelteMap<string, InteractiveObject>()
+				const snapshotIds = new SvelteSet<string>()
 				msg.objects.forEach((obj) => {
-					objMap.set(obj.id, obj)
+					snapshotIds.add(obj.id)
+					objectsState.objects.set(obj.id, obj)
 					if (!this.#gameObjects.has(obj.id)) {
-						const gameObj = createInteractiveObject(this, obj)
-						this.#gameObjects.set(obj.id, gameObj)
-						gameObj.container.on('pointerdown', () => {
-							this.#onObjectInteract(obj)
-						})
+						this.#applyObjectAdd(obj)
 					}
 				})
-				objectsState.objects = objMap
+				// Drop stale entries that weren't in the snapshot (post-reconnect).
+				for (const id of [...objectsState.objects.keys()]) {
+					if (!snapshotIds.has(id)) {
+						objectsState.objects.delete(id)
+					}
+				}
 			}
+
+			// Snapshot is authoritative for the joining client. Flush any
+			// object_add / object_remove deltas that arrived during hydration
+			// in receive order; handlers are idempotent (add-existing is a
+			// no-op; remove-missing is a no-op).
+			this.#snapshotHydrated = true
+			for (const d of this.#objectDeltaBuffer) {
+				if (d.kind === 'add') this.#applyObjectAdd(d.object)
+				else this.#applyObjectRemove(d.objectId)
+			}
+			this.#objectDeltaBuffer.length = 0
+		})
+
+		network.on('object_add', (msg) => {
+			if (!msg.object) return
+			if (!this.#snapshotHydrated) {
+				this.#objectDeltaBuffer.push({ kind: 'add', object: msg.object })
+				return
+			}
+			this.#applyObjectAdd(msg.object)
+		})
+
+		network.on('object_remove', (msg) => {
+			if (!msg.objectId) return
+			if (!this.#snapshotHydrated) {
+				this.#objectDeltaBuffer.push({ kind: 'remove', objectId: msg.objectId })
+				return
+			}
+			this.#applyObjectRemove(msg.objectId)
 		})
 
 		network.on('action', (msg) => {
@@ -1086,6 +1147,30 @@ export class WorldScene extends Phaser.Scene {
 
 		// Update nearby interactive objects
 		this.#updateNearbyObjects()
+	}
+
+	#applyObjectAdd(obj: InteractiveObject): void {
+		objectsState.objects.set(obj.id, obj)
+		if (this.#gameObjects.has(obj.id)) return // idempotent
+		const typeDef = getTypeDef(obj.type)
+		if (!typeDef) {
+			console.warn('[world] object_add: unknown type', obj.type)
+			return
+		}
+		const gameObj = createInteractiveObject(this, obj, typeDef)
+		this.#gameObjects.set(obj.id, gameObj)
+		gameObj.container.on('pointerdown', () => {
+			this.#onObjectInteract(obj)
+		})
+	}
+
+	#applyObjectRemove(objectId: string): void {
+		objectsState.objects.delete(objectId)
+		const existing = this.#gameObjects.get(objectId)
+		if (existing) {
+			destroyInteractiveObject(existing)
+			this.#gameObjects.delete(objectId)
+		}
 	}
 
 	#setupInteractiveObjects(): void {

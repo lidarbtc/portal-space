@@ -10,6 +10,9 @@ import type {
 	ColorPalette,
 	RegionalChatState,
 } from '@shared/types'
+import type { ObjectsConfig } from '@shared/config'
+import { nanoid } from 'nanoid'
+import type { Storage } from './storage'
 import { ServerClient } from './client'
 import {
 	TILE_SIZE,
@@ -40,6 +43,14 @@ import {
 	validateColors,
 } from './protocol'
 
+export interface RoomOptions {
+	id: string
+	width: number
+	height: number
+	storage: Storage
+	config: ObjectsConfig
+}
+
 export class Room {
 	id: string
 	players = new Map<string, ServerClient>()
@@ -47,15 +58,30 @@ export class Room {
 	collision: boolean[][]
 	width: number
 	height: number
+	storage: Storage
+	config: ObjectsConfig
 
 	// Map ws → clientId for fast lookup on message/close
 	#wsBySocket = new Map<ServerWebSocket<unknown>, string>()
 
-	constructor(id: string, width: number, height: number) {
-		this.id = id
-		this.width = width
-		this.height = height
-		this.collision = Array.from({ length: height }, () => new Array<boolean>(width).fill(false))
+	// Per-client FIFO of owned object ids (in placedAt ASC order, in-memory).
+	// Seeded lazily from Storage on the first /place per client-session.
+	#ownedObjectIds = new Map<string, string[]>()
+	#seededOwners = new Set<string>()
+
+	// Derived index of object ids whose type === 'regional_chat', for O(1)
+	// filtering in #updateZoneMembership instead of scanning all objects.
+	#regionalChatIds = new Set<string>()
+
+	constructor(opts: RoomOptions) {
+		this.id = opts.id
+		this.width = opts.width
+		this.height = opts.height
+		this.storage = opts.storage
+		this.config = opts.config
+		this.collision = Array.from({ length: opts.height }, () =>
+			new Array<boolean>(opts.width).fill(false),
+		)
 		this.#initCollisionMap()
 	}
 
@@ -141,6 +167,22 @@ export class Room {
 
 	addObject(obj: InteractiveObject): void {
 		this.objects.set(obj.id, obj)
+		if (obj.type === 'regional_chat') {
+			this.#regionalChatIds.add(obj.id)
+		}
+	}
+
+	removeObject(id: string): void {
+		const obj = this.objects.get(id)
+		if (!obj) return
+		this.objects.delete(id)
+		if (obj.type === 'regional_chat') {
+			this.#regionalChatIds.delete(id)
+			// Evict any players whose current zone is this object.
+			for (const c of this.players.values()) {
+				if (c.currentZoneID === id) c.currentZoneID = ''
+			}
+		}
 	}
 
 	// --- WebSocket message dispatch (replaces Go's readPump) ---
@@ -338,6 +380,12 @@ export class Room {
 				id: client.id,
 			})
 		}
+
+		// Release per-client placement state so long-running processes don't
+		// accumulate Map entries for every disconnected client. Storage rows
+		// are intentionally retained (owner persistence is the v1 contract).
+		this.#ownedObjectIds.delete(client.id)
+		this.#seededOwners.delete(client.id)
 	}
 
 	#handleMove(client: ServerClient, x: number, y: number, dir: string): void {
@@ -443,6 +491,13 @@ export class Room {
 		if (image && !normalizedImage) return
 		if (!text && !normalizedImage) return
 
+		// /place <type> — intercept before any chat routing. Command text is
+		// never re-broadcast as chat.
+		if (text.startsWith('/place ') || text === '/place') {
+			this.#handlePlace(client, text)
+			return
+		}
+
 		// Zone chat: direct-send to zone members only
 		if (client.currentZoneID) {
 			const obj = this.objects.get(client.currentZoneID)
@@ -481,6 +536,106 @@ export class Room {
 		if (text) msg.text = text
 		if (normalizedImage) msg.image = normalizedImage
 		this.#broadcast(msg)
+	}
+
+	#handlePlace(client: ServerClient, text: string): void {
+		const typeName = text.slice('/place'.length).trim()
+		if (!typeName) {
+			client.sendMsg({
+				type: 'error',
+				x: 0,
+				y: 0,
+				message: '/place <type> — type is required',
+			})
+			return
+		}
+
+		const typeDef = this.config.types[typeName]
+		if (!typeDef) {
+			client.sendMsg({
+				type: 'error',
+				x: 0,
+				y: 0,
+				message: `unknown object type: ${typeName}`,
+			})
+			return
+		}
+
+		// Snap to the player's current tile top-left corner to match Tiled's
+		// object coordinate convention (wb-1/wb-2 are at tile top-left, not
+		// tile center). Keeps runtime placements visually consistent with the
+		// seeded base objects.
+		const tileX = Math.floor(client.x / TILE_SIZE)
+		const tileY = Math.floor(client.y / TILE_SIZE)
+		const placeX = tileX * TILE_SIZE
+		const placeY = tileY * TILE_SIZE
+
+		this.#seedOwnerIfNeeded(client.id)
+		const arr = this.#ownedObjectIds.get(client.id) ?? []
+
+		// FIFO eviction — evict before add so clients that joined mid-burst
+		// never observe a transient >quota count.
+		while (arr.length >= this.config.quotaPerUser) {
+			const evictId = arr.shift()
+			if (!evictId) break
+			this.storage.deleteObject(evictId)
+			this.removeObject(evictId)
+			this.#broadcast({
+				type: 'object_remove',
+				x: 0,
+				y: 0,
+				objectId: evictId,
+			})
+		}
+
+		const id = nanoid()
+		const now = Date.now()
+		const state =
+			typeDef.defaultState === undefined || typeDef.defaultState === null
+				? null
+				: cloneShallow(typeDef.defaultState)
+
+		const obj: InteractiveObject = {
+			id,
+			type: typeName,
+			x: placeX,
+			y: placeY,
+			state,
+			ownerId: client.id,
+			placedAt: now,
+		}
+
+		this.storage.insertObject({ ...obj, roomId: this.id, ownerId: client.id, placedAt: now })
+		this.addObject(obj)
+		arr.push(id)
+		this.#ownedObjectIds.set(client.id, arr)
+
+		this.#broadcast({
+			type: 'object_add',
+			x: 0,
+			y: 0,
+			object: obj,
+		})
+	}
+
+	#seedOwnerIfNeeded(clientId: string): void {
+		if (this.#seededOwners.has(clientId)) return
+		const prior = this.storage.listObjectsByOwner(this.id, clientId)
+		// listObjectsByOwner is ordered by placedAt ASC — same as FIFO order.
+		const ids = prior.map((row) => row.id)
+		this.#ownedObjectIds.set(clientId, ids)
+		this.#seededOwners.add(clientId)
+	}
+
+	/** Test-only: inspect per-owner FIFO state. */
+	_debugOwnedIds(clientId: string): string[] | undefined {
+		const arr = this.#ownedObjectIds.get(clientId)
+		return arr ? [...arr] : undefined
+	}
+
+	/** Test-only: whether a clientId has been seeded this session. */
+	_debugIsSeeded(clientId: string): boolean {
+		return this.#seededOwners.has(clientId)
 	}
 
 	#handleAction(client: ServerClient, raw: string | unknown): void {
@@ -599,8 +754,9 @@ export class Room {
 		}
 
 		// Try to enter a new zone
-		for (const obj of this.objects.values()) {
-			if (obj.type !== 'regional_chat') continue
+		for (const zoneId of this.#regionalChatIds) {
+			const obj = this.objects.get(zoneId)
+			if (!obj) continue
 			const state = obj.state as RegionalChatState | undefined
 			if (!state) continue
 
@@ -665,4 +821,10 @@ export class Room {
 			}
 		}
 	}
+}
+
+function cloneShallow(value: unknown): unknown {
+	if (value === null || typeof value !== 'object') return value
+	if (Array.isArray(value)) return [...value]
+	return { ...(value as Record<string, unknown>) }
 }

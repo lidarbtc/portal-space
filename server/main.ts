@@ -1,4 +1,5 @@
 import type { ServerWebSocket } from 'bun'
+import { loadObjectConfig } from '@shared/config'
 import { Hub } from './hub'
 import { Storage } from './storage'
 import { YjsRelay } from './yjs-relay'
@@ -13,8 +14,19 @@ const DB_PATH = process.env.DB_PATH ?? 'portal-space.db'
 const BUILD_DIR = join(import.meta.dir, '../frontend/build')
 
 const storage = new Storage(DB_PATH)
-const hub = new Hub(storage)
-const yjsRelay = new YjsRelay(storage, ['wb-1', 'wb-2'])
+
+// Load shared YAML catalog + Tiled map at boot — both are read once, never
+// hot-reloaded at runtime (types rarely change; v1 non-goal).
+const configYaml = await Bun.file(join(import.meta.dir, '../shared/objects.config.yaml')).text()
+const config = loadObjectConfig(configYaml)
+const tiledJson = await Bun.file(join(import.meta.dir, '../frontend/static/assets/map.json')).json()
+
+const hub = new Hub(storage, config, tiledJson)
+
+// y.js whiteboard relay only serves the two Tiled-seeded whiteboards.
+// Runtime /place-placed whiteboards have nanoid ids and are NOT wired into
+// yjs yet (explicit v1 follow-up).
+const yjsRelay = new YjsRelay(storage, ['tiled:wb-1', 'tiled:wb-2'])
 
 // MIME type map for static files
 const MIME_TYPES: Record<string, string> = {

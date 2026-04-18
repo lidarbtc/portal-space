@@ -1,11 +1,12 @@
 import Phaser from 'phaser'
 import type { InteractiveObject, RegionalChatState } from '@shared/types'
+import type { ObjectTypeDef } from '@shared/config'
 
 const TILE_SIZE = 16
-const INTERACTION_RADIUS = 1.5 * TILE_SIZE
 
 export interface GameInteractiveObject {
 	data: InteractiveObject
+	typeDef: ObjectTypeDef
 	container: Phaser.GameObjects.Container
 	highlight: Phaser.GameObjects.Graphics
 	label: Phaser.GameObjects.DOMElement
@@ -20,36 +21,32 @@ export interface GameInteractiveObject {
 export function createInteractiveObject(
 	scene: Phaser.Scene,
 	obj: InteractiveObject,
+	typeDef: ObjectTypeDef,
 ): GameInteractiveObject {
 	const container = scene.add.container(obj.x, obj.y)
 	container.setDepth(5)
 
-	// Visual representation based on type
+	// Visual — sprite source comes from typeDef.sprite. For the two v1 types
+	// the sprite path selects between an image asset (ward-stone) and a
+	// procedural Graphics whiteboard.
 	let wardStoneSprite: Phaser.GameObjects.Image | undefined
-	if (obj.type === 'regional_chat') {
-		wardStoneSprite = scene.add.image(0, 0, 'ward-stone').setOrigin(0.5, 1)
+	if (typeDef.sprite.startsWith('image/')) {
+		const key = typeDef.sprite.slice('image/'.length)
+		wardStoneSprite = scene.add.image(0, 0, key).setOrigin(0.5, 1)
 		container.add(wardStoneSprite)
 	} else {
 		const sprite = scene.add.graphics()
-		if (obj.type === 'whiteboard') {
-			// Whiteboard: dark rectangle with border
-			sprite.fillStyle(0x2a2a3e, 1)
-			sprite.fillRect(-TILE_SIZE, -TILE_SIZE * 2, TILE_SIZE * 2, TILE_SIZE * 3)
-			sprite.lineStyle(2, 0x06b6d4, 1)
-			sprite.strokeRect(-TILE_SIZE, -TILE_SIZE * 2, TILE_SIZE * 2, TILE_SIZE * 3)
-			// Inner white area
-			sprite.fillStyle(0xffffff, 0.9)
-			sprite.fillRect(
-				-TILE_SIZE + 4,
-				-TILE_SIZE * 2 + 4,
-				TILE_SIZE * 2 - 8,
-				TILE_SIZE * 3 - 8,
-			)
-		}
+		// Whiteboard — dark rectangle with border and inner white area
+		sprite.fillStyle(0x2a2a3e, 1)
+		sprite.fillRect(-TILE_SIZE, -TILE_SIZE * 2, TILE_SIZE * 2, TILE_SIZE * 3)
+		sprite.lineStyle(2, 0x06b6d4, 1)
+		sprite.strokeRect(-TILE_SIZE, -TILE_SIZE * 2, TILE_SIZE * 2, TILE_SIZE * 3)
+		sprite.fillStyle(0xffffff, 0.9)
+		sprite.fillRect(-TILE_SIZE + 4, -TILE_SIZE * 2 + 4, TILE_SIZE * 2 - 8, TILE_SIZE * 3 - 8)
 		container.add(sprite)
 	}
 
-	// regional_chat: translucent circle zone
+	// regional_chat zone visuals — triggered by object state + circle hit shape
 	let zoneCircle: Phaser.GameObjects.Graphics | undefined
 	let zoneStroke: Phaser.GameObjects.Graphics | undefined
 	let zoneLabel: Phaser.GameObjects.DOMElement | undefined
@@ -59,19 +56,16 @@ export function createInteractiveObject(
 		const radius = state?.radius ?? 128
 		const name = state?.name ?? ''
 
-		// Fill layer (below stroke so stroke pulse is on top)
 		zoneCircle = scene.add.graphics()
 		zoneCircle.fillStyle(0x06b6d4, 0.08)
 		zoneCircle.fillCircle(0, 0, radius)
 		container.add(zoneCircle)
 
-		// Stroke layer — animated
 		zoneStroke = scene.add.graphics()
 		zoneStroke.lineStyle(2, 0x06b6d4, 0.3)
 		zoneStroke.strokeCircle(0, 0, radius)
 		container.add(zoneStroke)
 
-		// Pulse tween on the stroke alpha
 		scene.tweens.add({
 			targets: zoneStroke,
 			alpha: { from: 0.2, to: 0.4 },
@@ -81,7 +75,6 @@ export function createInteractiveObject(
 			ease: 'Sine.easeInOut',
 		})
 
-		// Zone name label at center
 		const zoneLabelEl = document.createElement('div')
 		zoneLabelEl.className = 'phaser-zone-label'
 		zoneLabelEl.textContent = name // XSS-safe
@@ -91,23 +84,25 @@ export function createInteractiveObject(
 		container.add(zoneLabel)
 	}
 
-	// Highlight effect (shown when nearby)
+	// Highlight graphic — rect types get a stroked outline. Circle types rely
+	// on a preFX glow applied to the sprite in updateNearbyState (pixel-
+	// perfect for ward-stone alpha mask).
 	const highlight = scene.add.graphics()
-	if (obj.type === 'whiteboard') {
+	if (typeDef.hitShape === 'rect') {
 		highlight.lineStyle(2, 0xfbbf24, 0.8)
-		highlight.strokeRect(
-			-TILE_SIZE - 2,
-			-TILE_SIZE * 2 - 2,
-			TILE_SIZE * 2 + 4,
-			TILE_SIZE * 3 + 4,
-		)
+		const r = typeDef.hitRect ?? {
+			x: -TILE_SIZE,
+			y: -TILE_SIZE * 2,
+			w: TILE_SIZE * 2,
+			h: TILE_SIZE * 3,
+		}
+		highlight.strokeRect(r.x - 2, r.y - 2, r.w + 4, r.h + 4)
 	}
-	// regional_chat uses preFX glow on the sprite instead of Graphics highlight
 	highlight.setVisible(false)
 	container.add(highlight)
 
-	// Interaction label — always uses INTERACTION_RADIUS proximity, not zone radius
-	const labelY = obj.type === 'regional_chat' ? 24 : TILE_SIZE * 1.5 + 8
+	// Interaction label — always uses typeDef.interactionRadius proximity
+	const labelY = typeDef.hitShape === 'circle' ? 24 : TILE_SIZE * 1.5 + 8
 	const labelEl = document.createElement('div')
 	labelEl.className = 'phaser-object-label'
 	labelEl.textContent = '[E] 사용'
@@ -116,21 +111,23 @@ export function createInteractiveObject(
 	label.pointerEvents = 'none'
 	container.add(label)
 
-	// Make interactive with pointer cursor
-	if (obj.type === 'regional_chat') {
-		const hitArea = new Phaser.Geom.Circle(0, 0, INTERACTION_RADIUS)
+	// Hit area driven by typeDef.hitShape
+	if (typeDef.hitShape === 'circle') {
+		const r = typeDef.hitCircle?.radius ?? typeDef.interactionRadius
+		const hitArea = new Phaser.Geom.Circle(0, 0, r)
 		container.setInteractive({
 			hitArea,
 			hitAreaCallback: Phaser.Geom.Circle.Contains,
 			useHandCursor: true,
 		})
 	} else {
-		const hitArea = new Phaser.Geom.Rectangle(
-			-TILE_SIZE,
-			-TILE_SIZE * 2,
-			TILE_SIZE * 2,
-			TILE_SIZE * 3,
-		)
+		const r = typeDef.hitRect ?? {
+			x: -TILE_SIZE,
+			y: -TILE_SIZE * 2,
+			w: TILE_SIZE * 2,
+			h: TILE_SIZE * 3,
+		}
+		const hitArea = new Phaser.Geom.Rectangle(r.x, r.y, r.w, r.h)
 		container.setInteractive({
 			hitArea,
 			hitAreaCallback: Phaser.Geom.Rectangle.Contains,
@@ -140,6 +137,7 @@ export function createInteractiveObject(
 
 	return {
 		data: obj,
+		typeDef,
 		container,
 		highlight,
 		label,
@@ -159,14 +157,17 @@ export function updateNearbyState(
 	const dx = obj.data.x - playerX
 	const dy = obj.data.y - playerY
 	const dist = Math.sqrt(dx * dx + dy * dy)
+	const radius = 1.5 * TILE_SIZE
 	const wasNearby = obj.isNearby
-	obj.isNearby = dist <= INTERACTION_RADIUS
+	obj.isNearby = dist <= radius
 
 	if (obj.isNearby !== wasNearby) {
 		obj.label.setVisible(obj.isNearby)
 
-		if (obj.wardStoneSprite) {
-			// Pixel-perfect outline glow via WebGL PostFX
+		// Accepted residual type-branch: circle-hit-shape (regional_chat) uses
+		// a WebGL preFX glow on the sprite itself for pixel-perfect outlines.
+		// Other shapes use the stroked Graphics highlight.
+		if (obj.wardStoneSprite && obj.typeDef.hitShape === 'circle') {
 			if (obj.isNearby) {
 				obj.wardStoneSprite.preFX?.addGlow(0xffffff, 3, 0, false, 0.15, 6)
 			} else {
