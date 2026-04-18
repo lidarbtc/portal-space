@@ -7,6 +7,7 @@ import type {
 	IncomingMessage,
 	OutgoingMessage,
 	Direction,
+	Facing8,
 	PlayerStatus,
 	Emoji,
 	PlayerInfo,
@@ -274,10 +275,17 @@ class NetworkClient {
 		this.#handlers.set(type, handler)
 	}
 
-	sendMove(x: number, y: number, dir: Direction): void {
+	sendMove(x: number, y: number, dir: Direction, facing8?: Facing8): void {
 		this.#lastX = x
 		this.#lastY = y
-		this.send({ type: 'move', x, y, dir })
+		const payload: { type: 'move'; x: number; y: number; dir: Direction; facing8?: Facing8 } = {
+			type: 'move',
+			x,
+			y,
+			dir,
+		}
+		if (facing8 !== undefined) payload.facing8 = facing8
+		this.send(payload)
 	}
 
 	sendStatus(status: PlayerStatus): void {
@@ -299,8 +307,10 @@ class NetworkClient {
 		this.send(payload)
 	}
 
-	sendDash(dir: Direction): void {
-		this.send({ type: 'dash', dir })
+	sendDash(dir: Direction, facing8?: Facing8): void {
+		const payload: { type: 'dash'; dir: Direction; facing8?: Facing8 } = { type: 'dash', dir }
+		if (facing8 !== undefined) payload.facing8 = facing8
+		this.send(payload)
 	}
 
 	sendEmote(emoji: Emoji): void {

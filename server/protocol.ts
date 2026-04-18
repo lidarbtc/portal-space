@@ -1,4 +1,4 @@
-import type { ChatImage, ColorPalette } from '@shared/types'
+import type { ChatImage, ColorPalette, Facing8, Direction } from '@shared/types'
 import {
 	MAP_WIDTH,
 	MAP_HEIGHT,
@@ -192,6 +192,30 @@ export function validateStatus(s: string): boolean {
 
 export function validateDirection(d: string): boolean {
 	return VALID_DIRECTIONS.has(d)
+}
+
+export const VALID_FACING8 = new Set([
+	'up',
+	'down',
+	'left',
+	'right',
+	'up-left',
+	'up-right',
+	'down-left',
+	'down-right',
+] as const)
+
+export function validateFacing8(v: string): boolean {
+	return VALID_FACING8.has(v as Facing8)
+}
+
+export function isFacing8ConsistentWithDir(f8: Facing8, dir: Direction): boolean {
+	const parts = f8.split('-') as string[]
+	return parts.includes(dir)
+}
+
+export function derivedFacing8FromDir(dir: Direction): Facing8 {
+	return dir
 }
 
 export function validateAvatar(a: number): boolean {

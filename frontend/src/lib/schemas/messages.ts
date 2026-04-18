@@ -12,6 +12,17 @@ import { Schema } from 'effect'
 
 const DirectionSchema = Schema.Literal('up', 'down', 'left', 'right')
 
+const Facing8Schema = Schema.Literal(
+	'up',
+	'down',
+	'left',
+	'right',
+	'up-left',
+	'up-right',
+	'down-left',
+	'down-right',
+)
+
 const PlayerStatusSchema = Schema.Literal('online', 'away', 'dnd')
 
 const EmojiSchema = Schema.Literal('👋', '☕', '🔥', '💻', '📢')
@@ -94,6 +105,7 @@ export const MoveMessageSchema = Schema.Struct({
 	...BaseFields,
 	id: Schema.optional(Schema.String),
 	dir: Schema.optional(DirectionSchema),
+	facing8: Schema.optional(Facing8Schema),
 })
 
 export const DashMessageSchema = Schema.Struct({
@@ -101,6 +113,7 @@ export const DashMessageSchema = Schema.Struct({
 	...BaseFields,
 	id: Schema.optional(Schema.String),
 	dir: Schema.optional(DirectionSchema),
+	facing8: Schema.optional(Facing8Schema),
 })
 
 export const StatusMessageSchema = Schema.Struct({

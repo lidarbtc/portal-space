@@ -3,6 +3,7 @@ import { loadObjectConfig, type ObjectsConfig } from '@shared/config'
 import type { OutgoingMessage } from '@shared/types'
 import type { ServerWebSocket } from 'bun'
 import { zoneChatLogs } from './db/schema'
+import { metrics } from './metrics'
 import { MAP_HEIGHT, MAP_WIDTH, TILE_SIZE } from './protocol'
 import { Room } from './room'
 import { Storage } from './storage'
@@ -708,6 +709,133 @@ describe('Room', () => {
 
 			expect(readLogs(storage)).toHaveLength(0)
 			storage.close()
+		})
+	})
+
+	describe('facing8 validation', () => {
+		it('facing8 echo: msg.facing8=up-right with dir=up broadcasts facing8=up-right', () => {
+			const ws1 = createMockWs()
+			const ws2 = createMockWs()
+			joinClient(room, ws1, 'mover')
+			joinClient(room, ws2, 'observer')
+
+			const client = [...room.players.values()].find((c) => c.nickname === 'mover')!
+			client.lastMove = 0
+			ws2.messages.length = 0
+
+			room.handleMessage(
+				ws1,
+				JSON.stringify({ type: 'move', x: 200, y: 200, dir: 'up', facing8: 'up-right' }),
+			)
+
+			const moveMsg = ws2.messages.find((m) => m.type === 'move')
+			expect(moveMsg).toBeDefined()
+			expect((moveMsg as OutgoingMessage & { facing8?: string }).facing8).toBe('up-right')
+		})
+
+		it('facing8 미전송 시 derivedFacing8 포함', () => {
+			const ws1 = createMockWs()
+			const ws2 = createMockWs()
+			joinClient(room, ws1, 'mover')
+			joinClient(room, ws2, 'observer')
+
+			const client = [...room.players.values()].find((c) => c.nickname === 'mover')!
+			client.lastMove = 0
+			ws2.messages.length = 0
+
+			room.handleMessage(ws1, JSON.stringify({ type: 'move', x: 200, y: 200, dir: 'right' }))
+
+			const moveMsg = ws2.messages.find((m) => m.type === 'move')
+			expect(moveMsg).toBeDefined()
+			expect((moveMsg as OutgoingMessage & { facing8?: string }).facing8).toBe('right')
+		})
+
+		it('facing8 inconsistent reject: facing8=up-right with dir=down → reject + counter +1', () => {
+			const ws = createMockWs()
+			joinClient(room, ws, 'mover')
+			const client = [...room.players.values()][0]
+			client.lastMove = 0
+			const before = client.x
+			const beforeCount = metrics.facing8_inconsistent_rejected_total
+
+			room.handleMessage(
+				ws,
+				JSON.stringify({ type: 'move', x: 200, y: 200, dir: 'down', facing8: 'up-right' }),
+			)
+
+			expect(client.x).toBe(before)
+			expect(metrics.facing8_inconsistent_rejected_total).toBe(beforeCount + 1)
+		})
+
+		it('facing8 invalid reject: facing8=banana → reject + counter +1', () => {
+			const ws = createMockWs()
+			joinClient(room, ws, 'mover')
+			const client = [...room.players.values()][0]
+			client.lastMove = 0
+			const before = client.x
+			const beforeCount = metrics.facing8_invalid_rejected_total
+
+			room.handleMessage(
+				ws,
+				JSON.stringify({ type: 'move', x: 200, y: 200, dir: 'right', facing8: 'banana' }),
+			)
+
+			expect(client.x).toBe(before)
+			expect(metrics.facing8_invalid_rejected_total).toBe(beforeCount + 1)
+		})
+
+		it('dash 축 cheat reject: dash dir=right 후 dy=10 → reject + counter +1', () => {
+			const ws = createMockWs()
+			joinClient(room, ws, 'dasher')
+			const client = [...room.players.values()][0]
+
+			client.x = 100
+			client.y = 100
+			client.lastDash = 0
+
+			room.handleMessage(ws, JSON.stringify({ type: 'dash', dir: 'right' }))
+
+			client.lastMove = 0
+			const beforeCount = metrics.dash_axis_violation_rejected_total
+
+			room.handleMessage(ws, JSON.stringify({ type: 'move', x: 110, y: 110, dir: 'right' }))
+
+			expect(client.x).toBe(100)
+			expect(metrics.dash_axis_violation_rejected_total).toBe(beforeCount + 1)
+		})
+
+		it('dash 축 정상 통과: dash dir=right 후 dy=2 → 통과', () => {
+			const ws = createMockWs()
+			joinClient(room, ws, 'dasher')
+			const client = [...room.players.values()][0]
+
+			client.x = 100
+			client.y = 100
+			client.lastDash = 0
+
+			room.handleMessage(ws, JSON.stringify({ type: 'dash', dir: 'right' }))
+
+			client.lastMove = 0
+
+			room.handleMessage(ws, JSON.stringify({ type: 'move', x: 110, y: 102, dir: 'right' }))
+
+			expect(client.x).toBe(110)
+		})
+
+		it('dash 종료 후 자유 이동: dashUntil 지난 후 dy=10도 통과', () => {
+			const ws = createMockWs()
+			joinClient(room, ws, 'dasher')
+			const client = [...room.players.values()][0]
+
+			client.x = 100
+			client.y = 100
+			client.dashDir = 'right'
+			client.dashUntil = Date.now() - 1000
+			client.lastMove = 0
+
+			room.handleMessage(ws, JSON.stringify({ type: 'move', x: 110, y: 110, dir: 'down' }))
+
+			expect(client.x).toBe(110)
 		})
 	})
 })

@@ -14,6 +14,9 @@ import {
 	validateColors,
 	encodeUpdates,
 	decodeUpdates,
+	validateFacing8,
+	isFacing8ConsistentWithDir,
+	derivedFacing8FromDir,
 	MAP_PIXEL_WIDTH,
 	MAP_PIXEL_HEIGHT,
 	MAX_CHAT_IMAGE_BASE64_LEN,
@@ -254,6 +257,51 @@ describe('validateColors', () => {
 
 	it('rejects partial invalid', () => {
 		expect(validateColors({ body: '#ff0000', eye: 'bad', foot: '#0000ff' })).toBe(false)
+	})
+})
+
+describe('validateFacing8', () => {
+	it('accepts all 8 directions', () => {
+		expect(validateFacing8('up')).toBe(true)
+		expect(validateFacing8('down')).toBe(true)
+		expect(validateFacing8('left')).toBe(true)
+		expect(validateFacing8('right')).toBe(true)
+		expect(validateFacing8('up-left')).toBe(true)
+		expect(validateFacing8('up-right')).toBe(true)
+		expect(validateFacing8('down-left')).toBe(true)
+		expect(validateFacing8('down-right')).toBe(true)
+	})
+
+	it('rejects invalid values', () => {
+		expect(validateFacing8('diagonal')).toBe(false)
+		expect(validateFacing8('invalid')).toBe(false)
+		expect(validateFacing8('')).toBe(false)
+	})
+})
+
+describe('isFacing8ConsistentWithDir', () => {
+	it('diagonal facing8 matches cardinal component', () => {
+		expect(isFacing8ConsistentWithDir('up-right', 'up')).toBe(true)
+		expect(isFacing8ConsistentWithDir('up-right', 'right')).toBe(true)
+		expect(isFacing8ConsistentWithDir('up-right', 'down')).toBe(false)
+		expect(isFacing8ConsistentWithDir('up-right', 'left')).toBe(false)
+		expect(isFacing8ConsistentWithDir('down-left', 'down')).toBe(true)
+		expect(isFacing8ConsistentWithDir('down-left', 'left')).toBe(true)
+		expect(isFacing8ConsistentWithDir('down-left', 'up')).toBe(false)
+	})
+
+	it('cardinal facing8 matches only same dir', () => {
+		expect(isFacing8ConsistentWithDir('up', 'up')).toBe(true)
+		expect(isFacing8ConsistentWithDir('up', 'right')).toBe(false)
+	})
+})
+
+describe('derivedFacing8FromDir', () => {
+	it('maps each cardinal direction to itself', () => {
+		expect(derivedFacing8FromDir('up')).toBe('up')
+		expect(derivedFacing8FromDir('down')).toBe('down')
+		expect(derivedFacing8FromDir('left')).toBe('left')
+		expect(derivedFacing8FromDir('right')).toBe('right')
 	})
 })
 

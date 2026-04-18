@@ -16,6 +16,17 @@ export type MsgType =
 	| 'object_remove'
 
 export type Direction = 'up' | 'down' | 'left' | 'right'
+export type Facing8 =
+	| 'up'
+	| 'down'
+	| 'left'
+	| 'right'
+	| 'up-left'
+	| 'up-right'
+	| 'down-left'
+	| 'down-right'
+
+export type IntentVector = { x: -1 | 0 | 1; y: -1 | 0 | 1 }
 export type PlayerStatus = 'online' | 'away' | 'dnd'
 export type Emoji = '👋' | '☕' | '🔥' | '💻' | '📢'
 
@@ -39,6 +50,7 @@ export interface IncomingMessage {
 	x?: number
 	y?: number
 	dir?: Direction
+	facing8?: Facing8
 	status?: PlayerStatus
 	text?: string
 	image?: ChatImage
@@ -81,6 +93,7 @@ export interface OutgoingMessage {
 	x: number
 	y: number
 	dir?: Direction
+	facing8?: Facing8
 	status?: PlayerStatus
 	text?: string
 	image?: ChatImage

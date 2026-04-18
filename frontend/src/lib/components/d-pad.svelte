@@ -1,16 +1,39 @@
 <script lang="ts">
+	import { SvelteMap } from 'svelte/reactivity'
 	import { dpadState } from '$lib/stores/dpad.svelte'
+	import type { IntentVector } from '@shared/types'
 
-	function handleTouchStart(direction: 'up' | 'down' | 'left' | 'right') {
-		return (e: TouchEvent) => {
-			e.preventDefault()
-			dpadState.direction = direction
+	// Track which buttons are currently pressed via pointer events
+	const pressedButtons = new SvelteMap<number, 'up' | 'down' | 'left' | 'right'>()
+
+	function computeIntent(): IntentVector {
+		let x: number = 0
+		let y: number = 0
+		for (const dir of pressedButtons.values()) {
+			if (dir === 'left') x -= 1
+			else if (dir === 'right') x += 1
+			else if (dir === 'up') y -= 1
+			else if (dir === 'down') y += 1
+		}
+		return {
+			x: Math.sign(x) as -1 | 0 | 1,
+			y: Math.sign(y) as -1 | 0 | 1,
 		}
 	}
 
-	function handleTouchEnd(e: TouchEvent) {
+	function handlePointerDown(dir: 'up' | 'down' | 'left' | 'right') {
+		return (e: PointerEvent) => {
+			e.preventDefault()
+			;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+			pressedButtons.set(e.pointerId, dir)
+			dpadState.intent = computeIntent()
+		}
+	}
+
+	function handlePointerUp(e: PointerEvent) {
 		e.preventDefault()
-		dpadState.direction = null
+		pressedButtons.delete(e.pointerId)
+		dpadState.intent = computeIntent()
 	}
 </script>
 
@@ -20,9 +43,10 @@
 		<button
 			class="dpad-btn"
 			aria-label="Up"
-			ontouchstart={handleTouchStart('up')}
-			ontouchend={handleTouchEnd}
-			ontouchcancel={handleTouchEnd}>▲</button
+			onpointerdown={handlePointerDown('up')}
+			onpointerup={handlePointerUp}
+			onpointercancel={handlePointerUp}
+			onpointerleave={handlePointerUp}>▲</button
 		>
 		<div class="dpad-spacer"></div>
 	</div>
@@ -30,17 +54,19 @@
 		<button
 			class="dpad-btn"
 			aria-label="Left"
-			ontouchstart={handleTouchStart('left')}
-			ontouchend={handleTouchEnd}
-			ontouchcancel={handleTouchEnd}>◄</button
+			onpointerdown={handlePointerDown('left')}
+			onpointerup={handlePointerUp}
+			onpointercancel={handlePointerUp}
+			onpointerleave={handlePointerUp}>◄</button
 		>
 		<div class="dpad-spacer"></div>
 		<button
 			class="dpad-btn"
 			aria-label="Right"
-			ontouchstart={handleTouchStart('right')}
-			ontouchend={handleTouchEnd}
-			ontouchcancel={handleTouchEnd}>►</button
+			onpointerdown={handlePointerDown('right')}
+			onpointerup={handlePointerUp}
+			onpointercancel={handlePointerUp}
+			onpointerleave={handlePointerUp}>►</button
 		>
 	</div>
 	<div class="dpad-row">
@@ -48,9 +74,10 @@
 		<button
 			class="dpad-btn"
 			aria-label="Down"
-			ontouchstart={handleTouchStart('down')}
-			ontouchend={handleTouchEnd}
-			ontouchcancel={handleTouchEnd}>▼</button
+			onpointerdown={handlePointerDown('down')}
+			onpointerup={handlePointerUp}
+			onpointercancel={handlePointerUp}
+			onpointerleave={handlePointerUp}>▼</button
 		>
 		<div class="dpad-spacer"></div>
 	</div>

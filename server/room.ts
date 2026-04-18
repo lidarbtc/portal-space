@@ -9,6 +9,8 @@ import type {
 	InteractiveObject,
 	OutgoingMessage,
 	RegionalChatState,
+	Direction,
+	Facing8,
 } from '@shared/types'
 import type { ServerWebSocket } from 'bun'
 import { nanoid } from 'nanoid'
@@ -40,7 +42,12 @@ import {
 	validateDirection,
 	validateEmoji,
 	validateStatus,
+	validateFacing8,
+	isFacing8ConsistentWithDir,
+	derivedFacing8FromDir,
 } from './protocol'
+import { DASH_AXIS_TOLERANCE_PX } from '@shared/constants'
+import { metrics } from './metrics'
 import type { Storage } from './storage'
 
 export interface RoomOptions {
@@ -209,7 +216,7 @@ export class Room {
 
 		switch (msg.type) {
 			case 'move':
-				this.#handleMove(client, msg.x ?? 0, msg.y ?? 0, msg.dir ?? '')
+				this.#handleMove(client, msg.x ?? 0, msg.y ?? 0, msg.dir ?? '', msg.facing8)
 				break
 			case 'status':
 				this.#handleStatus(client, msg.status ?? '')
@@ -224,7 +231,7 @@ export class Room {
 				this.#handleCustomStatus(client, msg.customStatus ?? '')
 				break
 			case 'dash':
-				this.#handleDash(client, msg.dir ?? '')
+				this.#handleDash(client, msg.dir ?? '', msg.facing8)
 				break
 			case 'profile': {
 				let nickname = sanitizeNickname(msg.nickname ?? '')
@@ -388,9 +395,20 @@ export class Room {
 		this.#seededOwners.delete(client.id)
 	}
 
-	#handleMove(client: ServerClient, x: number, y: number, dir: string): void {
+	#handleMove(client: ServerClient, x: number, y: number, dir: string, facing8?: string): void {
 		if (!this.#validateMove(x, y)) return
 		if (!validateDirection(dir)) return
+
+		if (facing8 !== undefined) {
+			if (!validateFacing8(facing8)) {
+				metrics.facing8_invalid_rejected_total++
+				return
+			}
+			if (!isFacing8ConsistentWithDir(facing8 as Facing8, dir as Direction)) {
+				metrics.facing8_inconsistent_rejected_total++
+				return
+			}
+		}
 
 		const now = Date.now()
 		const elapsed = now - client.lastMove
@@ -405,6 +423,23 @@ export class Room {
 			if (speed > maxSpeed) return
 		}
 
+		// Dash axis cheat detection
+		if (now < client.dashUntil && client.dashDir !== undefined) {
+			if (client.dashDir === 'right' || client.dashDir === 'left') {
+				const perp = Math.abs(y - client.y)
+				if (perp > DASH_AXIS_TOLERANCE_PX) {
+					metrics.dash_axis_violation_rejected_total++
+					return
+				}
+			} else {
+				const perp = Math.abs(x - client.x)
+				if (perp > DASH_AXIS_TOLERANCE_PX) {
+					metrics.dash_axis_violation_rejected_total++
+					return
+				}
+			}
+		}
+
 		// Rate limit: 1/MOVE_RATE_LIMIT seconds between moves
 		if (elapsed < 1000 / MOVE_RATE_LIMIT) return
 		client.lastMove = now
@@ -413,7 +448,17 @@ export class Room {
 		client.y = y
 		client.dir = dir
 
-		this.#broadcast({ type: 'move', id: client.id, x, y, dir: dir as OutgoingMessage['dir'] })
+		const effectiveFacing8: Facing8 =
+			facing8 !== undefined ? (facing8 as Facing8) : derivedFacing8FromDir(dir as Direction)
+
+		this.#broadcast({
+			type: 'move',
+			id: client.id,
+			x,
+			y,
+			dir: dir as OutgoingMessage['dir'],
+			facing8: effectiveFacing8,
+		})
 
 		this.#updateZoneMembership(client)
 	}
@@ -460,18 +505,38 @@ export class Room {
 		})
 	}
 
-	#handleDash(client: ServerClient, dir: string): void {
+	#handleDash(client: ServerClient, dir: string, facing8?: string): void {
 		if (!validateDirection(dir)) return
+
+		if (facing8 !== undefined) {
+			if (!validateFacing8(facing8)) {
+				metrics.facing8_invalid_rejected_total++
+				return
+			}
+			if (!isFacing8ConsistentWithDir(facing8 as Facing8, dir as Direction)) {
+				metrics.facing8_inconsistent_rejected_total++
+				return
+			}
+		}
+
 		const now = Date.now()
 		if (now - client.lastDash < DASH_COOLDOWN_MS) return
 		client.lastDash = now
 		client.dashUntil = now + DASH_DURATION_MS
+		client.dashStartX = client.x
+		client.dashStartY = client.y
+		client.dashDir = dir as Direction
+		const effectiveFacing8: Facing8 =
+			facing8 !== undefined ? (facing8 as Facing8) : derivedFacing8FromDir(dir as Direction)
+		client.dashFacing8 = effectiveFacing8
+
 		this.#broadcast({
 			type: 'dash',
 			x: client.x,
 			y: client.y,
 			id: client.id,
 			dir: dir as OutgoingMessage['dir'],
+			facing8: effectiveFacing8,
 		})
 	}
 

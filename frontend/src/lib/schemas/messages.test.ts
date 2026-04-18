@@ -68,10 +68,52 @@ describe('parseOutgoingMessage', () => {
 		}
 	})
 
+	it('decodes a move message without facing8 (구 클라 호환)', () => {
+		const raw = { type: 'move', id: 'p1', x: 120, y: 300, dir: 'right' }
+		const result = parseOutgoingMessage(raw)
+		expect(result._tag).toBe('ok')
+		if (result._tag === 'ok') {
+			expect(result.message.type).toBe('move')
+		}
+	})
+
+	it('decodes a move message with valid facing8', () => {
+		const raw = { type: 'move', id: 'p1', x: 120, y: 300, dir: 'right', facing8: 'up-right' }
+		const result = parseOutgoingMessage(raw)
+		expect(result._tag).toBe('ok')
+		if (result._tag === 'ok') {
+			expect(result.message.type).toBe('move')
+		}
+	})
+
+	it('returns error for move message with invalid facing8', () => {
+		const raw = { type: 'move', id: 'p1', x: 120, y: 300, dir: 'right', facing8: 'banana' }
+		const result = parseOutgoingMessage(raw)
+		expect(result._tag).toBe('error')
+	})
+
 	it('decodes a dash message', () => {
 		const raw = { type: 'dash', id: 'p1', x: 150, y: 200, dir: 'left' }
 		const result = parseOutgoingMessage(raw)
 		expect(result._tag).toBe('ok')
+	})
+
+	it('decodes a dash message without facing8 (구 클라 호환)', () => {
+		const raw = { type: 'dash', id: 'p1', x: 150, y: 200, dir: 'left' }
+		const result = parseOutgoingMessage(raw)
+		expect(result._tag).toBe('ok')
+	})
+
+	it('decodes a dash message with valid facing8', () => {
+		const raw = { type: 'dash', id: 'p1', x: 150, y: 200, dir: 'left', facing8: 'down-left' }
+		const result = parseOutgoingMessage(raw)
+		expect(result._tag).toBe('ok')
+	})
+
+	it('returns error for dash message with invalid facing8', () => {
+		const raw = { type: 'dash', id: 'p1', x: 150, y: 200, dir: 'left', facing8: 'banana' }
+		const result = parseOutgoingMessage(raw)
+		expect(result._tag).toBe('error')
 	})
 
 	it('decodes a status message', () => {

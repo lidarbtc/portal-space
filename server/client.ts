@@ -1,5 +1,5 @@
 import type { ServerWebSocket } from 'bun'
-import type { ColorPalette, OutgoingMessage, PlayerInfo } from '@shared/types'
+import type { ColorPalette, Direction, Facing8, OutgoingMessage, PlayerInfo } from '@shared/types'
 
 export class ServerClient {
 	id: string
@@ -22,6 +22,10 @@ export class ServerClient {
 	lastSettingsUpdate = 0
 	lastDash = 0
 	dashUntil = 0
+	dashStartX?: number
+	dashStartY?: number
+	dashDir?: Direction
+	dashFacing8?: Facing8
 
 	ws: ServerWebSocket<unknown>
 

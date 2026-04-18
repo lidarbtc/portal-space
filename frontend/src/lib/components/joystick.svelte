@@ -1,10 +1,12 @@
 <script lang="ts">
 	import { dpadState } from '$lib/stores/dpad.svelte'
-	import type { Direction } from '@shared/types'
+	import type { Facing8, IntentVector } from '@shared/types'
+	import { angleToDirection8 } from '$lib/game/movement/direction'
 
 	const BASE_SIZE = 120
 	const MAX_RADIUS = BASE_SIZE / 2
-	const DEAD_ZONE = MAX_RADIUS * 0.15
+	const MAGNITUDE_DEADZONE = 0.25
+	const HYSTERESIS_BAND = Math.PI / 16
 
 	let thumbX = $state(0)
 	let thumbY = $state(0)
@@ -12,20 +14,57 @@
 	let baseX = $state(0)
 	let baseY = $state(0)
 	let activeTouchId: number | null = $state(null)
+	let prevFacing8 = $state<Facing8 | null>(null)
 
 	let centerX = 0
 	let centerY = 0
 
-	function getDirection(dx: number, dy: number): Direction | null {
-		const distance = Math.sqrt(dx * dx + dy * dy)
-		if (distance < DEAD_ZONE) return null
+	function facing8ToIntent(f8: Facing8): IntentVector {
+		const ix =
+			f8 === 'right' || f8 === 'up-right' || f8 === 'down-right'
+				? 1
+				: f8 === 'left' || f8 === 'up-left' || f8 === 'down-left'
+					? -1
+					: 0
+		const iy =
+			f8 === 'down' || f8 === 'down-right' || f8 === 'down-left'
+				? 1
+				: f8 === 'up' || f8 === 'up-right' || f8 === 'up-left'
+					? -1
+					: 0
+		return { x: ix as -1 | 0 | 1, y: iy as -1 | 0 | 1 }
+	}
 
-		const angle = Math.atan2(dy, dx) * (180 / Math.PI)
+	function computeFacing8WithHysteresis(angleRad: number): Facing8 {
+		const candidate = angleToDirection8(angleRad)
+		if (prevFacing8 === null) return candidate
+		if (candidate === prevFacing8) return candidate
 
-		if (angle > -45 && angle <= 45) return 'right'
-		if (angle > 45 && angle <= 135) return 'down'
-		if (angle > -135 && angle <= -45) return 'up'
-		return 'left'
+		// Compute angle for prevFacing8 center to check deadband
+		const prevAngle = facing8ToAngleCenter(prevFacing8)
+		const diff = Math.abs(normalizeAngle(angleRad - prevAngle))
+		if (diff < HYSTERESIS_BAND) return prevFacing8
+		return candidate
+	}
+
+	function facing8ToAngleCenter(f8: Facing8): number {
+		const map: Record<Facing8, number> = {
+			right: 0,
+			'down-right': Math.PI / 4,
+			down: Math.PI / 2,
+			'down-left': (3 * Math.PI) / 4,
+			left: Math.PI,
+			'up-left': (-3 * Math.PI) / 4,
+			up: -Math.PI / 2,
+			'up-right': -Math.PI / 4,
+		}
+		return map[f8]
+	}
+
+	function normalizeAngle(a: number): number {
+		while (a > Math.PI) a -= 2 * Math.PI
+		while (a <= -Math.PI) a += 2 * Math.PI
+		return Math.abs(a)
 	}
 
 	function handleTouchStart(e: TouchEvent) {
@@ -48,7 +87,8 @@
 		visible = true
 		thumbX = 0
 		thumbY = 0
-		dpadState.direction = null
+		prevFacing8 = null
+		dpadState.intent = { x: 0, y: 0 }
 	}
 
 	function handleTouchMove(e: TouchEvent) {
@@ -79,7 +119,17 @@
 			thumbY = dy
 		}
 
-		dpadState.direction = getDirection(dx, dy)
+		const magnitude = distance / MAX_RADIUS
+		if (magnitude < MAGNITUDE_DEADZONE) {
+			prevFacing8 = null
+			dpadState.intent = { x: 0, y: 0 }
+			return
+		}
+
+		const angle = Math.atan2(dy, dx)
+		const f8 = computeFacing8WithHysteresis(angle)
+		prevFacing8 = f8
+		dpadState.intent = facing8ToIntent(f8)
 	}
 
 	function handleTouchEnd(e: TouchEvent) {
@@ -101,7 +151,8 @@
 		activeTouchId = null
 		thumbX = 0
 		thumbY = 0
-		dpadState.direction = null
+		prevFacing8 = null
+		dpadState.intent = { x: 0, y: 0 }
 	}
 </script>
 

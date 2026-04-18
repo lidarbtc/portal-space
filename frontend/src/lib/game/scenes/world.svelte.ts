@@ -9,8 +9,21 @@ import { createAvatarSpritesheet } from '../spritesheet'
 import { createTintedSpritesheet } from '../palette-swap'
 import { resolveNicknameColor } from '$lib/utils/nickname-colors'
 import { parseTextSegments } from '$lib/utils/linkify'
-import type { PlayerInfo, Direction, InteractiveObject, RegionalChatState } from '@shared/types'
+import type {
+	PlayerInfo,
+	Direction,
+	Facing8,
+	InteractiveObject,
+	RegionalChatState,
+} from '@shared/types'
 import { MAP_WIDTH, MAP_HEIGHT } from '@shared/types'
+import {
+	directionToFrame,
+	directionToVector,
+	intentToDirection4,
+	intentToFacing8,
+	derivedFacing8FromDir,
+} from '../movement/direction'
 import { zoomState, computeMinZoom, clampZoom } from '$lib/stores/zoom.svelte'
 import { objectsState } from '$lib/stores/objects.svelte'
 import { whiteboardState } from '$lib/stores/whiteboard.svelte'
@@ -43,6 +56,7 @@ interface PlayerObject {
 	targetX: number // remote player interpolation target
 	targetY: number // remote player interpolation target
 	dir: Direction
+	facing8?: Facing8
 	textureKey: string
 	bubbleElement: Phaser.GameObjects.DOMElement | null
 	bubbleTimer: ReturnType<typeof setTimeout> | null
@@ -85,6 +99,7 @@ export class WorldScene extends Phaser.Scene {
 	// Dash state
 	#isDashing = false
 	#dashDir: Direction | null = null
+	#dashFacing8: Facing8 | null = null
 	#modalOpen = false
 	#dashStartTime = 0
 	#lastDashTime = 0
@@ -355,6 +370,7 @@ export class WorldScene extends Phaser.Scene {
 					p.targetX = msg.x
 					p.targetY = msg.y
 					p.dir = msg.dir ?? 'down'
+					if (msg.facing8) p.facing8 = msg.facing8 as Facing8
 					this.#updateCharacterFrame(p, p.dir)
 				}
 				const info = gameState.players.get(msg.id)
@@ -476,13 +492,7 @@ export class WorldScene extends Phaser.Scene {
 				createTintedSpritesheet(this, newTextureKey, msg.player.colors)
 				p.textureKey = newTextureKey
 				p.sprite.setTexture(newTextureKey)
-				const dirFrame: Record<Direction, number> = {
-					down: 0,
-					up: 1,
-					right: 2,
-					left: 3,
-				}
-				p.sprite.setFrame(dirFrame[p.dir] ?? 0)
+				p.sprite.setFrame(directionToFrame(p.dir))
 			}
 
 			// Update players store (for PlayerList)
@@ -501,13 +511,8 @@ export class WorldScene extends Phaser.Scene {
 			const p = this.#playerObjects.get(msg.id)
 			if (!p) return
 			const dir = (msg.dir as Direction) ?? 'down'
-			const dirFrame: Record<Direction, number> = {
-				down: 0,
-				up: 1,
-				right: 2,
-				left: 3,
-			}
-			this.#spawnDashAfterimages(msg.x, msg.y, dir, p.textureKey, dirFrame[dir])
+			if (msg.facing8) p.facing8 = msg.facing8 as Facing8
+			this.#spawnDashAfterimages(msg.x, msg.y, dir, p.textureKey, directionToFrame(dir))
 		})
 
 		network.on('snapshot', (msg) => {
@@ -635,13 +640,7 @@ export class WorldScene extends Phaser.Scene {
 			createTintedSpritesheet(this, textureKey, info.colors)
 		}
 
-		const dirFrame: Record<Direction, number> = {
-			down: 0,
-			up: 1,
-			right: 2,
-			left: 3,
-		}
-		const frameIndex = dirFrame[info.dir] ?? 0
+		const frameIndex = directionToFrame(info.dir)
 
 		// All positions are relative to the character container
 		const sprite = this.add.sprite(0, 0, textureKey, frameIndex)
@@ -715,6 +714,11 @@ export class WorldScene extends Phaser.Scene {
 		})
 	}
 
+	/**
+	 * @param dir 검사 축+부호 신호 ('right'/'left' = x축, 'down'/'up' = y축).
+	 *   facing이 아니라 axis-signal. 호출자가 양 축 검사를 원하면 두 번 분리 호출 필요.
+	 *   TODO: 시그니처를 (axis: 'x'|'y', sign: -1|1)로 리팩터링 검토.
+	 */
 	#checkCollision(
 		p: PlayerObject,
 		newPx: number,
@@ -781,13 +785,7 @@ export class WorldScene extends Phaser.Scene {
 	}
 
 	#updateCharacterFrame(p: PlayerObject, dir: Direction): void {
-		const dirFrame: Record<Direction, number> = {
-			down: 0,
-			up: 1,
-			right: 2,
-			left: 3,
-		}
-		p.sprite.setFrame(dirFrame[dir] ?? 0)
+		p.sprite.setFrame(directionToFrame(dir))
 	}
 
 	#updatePlayerStatus(id: string, status: string): void {
@@ -1015,34 +1013,34 @@ export class WorldScene extends Phaser.Scene {
 			return
 		}
 
-		const dpad = dpadState.direction
+		const dpadIntent = dpadState.intent
 		const activeEl = document.activeElement
 		const isTyping =
 			activeEl?.tagName === 'INPUT' ||
 			activeEl?.tagName === 'TEXTAREA' ||
 			(activeEl as HTMLElement)?.isContentEditable
-		if ((gameState.chatInputActive || isTyping) && !dpad) return
+		if ((gameState.chatInputActive || isTyping) && dpadIntent.x === 0 && dpadIntent.y === 0)
+			return
 
 		let dx = 0,
 			dy = 0
-		let dir: Direction | null = null
+		let dir: Direction | null
 
 		// 축별 독립 합산 — 반대 방향 상쇄
 		if (this.#cursors.left.isDown || this.#wasd.left.isDown) dx -= 1
 		if (this.#cursors.right.isDown || this.#wasd.right.isDown) dx += 1
 		if (this.#cursors.up.isDown || this.#wasd.up.isDown) dy -= 1
 		if (this.#cursors.down.isDown || this.#wasd.down.isDown) dy += 1
+		dx += dpadIntent.x
+		dy += dpadIntent.y
+		dx = Math.sign(dx)
+		dy = Math.sign(dy)
 
-		// 방향 결정 (4방향만, X축 우선)
-		if (dx !== 0) {
-			dir = dx > 0 ? 'right' : 'left'
-		} else if (dy !== 0) {
-			dir = dy > 0 ? 'down' : 'up'
-		}
-
-		if (!dir && dpad) {
-			dir = dpad
-		}
+		// (c) 마지막 카디널 유지 알고리즘
+		const intent = { x: dx as -1 | 0 | 1, y: dy as -1 | 0 | 1 }
+		dir = intentToDirection4(intent, localPlayer.dir ?? null)
+		if (intent.x === 0 && intent.y === 0) dir = null
+		const currentFacing8 = intentToFacing8(intent)
 
 		const isMovingNow = dir !== null
 		const now = performance.now()
@@ -1056,22 +1054,20 @@ export class WorldScene extends Phaser.Scene {
 		) {
 			this.#isDashing = true
 			this.#dashDir = dir
+			this.#dashFacing8 = currentFacing8 ?? derivedFacing8FromDir(dir)
 			this.#dashStartTime = now
 			this.#lastDashTime = now
-			network.sendDash(dir)
+			// (d) facing8 송신: 대각선만
+			const dashFacing8ToSend =
+				intent.x !== 0 && intent.y !== 0 ? (this.#dashFacing8 ?? undefined) : undefined
+			network.sendDash(dir, dashFacing8ToSend)
 
-			const dirFrame: Record<Direction, number> = {
-				down: 0,
-				up: 1,
-				right: 2,
-				left: 3,
-			}
 			this.#spawnDashAfterimages(
 				localPlayer.x,
 				localPlayer.y,
 				dir,
 				localPlayer.textureKey,
-				dirFrame[dir],
+				directionToFrame(dir),
 			)
 		}
 
@@ -1079,22 +1075,47 @@ export class WorldScene extends Phaser.Scene {
 		if (this.#isDashing && now - this.#dashStartTime >= DASH_DURATION) {
 			this.#isDashing = false
 			this.#dashDir = null
+			this.#dashFacing8 = null
 		}
 
-		// Determine effective direction and speed
+		// Determine effective facing8 and speed
 		const effectiveDir = this.#isDashing ? this.#dashDir! : dir
+		const effectiveFacing8 = this.#isDashing ? this.#dashFacing8! : currentFacing8
 		const effectiveSpeed = this.#isDashing ? DASH_SPEED : MOVE_SPEED
 
 		if (effectiveDir) {
-			const eDx = effectiveDir === 'right' ? 1 : effectiveDir === 'left' ? -1 : 0
-			const eDy = effectiveDir === 'down' ? 1 : effectiveDir === 'up' ? -1 : 0
+			// (b) dash 룩업: directionToVector (대각선 1/√2 정규화)
+			const v = directionToVector(effectiveFacing8 ?? derivedFacing8FromDir(effectiveDir))
 			const moveAmount = effectiveSpeed * (delta / 1000)
-			let newX = localPlayer.x + eDx * moveAmount
-			let newY = localPlayer.y + eDy * moveAmount
 
-			const result = this.#checkCollision(localPlayer, newX, newY, effectiveDir)
-			newX = result.x
-			newY = result.y
+			// (f) 분리축 슬라이드 충돌
+			// NOTE: #checkCollision 4번째 인자는 facing이 아니라 "검사 축+부호 신호".
+			//   dir 'right'/'left' = x축, 'down'/'up' = y축. 한 호출에 facing dir을 그대로 넘기면
+			//   다른 축은 분기 미스로 무검사 통과 → 대각선 벽 관통 버그 발생.
+			// TODO(dash-swept): DASH_SPEED 1000 × delta 16ms ≈ 9.4px/축 (60fps) < tile 16px라 안전하나,
+			//   30fps drop 시 ~18.8px > 16px → 한 프레임 벽 통과 가능. swept 검사 follow-up.
+			// TODO(corner-cut): 두 축 슬라이드 통과 후 대각 칸 자체가 막힌 경우 정책 미정 (follow-up).
+			const xAxisDir: Direction | null = v.x > 0 ? 'right' : v.x < 0 ? 'left' : null
+			const yAxisDir: Direction | null = v.y > 0 ? 'down' : v.y < 0 ? 'up' : null
+
+			const xResult = xAxisDir
+				? this.#checkCollision(
+						localPlayer,
+						localPlayer.x + v.x * moveAmount,
+						localPlayer.y,
+						xAxisDir,
+					)
+				: { x: localPlayer.x, y: localPlayer.y }
+			const yResult = yAxisDir
+				? this.#checkCollision(
+						localPlayer,
+						localPlayer.x,
+						localPlayer.y + v.y * moveAmount,
+						yAxisDir,
+					)
+				: { x: localPlayer.x, y: localPlayer.y }
+			const newX = xResult.x
+			const newY = yResult.y
 
 			// If collision stopped movement during dash, end dash early
 			if (this.#isDashing) {
@@ -1103,6 +1124,7 @@ export class WorldScene extends Phaser.Scene {
 				if (movedX < 0.1 && movedY < 0.1) {
 					this.#isDashing = false
 					this.#dashDir = null
+					this.#dashFacing8 = null
 				}
 			}
 
@@ -1116,7 +1138,10 @@ export class WorldScene extends Phaser.Scene {
 			// Throttled network send
 			if (now - this.#lastNetworkSendTime >= NETWORK_SEND_INTERVAL) {
 				this.#lastNetworkSendTime = now
-				network.sendMove(newX, newY, effectiveDir)
+				// (d) facing8 송신: 대각선만
+				const facing8ToSend =
+					intent.x !== 0 && intent.y !== 0 ? (currentFacing8 ?? undefined) : undefined
+				network.sendMove(newX, newY, effectiveDir, facing8ToSend)
 
 				const info = gameState.players.get(this.#localPlayerId!)
 				if (info) {

@@ -1,7 +1,7 @@
-import type { Direction } from '@shared/types'
+import type { IntentVector } from '@shared/types'
 
 class DpadStore {
-	direction = $state<Direction | null>(null)
+	intent = $state<IntentVector>({ x: 0, y: 0 })
 }
 
 export const dpadState = new DpadStore()
