@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach, afterEach } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
+import { existsSync, unlinkSync } from 'fs'
 import { Storage } from './storage'
-import { unlinkSync, existsSync } from 'fs'
 
 const TEST_DB = '/tmp/portal-space-test.db'
 

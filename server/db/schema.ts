@@ -1,5 +1,5 @@
-import { sqliteTable, text, blob, integer, index } from 'drizzle-orm/sqlite-core'
 import { sql } from 'drizzle-orm'
+import { blob, index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
 export const yjsDocuments = sqliteTable('yjs_documents', {
 	boardId: text('board_id').primaryKey(),
@@ -29,5 +29,23 @@ export const interactiveObjects = sqliteTable(
 			table.ownerId,
 			table.placedAt,
 		),
+	}),
+)
+
+// Append-only log of text chat messages in regional zones where
+// retainHistory is enabled. Images, system messages, and global chat are
+// intentionally excluded — see `#persistZoneChat` in server/room.ts.
+export const zoneChatLogs = sqliteTable(
+	'zone_chat_logs',
+	{
+		id: integer('id').primaryKey({ autoIncrement: true }),
+		zoneId: text('zone_id').notNull(),
+		senderClientId: text('sender_client_id').notNull(),
+		senderNickname: text('sender_nickname').notNull(),
+		text: text('text').notNull(),
+		createdAt: integer('created_at').notNull(),
+	},
+	(t) => ({
+		byZoneCreated: index('idx_zone_chat_zone_created').on(t.zoneId, t.createdAt),
 	}),
 )

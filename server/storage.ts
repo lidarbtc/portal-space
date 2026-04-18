@@ -1,8 +1,8 @@
-import { and, asc, eq } from 'drizzle-orm'
 import type { InteractiveObject } from '@shared/types'
+import { and, asc, eq } from 'drizzle-orm'
 import { createDb, type DbInstance } from './db'
 import { runMigrations } from './db/migrate'
-import { interactiveObjects, yjsDocuments } from './db/schema'
+import { interactiveObjects, yjsDocuments, zoneChatLogs } from './db/schema'
 
 // A persisted InteractiveObject row, with room / owner / placement metadata.
 // `ownerId` is null for Tiled-seeded overrides (unused in v1 but reserved).
@@ -10,6 +10,14 @@ export interface StoredObject extends InteractiveObject {
 	roomId: string
 	ownerId: string
 	placedAt: number
+}
+
+export interface ChatLogEntry {
+	zoneId: string
+	senderClientId: string
+	senderNickname: string
+	text: string
+	createdAt: number
 }
 
 export class Storage {
@@ -123,6 +131,19 @@ export class Storage {
 			.orderBy(asc(interactiveObjects.placedAt))
 			.all()
 		return rows.map(rowToStoredObject)
+	}
+
+	// --- Regional zone chat log (append-only) ---
+
+	// 동기 insert. upsertDocumentAsync(setImmediate) 패턴은 Y.js 바이너리(수~수백 KB)
+	// 최적화용이며 채팅 텍스트(수십 바이트)에는 불필요. 동기 insert로 결정적 순서를 확보하는 것이
+	// 단순성/디버깅 측면에서 유리하다. busy_timeout worst-case 5s는 fail-open으로 보호.
+	appendChatLog(entry: ChatLogEntry): void {
+		try {
+			this.#dbInstance.db.insert(zoneChatLogs).values(entry).run()
+		} catch (err) {
+			console.error('[storage] appendChatLog failed', { zoneId: entry.zoneId, err })
+		}
 	}
 
 	close(): void {

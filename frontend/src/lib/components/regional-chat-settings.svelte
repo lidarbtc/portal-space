@@ -84,7 +84,6 @@
 				<label class="rcs-checkbox-field">
 					<input type="checkbox" bind:checked={retainHistory} class="rcs-checkbox" />
 					<span class="rcs-label">대화 이력 보존</span>
-					<span class="rcs-note">(추후 지원 예정)</span>
 				</label>
 			</div>
 
@@ -211,12 +210,6 @@
 		width: 16px;
 		height: 16px;
 		cursor: pointer;
-	}
-
-	:global(.rcs-note) {
-		font-size: 11px;
-		color: #6b7280;
-		font-family: 'MulmaruMono', monospace;
 	}
 
 	:global(.rcs-footer) {

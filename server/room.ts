@@ -1,47 +1,47 @@
 // ⚠️ ARCHITECTURAL INVARIANT: All methods MUST be synchronous. No async/await.
 
-import type { ServerWebSocket } from 'bun'
+import type { ObjectsConfig } from '@shared/config'
 import type {
-	OutgoingMessage,
-	InteractiveObject,
-	IncomingMessage,
 	ActionMessage,
 	ChatImage,
 	ColorPalette,
+	IncomingMessage,
+	InteractiveObject,
+	OutgoingMessage,
 	RegionalChatState,
 } from '@shared/types'
-import type { ObjectsConfig } from '@shared/config'
+import type { ServerWebSocket } from 'bun'
 import { nanoid } from 'nanoid'
-import type { Storage } from './storage'
 import { ServerClient } from './client'
 import {
-	TILE_SIZE,
-	MAX_PLAYERS,
-	MOVE_RATE_LIMIT,
-	EMOTE_RATE_LIMIT,
-	PROFILE_COOLDOWN,
+	ACTION_UPDATE_SETTINGS,
 	CUSTOM_STATUS_COOLDOWN,
-	SETTINGS_COOLDOWN,
-	DASH_DURATION_MS,
 	DASH_COOLDOWN_MS,
-	MAX_SPEED,
+	DASH_DURATION_MS,
 	DASH_SPEED,
+	DOMAIN_REGIONAL_CHAT,
+	EMOTE_RATE_LIMIT,
 	MAX_CUSTOM_STATUS_LEN,
 	MAX_NICKNAME_LEN,
-	MIN_ZONE_RADIUS,
+	MAX_PLAYERS,
+	MAX_SPEED,
 	MAX_ZONE_RADIUS,
-	DOMAIN_REGIONAL_CHAT,
-	ACTION_UPDATE_SETTINGS,
-	sanitizeNickname,
-	sanitizeChat,
-	sanitizeString,
+	MIN_ZONE_RADIUS,
+	MOVE_RATE_LIMIT,
 	normalizeChatImage,
-	validateDirection,
-	validateStatus,
-	validateEmoji,
+	PROFILE_COOLDOWN,
+	SETTINGS_COOLDOWN,
+	sanitizeChat,
+	sanitizeNickname,
+	sanitizeString,
+	TILE_SIZE,
 	validateAvatar,
 	validateColors,
+	validateDirection,
+	validateEmoji,
+	validateStatus,
 } from './protocol'
+import type { Storage } from './storage'
 
 export interface RoomOptions {
 	id: string
@@ -517,6 +517,11 @@ export class Room {
 			}
 			if (text) msg.text = text
 			if (normalizedImage) msg.image = normalizedImage
+
+			// Persist text-only zone chat if retainHistory is enabled (before broadcast so
+			// persist failure cannot delay delivery in sync mode; fail-open in Storage).
+			this.#persistZoneChat(client, text, normalizedImage, obj)
+
 			for (const c of this.players.values()) {
 				if (c.currentZoneID === client.currentZoneID) {
 					c.sendMsg(msg)
@@ -636,6 +641,31 @@ export class Room {
 	/** Test-only: whether a clientId has been seeded this session. */
 	_debugIsSeeded(clientId: string): boolean {
 		return this.#seededOwners.has(clientId)
+	}
+
+	// 정책: retainHistory=true zone의 순수 텍스트 메시지만 DB에 append-only 기록.
+	// 혼합(text+image) 메시지는 전체 드롭 — 이미지 저장이 스코프 밖이므로 텍스트만 저장하면
+	// 원본 컨텍스트와 분리되어 혼란을 유발함. 스펙의 "이미지 메시지 제외"를 보수적으로 해석한 결과.
+	#persistZoneChat(
+		client: ServerClient,
+		text: string,
+		normalizedImage: ChatImage | null,
+		obj: InteractiveObject | undefined,
+	): void {
+		if (!obj) return
+		const state = obj.state as RegionalChatState | undefined
+		if (state?.retainHistory !== true) return
+		if (normalizedImage != null) return
+		if (!text) return
+		if (!client.currentZoneID) return
+
+		this.storage.appendChatLog({
+			zoneId: client.currentZoneID,
+			senderClientId: client.id,
+			senderNickname: client.nickname,
+			text,
+			createdAt: Date.now(),
+		})
 	}
 
 	#handleAction(client: ServerClient, raw: string | unknown): void {

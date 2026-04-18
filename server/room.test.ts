@@ -1,10 +1,11 @@
-import { describe, it, expect, beforeEach } from 'bun:test'
-import { Room } from './room'
-import { Storage } from './storage'
-import { TILE_SIZE, MAP_WIDTH, MAP_HEIGHT } from './protocol'
+import { beforeEach, describe, expect, it } from 'bun:test'
 import { loadObjectConfig, type ObjectsConfig } from '@shared/config'
 import type { OutgoingMessage } from '@shared/types'
 import type { ServerWebSocket } from 'bun'
+import { zoneChatLogs } from './db/schema'
+import { MAP_HEIGHT, MAP_WIDTH, TILE_SIZE } from './protocol'
+import { Room } from './room'
+import { Storage } from './storage'
 
 const FIXTURE_YAML = `
 quotaPerUser: 3
@@ -600,6 +601,113 @@ describe('Room', () => {
 			expect(fixtureRoom._debugIsSeeded(clientId)).toBe(false)
 			// Storage contract: owner rows remain for next-session seed.
 			expect(storage.listObjectsByOwner('test', clientId)).toHaveLength(1)
+		})
+	})
+
+	describe('zone chat persistence (retainHistory)', () => {
+		const TINY_PNG =
+			'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAAA1BMVEUAAACnej3aAAAAC0lEQVR4nGNgAAIAAAUAAeImBZsAAAAASUVORK5CYII='
+
+		function setupZone(retainHistory: boolean) {
+			const storage = new Storage(':memory:')
+			const r = newTestRoom(storage)
+			r.addObject({
+				id: 'zone-1',
+				type: 'regional_chat',
+				x: 200,
+				y: 200,
+				state: { name: '테스트존', radius: 100, retainHistory },
+			})
+			return { r, storage }
+		}
+
+		function joinInZone(r: Room, ws: ReturnType<typeof createMockWs>, nickname: string) {
+			joinClient(r, ws, nickname)
+			const client = [...r.players.values()].find((c) => c.nickname === nickname)!
+			client.currentZoneID = 'zone-1'
+			return client
+		}
+
+		function readLogs(storage: Storage) {
+			return storage.db.select().from(zoneChatLogs).all()
+		}
+
+		it('retain=true + text → row appended', () => {
+			const { r, storage } = setupZone(true)
+			const ws = createMockWs()
+			joinInZone(r, ws, 'writer')
+
+			r.handleMessage(ws, JSON.stringify({ type: 'chat', text: 'persist me' }))
+
+			const rows = readLogs(storage)
+			expect(rows).toHaveLength(1)
+			expect(rows[0]).toMatchObject({
+				zoneId: 'zone-1',
+				senderNickname: 'writer',
+				text: 'persist me',
+			})
+			expect(rows[0].senderClientId).toBeTruthy()
+			expect(typeof rows[0].createdAt).toBe('number')
+			storage.close()
+		})
+
+		it('retain=false + text → NOT appended', () => {
+			const { r, storage } = setupZone(false)
+			const ws = createMockWs()
+			joinInZone(r, ws, 'writer')
+
+			r.handleMessage(ws, JSON.stringify({ type: 'chat', text: 'do not persist' }))
+
+			expect(readLogs(storage)).toHaveLength(0)
+			storage.close()
+		})
+
+		it('retain=true + image-only → NOT appended', () => {
+			const { r, storage } = setupZone(true)
+			const ws = createMockWs()
+			joinInZone(r, ws, 'writer')
+
+			r.handleMessage(
+				ws,
+				JSON.stringify({
+					type: 'chat',
+					image: { mime: 'image/png', data: TINY_PNG, size: 70, name: 'dot.png' },
+				}),
+			)
+
+			expect(readLogs(storage)).toHaveLength(0)
+			storage.close()
+		})
+
+		it('retain=true + mixed (text+image) → NOT appended (policy: drop)', () => {
+			const { r, storage } = setupZone(true)
+			const ws = createMockWs()
+			joinInZone(r, ws, 'writer')
+
+			r.handleMessage(
+				ws,
+				JSON.stringify({
+					type: 'chat',
+					text: 'caption',
+					image: { mime: 'image/png', data: TINY_PNG, size: 70, name: 'dot.png' },
+				}),
+			)
+
+			expect(readLogs(storage)).toHaveLength(0)
+			storage.close()
+		})
+
+		it('global chat (no zone) → NOT appended', () => {
+			const { r, storage } = setupZone(true)
+			const ws = createMockWs()
+			joinClient(r, ws, 'writer') // not in zone-1
+			const client = [...r.players.values()][0]
+			client.currentZoneID = ''
+
+			r.handleMessage(ws, JSON.stringify({ type: 'chat', text: 'broadcast-only' }))
+
+			expect(readLogs(storage)).toHaveLength(0)
+			storage.close()
 		})
 	})
 })
