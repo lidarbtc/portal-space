@@ -36,13 +36,16 @@ import {
 	type GameInteractiveObject,
 } from '../objects/interactive-object'
 import { getTypeDef } from '../objects/config'
+import {
+	MOVE_SPEED_PX_PER_SEC,
+	NETWORK_SEND_INTERVAL_MS,
+	DASH_SPEED_PX_PER_SEC,
+	DASH_DURATION_MS,
+	DASH_COOLDOWN_MS,
+	TILE_SIZE_PX,
+} from '@shared/constants'
 
-const MOVE_SPEED = 200 // px/sec
-const NETWORK_SEND_INTERVAL = 100 // ms (10Hz)
 const REMOTE_LERP_FACTOR = 0.15
-const DASH_SPEED = 800 // px/sec during dash
-const DASH_DURATION = 200 // ms
-const DASH_COOLDOWN = 1500 // ms
 const ALLOWED_CHAT_IMAGE_MIMES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp'])
 
 interface PlayerObject {
@@ -758,6 +761,38 @@ export class WorldScene extends Phaser.Scene {
 		return { x: newPx, y: newPy }
 	}
 
+	/**
+	 * 단일 축 swept 충돌 검사. 한 프레임 이동량을 tile 단위(TILE_SIZE_PX)로
+	 * sub-step 분할해 #checkCollision을 순차 호출 → 한 프레임에 벽 한 칸을
+	 * 건너뛰는 swept tunneling 방지. 60fps 일반 이동은 1 step, dash 30fps drop도
+	 * 2~3 step이라 부담 미미.
+	 */
+	#sweptCollisionAxis(
+		p: PlayerObject,
+		delta: number,
+		axis: 'x' | 'y',
+		axisDir: Direction,
+	): { x: number; y: number } {
+		const steps = Math.max(1, Math.ceil(Math.abs(delta) / TILE_SIZE_PX))
+		let curX = p.x
+		let curY = p.y
+		for (let i = 1; i <= steps; i++) {
+			const t = i / steps
+			if (axis === 'x') {
+				const stepX = p.x + delta * t
+				const r = this.#checkCollision(p, stepX, p.y, axisDir)
+				curX = r.x
+				if (r.x !== stepX) break
+			} else {
+				const stepY = p.y + delta * t
+				const r = this.#checkCollision(p, p.x, stepY, axisDir)
+				curY = r.y
+				if (r.y !== stepY) break
+			}
+		}
+		return { x: curX, y: curY }
+	}
+
 	#updatePlayerVisuals(p: PlayerObject): void {
 		p.container.setPosition(p.x, p.y)
 		// nameElement is a Container child → auto-follows container transform.
@@ -955,7 +990,7 @@ export class WorldScene extends Phaser.Scene {
 		frame: number,
 	): void {
 		const count = 6
-		const delayPerGhost = DASH_DURATION / count
+		const delayPerGhost = DASH_DURATION_MS / count
 
 		for (let i = 0; i < count; i++) {
 			this.time.delayedCall(delayPerGhost * (i + 1), () => {
@@ -1050,7 +1085,7 @@ export class WorldScene extends Phaser.Scene {
 			dir &&
 			!this.#isDashing &&
 			Phaser.Input.Keyboard.JustDown(this.#spaceKey) &&
-			now - this.#lastDashTime >= DASH_COOLDOWN
+			now - this.#lastDashTime >= DASH_COOLDOWN_MS
 		) {
 			this.#isDashing = true
 			this.#dashDir = dir
@@ -1072,7 +1107,7 @@ export class WorldScene extends Phaser.Scene {
 		}
 
 		// End dash if duration expired
-		if (this.#isDashing && now - this.#dashStartTime >= DASH_DURATION) {
+		if (this.#isDashing && now - this.#dashStartTime >= DASH_DURATION_MS) {
 			this.#isDashing = false
 			this.#dashDir = null
 			this.#dashFacing8 = null
@@ -1081,38 +1116,30 @@ export class WorldScene extends Phaser.Scene {
 		// Determine effective facing8 and speed
 		const effectiveDir = this.#isDashing ? this.#dashDir! : dir
 		const effectiveFacing8 = this.#isDashing ? this.#dashFacing8! : currentFacing8
-		const effectiveSpeed = this.#isDashing ? DASH_SPEED : MOVE_SPEED
+		const effectiveSpeed = this.#isDashing ? DASH_SPEED_PX_PER_SEC : MOVE_SPEED_PX_PER_SEC
 
 		if (effectiveDir) {
 			// (b) dash 룩업: directionToVector (대각선 1/√2 정규화)
 			const v = directionToVector(effectiveFacing8 ?? derivedFacing8FromDir(effectiveDir))
 			const moveAmount = effectiveSpeed * (delta / 1000)
 
-			// (f) 분리축 슬라이드 충돌
+			// (f) 분리축 슬라이드 충돌 + sub-step swept
 			// NOTE: #checkCollision 4번째 인자는 facing이 아니라 "검사 축+부호 신호".
 			//   dir 'right'/'left' = x축, 'down'/'up' = y축. 한 호출에 facing dir을 그대로 넘기면
 			//   다른 축은 분기 미스로 무검사 통과 → 대각선 벽 관통 버그 발생.
-			// TODO(dash-swept): DASH_SPEED 1000 × delta 16ms ≈ 9.4px/축 (60fps) < tile 16px라 안전하나,
-			//   30fps drop 시 ~18.8px > 16px → 한 프레임 벽 통과 가능. swept 검사 follow-up.
-			// TODO(corner-cut): 두 축 슬라이드 통과 후 대각 칸 자체가 막힌 경우 정책 미정 (follow-up).
+			// NOTE(dash-swept): #sweptCollisionAxis가 한 프레임 이동량을 tile 단위로 sub-step 분할하여
+			//   30fps drop(dash 1000 × 33ms ≈ 33px) 환경에서도 벽 한 칸 건너뛰기를 방지한다.
+			// NOTE(corner-cut): 두 축 슬라이드 통과 후 대각 칸 자체가 collidable이어도 통과 허용.
+			//   게임 디자인 결정(2026-04-19): 캐릭터가 모서리를 비스듬히 지나는 자연스러움 우선
+			//   (Zelda/Pokemon 스타일). 엄밀한 차단이 필요한 위치는 collidable 영역을 넓혀 회피.
 			const xAxisDir: Direction | null = v.x > 0 ? 'right' : v.x < 0 ? 'left' : null
 			const yAxisDir: Direction | null = v.y > 0 ? 'down' : v.y < 0 ? 'up' : null
 
 			const xResult = xAxisDir
-				? this.#checkCollision(
-						localPlayer,
-						localPlayer.x + v.x * moveAmount,
-						localPlayer.y,
-						xAxisDir,
-					)
+				? this.#sweptCollisionAxis(localPlayer, v.x * moveAmount, 'x', xAxisDir)
 				: { x: localPlayer.x, y: localPlayer.y }
 			const yResult = yAxisDir
-				? this.#checkCollision(
-						localPlayer,
-						localPlayer.x,
-						localPlayer.y + v.y * moveAmount,
-						yAxisDir,
-					)
+				? this.#sweptCollisionAxis(localPlayer, v.y * moveAmount, 'y', yAxisDir)
 				: { x: localPlayer.x, y: localPlayer.y }
 			const newX = xResult.x
 			const newY = yResult.y
@@ -1136,7 +1163,7 @@ export class WorldScene extends Phaser.Scene {
 			this.#updatePlayerVisuals(localPlayer)
 
 			// Throttled network send
-			if (now - this.#lastNetworkSendTime >= NETWORK_SEND_INTERVAL) {
+			if (now - this.#lastNetworkSendTime >= NETWORK_SEND_INTERVAL_MS) {
 				this.#lastNetworkSendTime = now
 				// (d) facing8 송신: 대각선만
 				const facing8ToSend =
